@@ -1,0 +1,85 @@
+{
+  "name": "runbrowser",
+  "type": "module",
+  "version": "0.1.0-alpha.1",
+  "packageManager": "pnpm@9.15.3",
+  "description": "Make website accessible for your ai agent",
+  "author": "Jiwei Yuan <ji-weiyuan@outlook.com>",
+  "license": "MIT",
+  "funding": "https://github.com/sponsors/jiweiyuan",
+  "homepage": "https://github.com/runbrowser/runbrowser#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/runbrowser/runbrowser.git"
+  },
+  "bugs": "https://github.com/jiweiyuan/runbrowser/issues",
+  "keywords": [],
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "*": [
+        "./dist/*",
+        "./dist/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "dev": "unbuild --stub",
+    "lint": "eslint .",
+    "prepublishOnly": "nr build",
+    "release": "bumpp && pnpm publish",
+    "start": "esno src/index.ts",
+    "agent:xiaohongshu": "esno examples/xiaohongshu.ts",
+    "agent:youtube": "esno examples/youtube.ts",
+    "agent:bilibili": "esno examples/bilibili.ts",
+    "agent:x": "esno examples/x.ts",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepare": "simple-git-hooks"
+  },
+  "dependencies": {
+    "puppeteer": "^23.11.1"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^3.11.2",
+    "@antfu/ni": "^0.23.1",
+    "@antfu/utils": "^0.7.10",
+    "@types/axios": "^0.14.4",
+    "@types/node": "^22.10.1",
+    "axios": "^1.7.9",
+    "bumpp": "^9.8.1",
+    "eslint": "^9.15.0",
+    "esno": "^4.8.0",
+    "lint-staged": "^15.2.10",
+    "pnpm": "^9.14.3",
+    "puppeteer": "^23.11.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-proxy": "^1.0.2",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "simple-git-hooks": "^2.11.1",
+    "typescript": "^5.7.2",
+    "unbuild": "^2.0.0",
+    "vite": "^6.0.1",
+    "vitest": "^2.1.6"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "*": "eslint --fix"
+  }
+}
