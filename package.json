@@ -1,7 +1,7 @@
 {
-  "name": "runbrowser",
+  "name": "@run-browser/runbrowser",
   "type": "module",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "packageManager": "pnpm@9.15.3",
   "description": "Make website accessible for your ai agent",
   "author": "Jiwei Yuan <ji-weiyuan@outlook.com>",
@@ -52,6 +52,7 @@
     "prepare": "simple-git-hooks"
   },
   "dependencies": {
+    "@changesets/cli": "^2.27.11",
     "puppeteer": "^23.11.1"
   },
   "devDependencies": {
