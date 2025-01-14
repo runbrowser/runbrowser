@@ -2,11 +2,15 @@ import type { Page } from 'puppeteer'
 import type { BrowserOptions } from '../browser'
 import { BrowserInstance } from '../browser'
 
-export default class BaseAgent {
+export interface AgentOptions {
+  llm?: string
+}
+
+export default class BrowserAgent {
   private browser: BrowserInstance
   public page: Page | null = null
 
-  constructor(browserConfig: BrowserOptions = {}) {
+  constructor(agentOption: AgentOptions, browserConfig: BrowserOptions = {}) {
     this.browser = new BrowserInstance(browserConfig)
   }
 

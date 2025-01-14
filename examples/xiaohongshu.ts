@@ -4,12 +4,19 @@ async function main(): Promise<void> {
   const browserOptions = {
     chromePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   }
-  //   const llm = 'deepseek'
-  //   const keywords = ['AI Agent', 'LLM', 'AI', '大模型', 'Agent']
-  //   const commentPrompt = 'AI Agent is a large language model that can generate human-like text. It is trained on a diverse range of internet text and can generate text on a wide range of topics. It is capable of writing essays, answering questions, and even generating code. It is a powerful tool that can be used for a wide range of applications, from content generation to chatbots to code generation. It is a cutting-edge technology that is revolutionizing the field of natural language processing.'
-  const agent = new XiaohongshuAgent(browserOptions)
 
-  await agent.run()
+  const commentOptions = {
+    keywords: ['AI Agent', 'LLM', 'AI', '大模型', 'Agent'],
+    systemPrompt: 'You are a software engineeer working in a London based startup. You are developing a new AI Agent that can generate human-like text. You are using xiaohongshu to gather feedback on your product. You are browsing the xiaohongshu website to see what people are saying about AI Agents. You see a post about AI Agents and decide to leave a comment, you should comment on the post. and the comment should be related to your product, your comment must contain https://github.com/runbrowser/runbrowser, and your comment must be at least 50 long and in Chinese.',
+    defaultReply: '谢谢你的分享，我也在研究AI Agent，你可以看看这个项目 https://github.com/runbrowser/runbrowser',
+  }
+
+  const agentOptions = {
+    commentOption: commentOptions,
+  }
+
+  const agent = new XiaohongshuAgent(agentOptions, browserOptions)
+  await agent.comment()
 }
 
 main()

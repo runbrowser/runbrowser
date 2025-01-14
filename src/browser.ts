@@ -22,6 +22,7 @@ export class BrowserInstance {
   }
 
   private async launchChromeProcess(): Promise<void> {
+    console.log('Launching a Chrome Instance...')
     const CHROME_STARTUP_TIMEOUT = 10000
     return new Promise((resolve, reject) => {
       const chrome = spawn(this.browserOptions.chromePath || '', [
@@ -72,6 +73,7 @@ export class BrowserInstance {
 
     const isChromeRunning = await this.isRunning()
     if (isChromeRunning) {
+      console.log('Connecting to an existing Chrome Instance...')
       const browser = await puppeteer.connect({
         browserURL: 'http://localhost:9222',
         defaultViewport: this.browserOptions.defaultViewport,

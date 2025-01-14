@@ -1,36 +1,56 @@
-import type { Page } from 'puppeteer'
 import type { BrowserOptions } from '../browser'
-import { sleep } from '../utils'
-import BaseAgent from './agent'
+import type { AgentOptions } from './agent'
+import { matchKeywords, sleep } from '../utils'
+import BrowserAgent from './agent'
 
-export default class XiaohongshuAgent extends BaseAgent {
+export interface XiaohongshuAgentOptions extends AgentOptions {
+  commentOption?: CommentOptions
+}
+
+export default class XiaohongshuAgent extends BrowserAgent {
   private MAX_OPERATION_NUM = 100
-
-  constructor(browserOptions: BrowserOptions) {
-    browserOptions.defaultViewport = browserOptions.defaultViewport || {
-      width: 1600,
-      height: 900,
-    }
-    super(browserOptions)
+  private commentOptions: CommentOptions = {
+    keywords: [],
+    defaultReply: '',
   }
 
-  async run(): Promise<void> {
+  constructor(agentOptions: XiaohongshuAgentOptions = {}, browserOptions: BrowserOptions = {}) {
+    browserOptions.defaultViewport = browserOptions.defaultViewport || {
+      width: 1600,
+      height: 800,
+    }
+    super(agentOptions, browserOptions)
+    this.commentOptions = {
+      ...this.commentOptions,
+      ...agentOptions.commentOption,
+    }
+  }
+
+  async comment(): Promise<void> {
     try {
       await super.setup()
-      await this.login(this.getPage())
+      await this.login()
     } catch (error) {
       console.error('Error:', error)
       throw error
     }
-
     try {
-      const page: Page = this.getPage()
       let commentCount = 0
+      let errorCount = 0
       while (commentCount < this.MAX_OPERATION_NUM) {
-        const num = await this.autoComment(page)
-        commentCount += num
+        try {
+          const num = await this.commentPage()
+          commentCount += num
+        } catch (error) {
+          errorCount++
+          console.error('Error during commenting:', error)
+          if (errorCount > 10) {
+            console.error('Too many errors, exiting')
+            break
+          }
+          continue
+        }
       }
-
       console.log('Total comments:', commentCount)
     } catch (error) {
       console.error('Error:', error)
@@ -38,7 +58,8 @@ export default class XiaohongshuAgent extends BaseAgent {
     }
   }
 
-  async login(page: Page): Promise<void> {
+  async login(): Promise<void> {
+    const page = this.getPage()
     try {
       await page.goto('https://xiaohongshu.com/explore', {
         waitUntil: 'networkidle0',
@@ -69,133 +90,82 @@ export default class XiaohongshuAgent extends BaseAgent {
     }
   }
 
-  async autoComment(page: Page): Promise<number> {
-    try {
-      await page.waitForSelector('#exploreFeeds .note-item')
-    } catch (error) {
-      console.error('Error during waiting:', error)
-      return 0
-    }
-
+  async commentPage(): Promise<number> {
+    const page = this.getPage()
+    await page.waitForSelector('#exploreFeeds .note-item')
+    await sleep(2000 * (0.5 + Math.random()))
     const sections = await page.$$('#exploreFeeds .note-item')
     let commentNum = 0
-
-    for (const section of sections) {
+    const sectionNum = sections.length || 0
+    if (sectionNum === 0) {
+      console.log('No sections found')
+      return commentNum
+    }
+    for (let i = 0; i < sectionNum; i++) {
+      const section = sections[i]
       try {
         const sectionText = await page.evaluate(el => el.textContent, section)
-        if (sectionText?.includes('英语') || sectionText?.includes('口语') || sectionText?.includes('新概念')) {
-          await section.scrollIntoView()
-          const link = await section.$('.cover.ld.mask')
-          if (link) {
-            await link.click()
-            console.log('Clicked on the link')
-          } else {
-            console.log('Link not found')
-            continue
-          }
-        } else {
+        if (!matchKeywords(sectionText, this.commentOptions.keywords)) {
           continue
         }
-      } catch (error) {
-        console.error('Error during clicking:', error)
-        continue
-      }
-
-      try {
-        await page.waitForSelector('.btn.submit.gray')
-        await page.waitForSelector('.interact-container .like-lottie')
-      } catch (error) {
-        console.error('Error during waiting:', error)
-        continue
-      }
-
-      const likeBtn = await page.$('.interact-container .like-lottie')
-      if (likeBtn) {
-        await likeBtn.click()
-        console.log('Clicked on the like button')
-        sleep(3000)
-      } else {
-        console.log('Like button not found')
-      }
-
-      try {
-        await page.waitForSelector('div[data-v-b91d006a].inner')
-      } catch (error) {
-        console.error('Error during waiting:', error)
-        continue
-      }
-
-      const inner = await page.$('div[data-v-b91d006a].inner')
-      sleep(2000 * (0.5 + Math.random()))
-      if (inner) {
-        await inner.click()
-        console.log('Clicked on the inner')
-      } else {
-        console.log('Inner not found')
-      }
-
-      try {
-        await page.waitForSelector('#content-textarea')
-      } catch (error) {
-        console.error('Error during waiting:', error)
-        continue
-      }
-
-      await page.evaluate((text) => {
-        const element = document.querySelector('#content-textarea')
-        if (element) {
-          element.textContent = text
-          element.dispatchEvent(new Event('input', { bubbles: true }))
-        }
-      }, '给你推荐一个特别好用影子跟读网站，hispeaking.com，沉浸式跟读，体验特别不错')
-
-      const content = await page.$eval('#content-textarea', el => el.textContent)
-      console.log('Content entered:', content)
-      await sleep(2000 * (0.5 + Math.random()))
-
-      const submitButton = await page.$('.btn.submit')
-      if (submitButton) {
-        await submitButton.click()
-        console.log('Clicked on the submit button')
-        await sleep(3000 * (0.5 + Math.random()))
-      } else {
-        console.log('Submit button not found')
-        continue
-      }
-
-      try {
-        await page.waitForSelector('.close.close-mask-dark')
-      } catch (error) {
-        console.error('Error during waiting:', error)
-        continue
-      }
-
-      const closeBtn = await page.$('.close.close-mask-dark')
-      if (closeBtn) {
-        await closeBtn.click()
+        console.log('Matched:', sectionText)
+        await section.scrollIntoView()
         await sleep(2000 * (0.5 + Math.random()))
-        console.log('Went back to the previous page')
-      } else {
-        console.log('Close button not found')
+        await page.waitForSelector('.cover.ld.mask')
+        const link = await section.$('.cover.ld.mask')
+        link?.click()
+        console.log('Opened the post')
+        await sleep(4000 * (0.5 + Math.random()))
+        try {
+          await page.waitForSelector('.interact-container .like-lottie')
+          const likeBtn = await page.$('.interact-container .like-lottie')
+          await likeBtn?.click()
+          await page.waitForSelector('.content-edit .not-active.inner-when-not-active .inner')
+          const inner = await page.$('.content-edit .not-active.inner-when-not-active .inner')
+          await inner?.click()
+          console.log('Clicked on Input Box')
+          await sleep(2000 * (0.5 + Math.random()))
+          await page.waitForSelector('#content-textarea')
+          const commentText = this.commentOptions.defaultReply || ''
+          await page.evaluate((text) => {
+            const element = document.querySelector('#content-textarea')
+            if (element) {
+              element.textContent = text
+              element.dispatchEvent(new Event('input', { bubbles: true }))
+            }
+          }, commentText)
+          console.log('Commenting:', commentText)
+          await sleep(2000 * (0.5 + Math.random()))
+          await page.waitForSelector('.btn.submit')
+          const submitButton = await page.$('.btn.submit')
+          await submitButton?.click()
+          console.log('Comment submitted')
+          await sleep(4000 * (0.5 + Math.random()))
+          await page.waitForSelector('.close.close-mask-dark')
+          const closeBtn = await page.$('.close.close-mask-dark')
+          await closeBtn?.click()
+          console.log('Closed the post')
+          await sleep(2000 * (0.5 + Math.random()))
+        } catch (error) {
+          console.error('Error during commentPost:', error)
+        }
+        commentNum++
+      } catch (error) {
+        console.error('Error during waiting:', error)
+        continue
       }
-
-      commentNum++
     }
 
-    const refreshSelector = 'a[href="/explore?channel_id=homefeed_recommend"]'
     try {
-      await page.waitForSelector(refreshSelector)
-      const refreshButton = await page.$(refreshSelector)
-      if (refreshButton) {
-        await refreshButton.click()
-        await page.waitForSelector('#exploreFeeds .note-item', {
-          timeout: 10000,
-          visible: true,
-        })
-        await sleep(2000 * (0.5 + Math.random()))
-      } else {
-        console.log('Refresh button not found')
-      }
+      await page.waitForSelector('a[href="/explore?channel_id=homefeed_recommend"]')
+      const refreshButton = await page.$('a[href="/explore?channel_id=homefeed_recommend"]')
+      await refreshButton?.click()
+      console.log('Refreshed the page')
+      await page.waitForSelector('#exploreFeeds .note-item', {
+        timeout: 10000,
+        visible: true,
+      })
+      await sleep(2000 * (0.5 + Math.random()))
     } catch (error) {
       console.error('Error during refresh:', error)
       return commentNum
@@ -205,13 +175,9 @@ export default class XiaohongshuAgent extends BaseAgent {
   }
 }
 
-export enum XiaohongshuAgentTask {
-  COMMENT = 'comment',
-}
-
-export interface CommentTaskOptions {
-  limit: number
-  llm: string
+export interface CommentOptions {
+  limit?: number
   keywords: string[]
-  commentPrompt: string
+  defaultReply?: string
+  systemPrompt?: string
 }
