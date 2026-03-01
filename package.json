@@ -1,0 +1,14 @@
+{
+  "name": "runbrowser-root",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter runbrowser build",
+    "typecheck": "pnpm --filter runbrowser typecheck",
+    "test": "pnpm --filter runbrowser test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
