@@ -1,0 +1,79 @@
+[return value]       - layouttable:
+          - layouttablerow:
+            - layouttablecell "Hacker Newsnew | past | comments | ask | show | jobs | submit login":
+              - layouttable:
+                  - layouttablerow:
+                    - layouttablecell:
+                      - role=link
+                    - layouttablecell "Hacker Newsnew | past | comments | ask | show | jobs | submit":
+                      - role=link[name="Hacker News"]
+                      - role=link[name="new"]
+                      - role=link[name="past"] >> nth=0
+                      - role=link[name="comments"]
+                      - role=link[name="ask"]
+                      - role=link[name="show"]
+                      - role=link[name="jobs"]
+                      - role=link[name="submit"]
+                    - layouttablecell:
+                      - role=link[name="login"]
+          - layouttablerow:
+            - layouttablecell "Y Combinator (ycombinator.com) 57 points by pg on Oct 9, 2006 | hide | past | favorite | 3 comments sama on Oct 9, 2006 | [–] \"the rising star of venture capital\" -unknown VC eating lunch on SHR pg on Oct 9, 2006":
+              - layouttable:
+                  - layouttablerow:
+                    - layouttablecell:
+                      - link [id="up_1"]
+                    - layouttablecell "Y Combinator (ycombinator.com)":
+                      - role=link[name="Y Combinator"]
+                      - role=link[name="ycombinator.com"]
+                  - layouttablerow:
+                    - layouttablecell "57 points by pg on Oct 9, 2006 | hide | past | favorite | 3 comments":
+                      - role=link[name="pg"] >> nth=0
+                      - role=link[name="on Oct 9, 2006"] >> nth=0
+                      - role=link[name="hide"]
+                      - role=link[name="past"] >> nth=1
+                      - role=link[name="favorite"]
+                      - role=link[name="3 comments"]
+              - layouttable:
+                  - layouttablerow:
+                    - layouttablecell:
+                      - layouttable:
+                          - layouttablerow:
+                            - layouttablecell:
+                              - link [id="up_15"]
+                            - layouttablecell "sama on Oct 9, 2006 | [–] \"the rising star of venture capital\" -unknown VC eating lunch on SHR":
+                              - role=link[name="sama"]
+                              - role=link[name="on Oct 9, 2006"] >> nth=1
+                              - link "[–]" [id="15"]
+                  - layouttablerow:
+                    - layouttablecell:
+                      - layouttable:
+                          - layouttablerow:
+                            - layouttablecell:
+                              - link [id="up_17"]
+                            - layouttablecell "pg on Oct 9, 2006 | | [–] Is there anywhere to eat on Sandhill Road?":
+                              - role=link[name="pg"] >> nth=1
+                              - role=link[name="on Oct 9, 2006"] >> nth=2
+                              - link "[–]" [id="17"]
+                  - layouttablerow:
+                    - layouttablecell:
+                      - layouttable:
+                          - layouttablerow:
+                            - layouttablecell:
+                              - link [id="up_1079"]
+                            - layouttablecell "dmon on Feb 25, 2007 | | | [–] sure":
+                              - role=link[name="dmon"]
+                              - role=link[name="on Feb 25, 2007"]
+                              - link "[–]" [id="1079"]
+          - layouttablerow:
+            - layouttablecell "Guidelines | FAQ | Lists | API | Security | Legal | Apply to YC | Contact Search:":
+                - role=link[name="Guidelines"]
+                - role=link[name="FAQ"]
+                - role=link[name="Lists"]
+                - role=link[name="API"]
+                - role=link[name="Security"]
+                - role=link[name="Legal"]
+                - role=link[name="Apply to YC"]
+                - role=link[name="Contact"]
+                - role=textbox
+
+use refToLocator({ ref: 'e3' }) to get locators for ref strings.
