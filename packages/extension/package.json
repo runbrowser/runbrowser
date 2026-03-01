@@ -1,0 +1,36 @@
+{
+  "name": "mcp-extension",
+  "version": "0.0.72",
+  "description": "Playwright MCP Browser Extension",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuanjiwei/runbrowser.git"
+  },
+  "homepage": "https://github.com/yuanjiwei/runbrowser",
+  "engines": {
+    "node": ">=18"
+  },
+  "author": {
+    "name": "Microsoft Corporation"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc --project . && vite build --config vite.config.mts && tsx scripts/download-prism.ts",
+    "reload": "bun run build && osascript -e 'tell application \"Google Chrome\" to open location \"chrome://extensions/?id=pebbngnfojnignonigcnkdilknapkgid\"'",
+    "watch": "vite build --watch --config vite.config.mts",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.315",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.8.2",
+    "vite": "^5.4.21",
+    "vite-plugin-static-copy": "^3.1.1",
+    "tsx": "^4.19.0"
+  },
+  "dependencies": {
+    "runbrowser": "workspace:*",
+    "zustand": "^5.0.8"
+  }
+}

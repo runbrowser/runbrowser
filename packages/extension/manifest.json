@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "RunBrowser",
+  "version": "0.0.72",
+  "description": "Automate your Browser using Cursor, Claude, VS Code. More capable and context efficient than Playwright MCP.",
+  "permissions": [
+    "debugger",
+    "tabGroups",
+    "contextMenus",
+    "tabs",
+    "tabCapture",
+    "offscreen",
+    "identity",
+    "identity.email"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Click to attach debugger",
+    "default_icon": {
+      "16": "icons/icon-gray-16.png",
+      "32": "icons/icon-gray-32.png",
+      "48": "icons/icon-gray-48.png",
+      "128": "icons/icon-gray-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-gray-16.png",
+    "32": "icons/icon-gray-32.png",
+    "48": "icons/icon-gray-48.png",
+    "128": "icons/icon-gray-128.png"
+  }
+}
