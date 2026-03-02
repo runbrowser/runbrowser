@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter @runbrowser/relay build && pnpm --filter @runbrowser/core build && pnpm --filter @runbrowser/mcp --filter runbrowser build",
+    "build:extension": "pnpm --filter mcp-extension build",
+    "dev:extension": "pnpm --filter mcp-extension dev",
+    "build:all": "pnpm run build && pnpm run build:extension",
     "typecheck": "pnpm --filter @runbrowser/core typecheck && pnpm --filter @runbrowser/mcp typecheck && pnpm --filter runbrowser typecheck",
     "test": "pnpm --filter runbrowser test"
   },

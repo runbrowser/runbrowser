@@ -16,18 +16,19 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build": "tsc --project . && vite build --config vite.config.mts && tsx scripts/download-prism.ts",
+    "build": "vite build --config vite.config.mts && tsx scripts/download-prism.ts",
+    "typecheck": "tsc --project .",
     "reload": "bun run build && osascript -e 'tell application \"Google Chrome\" to open location \"chrome://extensions/?id=pebbngnfojnignonigcnkdilknapkgid\"'",
-    "watch": "vite build --watch --config vite.config.mts",
+    "dev": "vite build --watch --config vite.config.mts",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.315",
-    "concurrently": "^8.2.2",
+    "tsx": "^4.19.0",
     "typescript": "^5.8.2",
     "vite": "^5.4.21",
-    "vite-plugin-static-copy": "^3.1.1",
-    "tsx": "^4.19.0"
+    "vite-plugin-extension-reload": "workspace:*",
+    "vite-plugin-static-copy": "^3.1.1"
   },
   "dependencies": {
     "runbrowser": "workspace:*",

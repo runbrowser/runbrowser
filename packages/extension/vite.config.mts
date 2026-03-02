@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+import { extensionReload } from 'vite-plugin-extension-reload'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -25,6 +26,7 @@ const outDir = process.env.RUNBROWSER_EXTENSION_DIST || 'dist'
 
 export default defineConfig({
   plugins: [
+    extensionReload(),
     viteStaticCopy({
       targets: [
         {

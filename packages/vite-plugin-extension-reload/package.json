@@ -1,0 +1,46 @@
+{
+  "name": "vite-plugin-extension-reload",
+  "version": "0.0.1",
+  "description": "Vite plugin that auto-reloads Chrome/MV3 browser extensions during development",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "vite-plugin",
+    "chrome-extension",
+    "browser-extension",
+    "hot-reload",
+    "mv3",
+    "manifest-v3",
+    "service-worker"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/user/vite-plugin-extension-reload.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "tsc"
+  },
+  "peerDependencies": {
+    "vite": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.2",
+    "vite": "^5.4.21"
+  }
+}

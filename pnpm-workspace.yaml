@@ -4,3 +4,4 @@ packages:
   - packages/extension
   - packages/mcp
   - packages/relay
+  - packages/vite-plugin-extension-reload
