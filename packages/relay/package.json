@@ -1,0 +1,82 @@
+{
+  "name": "@runbrowser/relay",
+  "version": "0.0.1",
+  "description": "CDP relay for RunBrowser — bridges Chrome extension WebSocket to Playwright CDP clients",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./types": {
+      "types": "./dist/cdp-types.d.ts",
+      "import": "./dist/cdp-types.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol.d.ts",
+      "import": "./dist/protocol.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
+    "./logger": {
+      "types": "./dist/create-logger.d.ts",
+      "import": "./dist/create-logger.js"
+    },
+    "./start": {
+      "types": "./dist/start.d.ts",
+      "import": "./dist/start.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "runbrowser-relay": "./bin.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist",
+    "src",
+    "bin.js"
+  ],
+  "keywords": [
+    "cdp",
+    "chrome-devtools-protocol",
+    "relay",
+    "websocket",
+    "playwright",
+    "browser",
+    "runbrowser"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuanjiwei/runbrowser.git",
+    "directory": "packages/relay"
+  },
+  "homepage": "https://github.com/yuanjiwei/runbrowser",
+  "license": "MIT",
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@hono/node-ws": "^1.2.0",
+    "hono": "^4.10.6",
+    "picocolors": "^1.1.1",
+    "strip-ansi": "^7.1.2",
+    "ws": "^8.18.3",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/ws": "^8.18.1",
+    "devtools-protocol": "^0.0.1568893",
+    "typescript": "^5.9.3"
+  }
+}

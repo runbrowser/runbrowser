@@ -11,7 +11,7 @@ import pc from 'picocolors'
 Buffer.prototype[util.inspect.custom] = function () {
   return `<Buffer ${this.length} bytes>`
 }
-import { killPortProcess } from './kill-port.js'
+import { killPortProcess } from '@runbrowser/relay'
 import { VERSION, LOG_FILE_PATH, LOG_CDP_FILE_PATH, parseRelayHost } from './utils.js'
 import {
   ensureRelayServer,
@@ -20,7 +20,7 @@ import {
   getExtensionOutdatedWarning,
   getExtensionStatus,
   type ExtensionStatus,
-} from './relay-client.js'
+} from '@runbrowser/relay/client'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -495,8 +495,7 @@ cli
     }
 
     // Lazy-load heavy dependencies only when serve command is used
-    const { createFileLogger } = await import('./create-logger.js')
-    const { startRunBrowserCDPRelayServer } = await import('./cdp-relay.js')
+    const { createFileLogger, startRunBrowserCDPRelayServer } = await import('@runbrowser/relay')
 
     const logger = createFileLogger()
 

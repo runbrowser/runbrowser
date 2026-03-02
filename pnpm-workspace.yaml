@@ -1,3 +1,6 @@
 packages:
   - packages/cli
+  - packages/core
   - packages/extension
+  - packages/mcp
+  - packages/relay

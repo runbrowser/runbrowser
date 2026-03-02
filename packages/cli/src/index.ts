@@ -1,12 +1,8 @@
-export * from './cdp-relay.js'
-export * from './utils.js'
-export { getCDPSessionForPage, PlaywrightCDPSessionAdapter } from './cdp-session.js'
-export type { ICDPSession } from './cdp-session.js'
-export { Editor } from './editor.js'
-export type { ReadResult, SearchMatch, EditResult } from './editor.js'
-export { Debugger } from './debugger.js'
-export type { BreakpointInfo, LocationInfo, EvaluateResult, ScriptInfo } from './debugger.js'
-export { getAriaSnapshot, showAriaRefLabels, hideAriaRefLabels } from './aria-snapshot.js'
-export type { AriaRef, AriaSnapshotResult } from './aria-snapshot.js'
-export { startRecording, stopRecording, isRecording, cancelRecording } from './screen-recording.js'
-export type { StartRecordingOptions, StopRecordingOptions, RecordingState } from './screen-recording.js'
+/**
+ * runbrowser — public API re-exports from @runbrowser/core.
+ *
+ * All shared library code now lives in @runbrowser/core.
+ * This file re-exports everything for backward compatibility,
+ * so existing `import { ... } from 'runbrowser'` keeps working.
+ */
+export * from '@runbrowser/core'

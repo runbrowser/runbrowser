@@ -1,24 +1,24 @@
 // @ts-nocheck — browser-side bundle, DOM API typing edge cases
 /**
- * Browser-side ghost cursor renderer.
+ * Browser-side cursor overlay renderer.
  * Injected into the page to visualize automated mouse actions with smooth easing.
  */
 
 import { SCREENSTUDIO_POINTER_MACOS_TAHOE_DATA_URL } from './assets/cursors/screen-studio/pointer-macos-tahoe-data-url.js'
 
-type GhostCursorActionType = 'move' | 'down' | 'up' | 'wheel'
-type GhostCursorButton = 'left' | 'right' | 'middle' | 'none'
-type GhostCursorStyle = 'minimal' | 'dot' | 'screenstudio'
+type CursorOverlayActionType = 'move' | 'down' | 'up' | 'wheel'
+type CursorOverlayButton = 'left' | 'right' | 'middle' | 'none'
+type CursorOverlayStyle = 'minimal' | 'dot' | 'screenstudio'
 
-interface GhostCursorAction {
-  type: GhostCursorActionType
+interface CursorOverlayAction {
+  type: CursorOverlayActionType
   x: number
   y: number
-  button: GhostCursorButton
+  button: CursorOverlayButton
 }
 
-export interface GhostCursorClientOptions {
-  style?: GhostCursorStyle
+export interface CursorOverlayOptions {
+  style?: CursorOverlayStyle
   color?: string
   size?: number
   zIndex?: number
@@ -28,8 +28,8 @@ export interface GhostCursorClientOptions {
   speedPxPerMs?: number
 }
 
-interface GhostCursorRuntimeOptions {
-  style: GhostCursorStyle
+interface CursorOverlayRuntimeOptions {
+  style: CursorOverlayStyle
   color: string
   size: number
   zIndex: number
@@ -39,9 +39,9 @@ interface GhostCursorRuntimeOptions {
   speedPxPerMs: number
 }
 
-interface GhostCursorRuntimeState {
+interface CursorOverlayRuntimeState {
   cursorElement: ReturnType<typeof createCursorElement> | null
-  options: GhostCursorRuntimeOptions
+  options: CursorOverlayRuntimeOptions
   x: number
   y: number
   scale: number
@@ -49,25 +49,25 @@ interface GhostCursorRuntimeState {
   enabled: boolean
 }
 
-interface GhostCursorApi {
-  enable: (options?: GhostCursorClientOptions) => void
+interface CursorOverlayApi {
+  enable: (options?: CursorOverlayOptions) => void
   disable: () => void
-  applyMouseAction: (action: GhostCursorAction) => void
+  applyMouseAction: (action: CursorOverlayAction) => void
   isEnabled: () => boolean
 }
 
 declare global {
-  var __runbrowserGhostCursor: GhostCursorApi | undefined
+  var __runbrowserCursorOverlay: CursorOverlayApi | undefined
 }
 
-const CURSOR_ID = '__runbrowser_ghost_cursor__'
+const CURSOR_ID = '__runbrowser_cursor_overlay__'
 const SCREENSTUDIO_POINTER_ASPECT_RATIO = 618 / 958
 const SCREENSTUDIO_HOTSPOT_X_RATIO = 0.14
 const SCREENSTUDIO_HOTSPOT_Y_RATIO = 0.06
 const MINIMAL_TRIANGLE_HOTSPOT_X_RATIO = 0.07
 const MINIMAL_TRIANGLE_HOTSPOT_Y_RATIO = 0.06
 
-const DEFAULT_OPTIONS: GhostCursorRuntimeOptions = {
+const DEFAULT_OPTIONS: CursorOverlayRuntimeOptions = {
   style: 'minimal',
   color: '#111827',
   size: 22,
@@ -78,7 +78,7 @@ const DEFAULT_OPTIONS: GhostCursorRuntimeOptions = {
   speedPxPerMs: 4,
 }
 
-const runtime: GhostCursorRuntimeState = {
+const runtime: CursorOverlayRuntimeState = {
   cursorElement: null,
   options: DEFAULT_OPTIONS,
   x: 0,
@@ -93,7 +93,7 @@ function clamp(options: { value: number; min: number; max: number }): number {
   return Math.min(max, Math.max(min, value))
 }
 
-function mergeOptions(options?: GhostCursorClientOptions): GhostCursorRuntimeOptions {
+function mergeOptions(options?: CursorOverlayOptions): CursorOverlayRuntimeOptions {
   if (!options) {
     return DEFAULT_OPTIONS
   }
@@ -306,7 +306,7 @@ function setPressed(options: { pressed: boolean }): void {
   applyTransform()
 }
 
-function enable(options?: GhostCursorClientOptions): void {
+function enable(options?: CursorOverlayOptions): void {
   runtime.options = mergeOptions(options)
   runtime.enabled = true
   ensureCursorElement()
@@ -333,7 +333,7 @@ function disable(): void {
   }
 }
 
-function applyMouseAction(action: GhostCursorAction): void {
+function applyMouseAction(action: CursorOverlayAction): void {
   if (!runtime.enabled) {
     return
   }
@@ -355,7 +355,7 @@ function applyMouseAction(action: GhostCursorAction): void {
   }
 }
 
-const api: GhostCursorApi = {
+const api: CursorOverlayApi = {
   enable,
   disable,
   applyMouseAction,
@@ -364,6 +364,6 @@ const api: GhostCursorApi = {
   },
 }
 
-globalThis.__runbrowserGhostCursor = api
+globalThis.__runbrowserCursorOverlay = api
 
 export {}

@@ -27,8 +27,8 @@ Buffer.prototype[util.inspect.custom] = function () {
 import { EventEmitter } from 'node:events'
 import { VERSION, EXTENSION_IDS } from './utils.js'
 import { createCdpLogger, type CdpLogEntry, type CdpLogger } from './cdp-log.js'
-import { RecordingRelay } from './recording-relay.js'
-import * as relayState from './relay-state.js'
+import { RecordingRelay } from './recording.js'
+import * as relayState from './state.js'
 
 /**
  * Checks if a target should be filtered out (not exposed to Playwright).
@@ -68,18 +68,65 @@ export type RelayServer = {
   off<K extends keyof RelayServerEvents>(event: K, listener: RelayServerEvents[K]): void
 }
 
+/**
+ * Interface for the ExecutorManager, used for CLI execute endpoints.
+ * Provided via dependency injection to avoid circular package dependencies.
+ */
+export interface ExecutorManagerLike {
+  getSession(sessionId: string): ExecutorLike | undefined
+  getExecutor(options: {
+    sessionId: string
+    cwd?: string
+    sessionMetadata?: {
+      extensionId: string | null
+      browser: string | null
+      profile: { email: string; id: string } | null
+    }
+  }): ExecutorLike
+  listSessions(): Array<{
+    id: string
+    stateKeys: string[]
+    browser: string | null
+    profile: { email: string; id: string } | null
+    extensionId: string | null
+  }>
+  deleteExecutor(sessionId: string): boolean
+}
+
+export interface ExecutorLike {
+  execute(code: string, timeout: number): Promise<{ text: string; images: Array<{ data: string; mimeType: string }>; isError: boolean }>
+  reset(): Promise<{ page: { url(): string }; context: { pages(): any[] } }>
+  getSessionMetadata(): {
+    extensionId: string | null
+    browser: string | null
+    profile: { email: string; id: string } | null
+  }
+}
+
+/**
+ * Factory function type for creating an ExecutorManager.
+ * Called lazily when the first CLI endpoint is accessed.
+ */
+export type ExecutorManagerFactory = (config: {
+  cdpConfig: { host: string; port: number }
+  logger: { log(...args: any[]): void; error(...args: any[]): void }
+}) => Promise<ExecutorManagerLike> | ExecutorManagerLike
+
 export async function startRunBrowserCDPRelayServer({
   port = 19988,
   host = '127.0.0.1',
   token,
   logger,
   cdpLogger,
+  executorManagerFactory,
 }: {
   port?: number
   host?: string
   token?: string
   logger?: { log(...args: any[]): void; error(...args: any[]): void }
   cdpLogger?: CdpLogger
+  /** Optional factory to create an ExecutorManager for CLI execute endpoints. */
+  executorManagerFactory?: ExecutorManagerFactory
 } = {}): Promise<RelayServer> {
   const emitter = new EventEmitter()
   const store = relayState.createRelayStore()
@@ -1648,14 +1695,15 @@ export async function startRunBrowserCDPRelayServer({
   // Session counter for suggesting next session number
   let nextSessionNumber = 1
 
-  // Lazy-load ExecutorManager to avoid circular imports and only when needed
-  let executorManager: import('./executor.js').ExecutorManager | null = null
+  // Lazy-load ExecutorManager via injected factory to avoid circular package dependencies
+  let executorManager: ExecutorManagerLike | null = null
 
-  const getExecutorManager = async () => {
+  const getExecutorManager = async (): Promise<ExecutorManagerLike> => {
     if (!executorManager) {
-      const { ExecutorManager } = await import('./executor.js')
-      // Pass config instead of URL so executor can generate unique client IDs for each connection
-      executorManager = new ExecutorManager({
+      if (!executorManagerFactory) {
+        throw new Error('CLI execute endpoints require an executorManagerFactory. Pass one in server config.')
+      }
+      executorManager = await executorManagerFactory({
         cdpConfig: { host: '127.0.0.1', port },
         logger: logger || { log: console.error, error: console.error },
       })

@@ -6,9 +6,7 @@ import { chromium, BrowserContext } from 'playwright-core'
 import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
-import { startRunBrowserCDPRelayServer, type RelayServer } from './cdp-relay.js'
-import { createFileLogger } from './create-logger.js'
-import { killPortProcess } from './kill-port.js'
+import { startRunBrowserCDPRelayServer, createFileLogger, killPortProcess, type RelayServer } from '@runbrowser/relay'
 
 const execAsync = promisify(exec)
 const extensionBuildQueues: Map<string, Promise<void>> = new Map()

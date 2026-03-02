@@ -4,8 +4,8 @@
  */
 import { describe, test, expect } from 'vitest'
 import type { WSContext } from 'hono/ws'
-import type { Protocol } from './cdp-types.js'
-import * as relayState from './relay-state.js'
+import type { Protocol } from '@runbrowser/relay/types'
+import * as relayState from '@runbrowser/relay'
 
 // ---------------------------------------------------------------------------
 // Helpers

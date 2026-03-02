@@ -242,8 +242,8 @@ export async function ensureRelayServer(options: EnsureRelayServerOptions = {}):
   // This handles: tsx, vite-node, ts-node, or direct node on compiled output
   const isRunningFromSource = __filename.endsWith('.ts')
   const scriptPath = isRunningFromSource
-    ? path.resolve(__dirname, './start-relay-server.ts')
-    : path.resolve(__dirname, './start-relay-server.js')
+    ? path.resolve(__dirname, './start.ts')
+    : path.resolve(__dirname, './start.js')
 
   const serverProcess = spawn(isRunningFromSource ? 'tsx' : process.execPath, [scriptPath], {
     detached: true,

@@ -1,20 +1,20 @@
 /**
- * Encapsulates ghost cursor lifecycle for recording sessions.
+ * Encapsulates cursor overlay lifecycle for recording sessions.
  *
  * DIFFERENCE FROM UPSTREAM PLAYWRITER: The fork adds page.onMouseAction as a native
- * Playwright API. Without the fork, ghost cursor is driven by injecting
+ * Playwright API. Without the fork, cursor overlay is driven by injecting
  * client-side JavaScript that listens for mouse events directly in the page.
- * The enableGhostCursor/applyGhostCursorMouseAction functions handle this
+ * The enableCursorOverlay/applyCursorOverlayMouseAction functions handle this
  * by using page.evaluate() to inject cursor tracking code.
  *
  * For relay-level mouse action interception (pre-dispatch hooks), see the
  * relay server's Input.dispatchMouseEvent interception.
  */
 import type { BrowserContext, Page } from 'playwright-core'
-import { disableGhostCursor, enableGhostCursor, type GhostCursorClientOptions } from './ghost-cursor.js'
+import { disableCursorOverlay, enableCursorOverlay, type CursorOverlayOptions } from './cursor-overlay.js'
 import { getSessionId } from './playwright-compat.js'
 
-interface RecordingGhostCursorLogger {
+interface RecordingCursorOverlayLogger {
   error: (...args: unknown[]) => void
 }
 
@@ -23,11 +23,11 @@ interface RecordingTargetOptions {
   sessionId?: string
 }
 
-export class RecordingGhostCursorController {
+export class RecordingCursorOverlayController {
   private readonly cursorApplyQueueByPage = new WeakMap<Page, Promise<void>>()
-  private readonly logger: RecordingGhostCursorLogger
+  private readonly logger: RecordingCursorOverlayLogger
 
-  constructor(options: { logger: RecordingGhostCursorLogger }) {
+  constructor(options: { logger: RecordingCursorOverlayLogger }) {
     this.logger = options.logger
   }
 
@@ -58,9 +58,9 @@ export class RecordingGhostCursorController {
   async enableForRecording(options: { page: Page }): Promise<void> {
     const { page } = options
     try {
-      await enableGhostCursor({ page })
+      await enableCursorOverlay({ page })
     } catch (error) {
-      this.logger.error('[runbrowser] Failed to enable ghost cursor', error)
+      this.logger.error('[runbrowser] Failed to enable cursor overlay', error)
     }
   }
 
@@ -68,19 +68,19 @@ export class RecordingGhostCursorController {
     const { page } = options
     this.cursorApplyQueueByPage.delete(page)
     try {
-      await disableGhostCursor({ page })
+      await disableCursorOverlay({ page })
     } catch (error) {
-      this.logger.error('[runbrowser] Failed to disable ghost cursor', error)
+      this.logger.error('[runbrowser] Failed to disable cursor overlay', error)
     }
   }
 
-  async show(options: { page: Page; cursorOptions?: GhostCursorClientOptions }): Promise<void> {
+  async show(options: { page: Page; cursorOptions?: CursorOverlayOptions }): Promise<void> {
     const { page, cursorOptions } = options
-    await enableGhostCursor({ page, cursorOptions })
+    await enableCursorOverlay({ page, cursorOptions })
   }
 
   async hide(options: { page: Page }): Promise<void> {
     const { page } = options
-    await disableGhostCursor({ page })
+    await disableCursorOverlay({ page })
   }
 }

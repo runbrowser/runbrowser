@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter runbrowser build",
-    "typecheck": "pnpm --filter runbrowser typecheck",
+    "build": "pnpm --filter @runbrowser/relay build && pnpm --filter @runbrowser/core build && pnpm --filter @runbrowser/mcp --filter runbrowser build",
+    "typecheck": "pnpm --filter @runbrowser/core typecheck && pnpm --filter @runbrowser/mcp typecheck && pnpm --filter runbrowser typecheck",
     "test": "pnpm --filter runbrowser test"
   },
   "devDependencies": {
