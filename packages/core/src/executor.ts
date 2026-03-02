@@ -31,7 +31,7 @@ import {
   type ScreenshotResult,
   type SnapshotFormat,
 } from './aria-snapshot.js'
-import { createGhostBrowserChrome, type GhostBrowserCommandResult } from './ghost-browser.js'
+
 export type { SnapshotFormat }
 import { getCleanHTML, type GetCleanHTMLOptions } from './clean-html.js'
 import { getPageMarkdown, type GetPageMarkdownOptions } from './page-markdown.js'
@@ -1039,18 +1039,6 @@ export class PlaywrightExecutor {
         },
       })
 
-      // Ghost Browser API - creates chrome object that mirrors Ghost Browser's APIs
-      // See extension/src/ghost-browser-api.d.ts for full API documentation
-      const chromeGhostBrowser = createGhostBrowserChrome(async (namespace, method, args) => {
-        const cdp = await getCDPSession({ page })
-        const result = await cdp.send('ghost-browser' as any, { namespace, method, args })
-        const typed = result as GhostBrowserCommandResult
-        if (!typed.success) {
-          throw new Error(typed.error || `Ghost Browser API call failed: ${namespace}.${method}`)
-        }
-        return typed.result
-      })
-
       let vmContextObj: any = {
         page,
         context,
@@ -1097,8 +1085,6 @@ export class PlaywrightExecutor {
         },
         require: this.sandboxedRequire,
         import: (specifier: string) => import(specifier),
-        // Ghost Browser API - only works in Ghost Browser, mirrors chrome.ghostPublicAPI etc
-        chrome: chromeGhostBrowser,
         ...usefulGlobals,
       }
 

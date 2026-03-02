@@ -1275,21 +1275,4 @@ await state.page.screenshot({ path: 'region.png', scale: 'css', clip: { x: 100, 
 
 Prefer locator-based actions over coordinates — locators are stable across scroll/resize, auto-wait for elements, and don't require screenshot round-trips that burn ~800 image tokens per cycle.
 
-## Ghost Browser integration
 
-RunBrowser supports [Ghost Browser](https://ghostbrowser.com/) for multi-identity automation. When running in Ghost Browser, the `chrome` object exposes APIs to control identities, proxies, and sessions - useful for managing multiple accounts, rotating proxies, or isolated cookie sessions.
-
-```js
-// List identities and open tabs in different ones
-const identities = await chrome.projects.getIdentitiesList()
-await chrome.ghostPublicAPI.openTab({ url: 'https://reddit.com', identity: identities[0].id })
-
-// Assign proxies per tab or identity
-const proxies = await chrome.ghostProxies.getList()
-await chrome.ghostProxies.setTabProxy(tabId, proxies[0].id)
-```
-
-For complete API reference with all methods, types, and examples, read:
-`extension/src/ghost-browser-api.d.ts`
-
-Note: Only works in Ghost Browser. In regular Chrome, calls fail with "not available".

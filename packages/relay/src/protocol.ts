@@ -199,33 +199,8 @@ export type CancelRecordingResult = {
   error?: string
 }
 
-// Ghost Browser API command message (for Ghost Browser integration)
-export type GhostBrowserCommandMessage = {
-  id: number
-  method: 'ghost-browser'
-  params: {
-    /** API namespace: 'ghostPublicAPI' | 'ghostProxies' | 'projects' */
-    namespace: 'ghostPublicAPI' | 'ghostProxies' | 'projects'
-    /** Method name within the namespace */
-    method: string
-    /** Arguments to pass to the method */
-    args: unknown[]
-  }
-}
-
-export type GhostBrowserCommandResult =
-  | {
-      success: true
-      result: unknown
-    }
-  | {
-      success: false
-      error: string
-    }
-
 export type RelayToExtensionMessage =
   | ServerPingMessage
   | CreateInitialTabMessage
   | RecordingCommandMessage
-  | GhostBrowserCommandMessage
   | ExtensionCommandMessage

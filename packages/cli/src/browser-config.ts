@@ -10,12 +10,6 @@ export function getBrowserExecutablePath(): string {
     return envPath
   }
 
-  // Check for Ghost Browser on macOS
-  // const ghostBrowserPath = '/Applications/Ghost Browser.app/Contents/MacOS/Ghost Browser'
-  // if (fs.existsSync(ghostBrowserPath)) {
-  //     return ghostBrowserPath
-  // }
-
   // Fall back to finding Chrome
   return findChromeExecutablePath()
 }

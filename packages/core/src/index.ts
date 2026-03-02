@@ -107,10 +107,6 @@ export { enableCursorOverlay, disableCursorOverlay, applyCursorOverlayMouseActio
 export type { CursorOverlayOptions } from './cursor-overlay.js'
 export { RecordingCursorOverlayController } from './recording-cursor-overlay.js'
 
-// Ghost Browser
-export { createGhostBrowserChrome } from './ghost-browser.js'
-export type { GhostBrowserCommandResult } from './ghost-browser.js'
-
 // Playwright compat
 export { getTargetId, getSessionId, getFrameId, getSelector, isFrame } from './playwright-compat.js'
 export type { MouseActionEvent } from './playwright-compat.js'

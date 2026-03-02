@@ -7,7 +7,7 @@ import { createStore } from 'zustand/vanilla'
 import type { ExtensionState, ConnectionState, TabState, TabInfo } from './types'
 import type { CDPEvent, Protocol } from 'runbrowser/src/cdp-types'
 import type { ExtensionCommandMessage, ExtensionResponseMessage, RelayToExtensionMessage } from 'runbrowser/src/protocol'
-import { handleGhostBrowserCommand, type GhostBrowserCommandParams } from 'runbrowser/src/ghost-browser'
+
 import {
   getActiveRecordings,
   handleStartRecording,
@@ -71,16 +71,6 @@ function isRelayToExtensionMessage(value: unknown): value is RelayToExtensionMes
     case 'isRecording':
     case 'cancelRecording':
       return hasNumericId(value) && isRecord(value.params) && hasOptionalSessionId(value.params)
-    case 'ghost-browser':
-      return (
-        hasNumericId(value) &&
-        isRecord(value.params) &&
-        (value.params.namespace === 'ghostPublicAPI' ||
-          value.params.namespace === 'ghostProxies' ||
-          value.params.namespace === 'projects') &&
-        typeof value.params.method === 'string' &&
-        Array.isArray(value.params.args)
-      )
     default:
       return false
   }
@@ -99,10 +89,6 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function detectBrowserName(): Promise<string> {
-  if ((chrome as unknown as { ghostPublicAPI?: unknown }).ghostPublicAPI) {
-    return 'Ghost'
-  }
-
   const navigatorWithUaData = navigator as NavigatorWithUaData
   const brands = navigatorWithUaData.userAgentData?.brands
   if (brands && brands.length > 0) {
@@ -449,29 +435,6 @@ class ConnectionManager {
           logger.error('Failed to cancel recording:', error)
           sendMessage({ id: message.id, result: { success: false, error: errorMessage } })
         }
-        return
-      }
-
-      // Handle Ghost Browser API commands
-      // This allows calling chrome.ghostPublicAPI, chrome.ghostProxies, chrome.projects
-      // from the runbrowser executor sandbox when running in Ghost Browser
-      if (message.method === 'ghost-browser') {
-        const params = message.params as GhostBrowserCommandParams
-        const result = await handleGhostBrowserCommand(params, chrome)
-        if (!result.success) {
-          logger.error('Ghost Browser API error:', result.error)
-        }
-        // Auto-connect tabs created via ghostPublicAPI.openTab so they appear in context.pages()
-        if (result.success && params.namespace === 'ghostPublicAPI' && params.method === 'openTab') {
-          const tabId = result.result as number
-          if (tabId) {
-            logger.debug('Auto-connecting Ghost Browser tab:', tabId)
-            setTabConnecting(tabId)
-            await sleep(100)
-            await attachTab(tabId)
-          }
-        }
-        sendMessage({ id: message.id, result })
         return
       }
 

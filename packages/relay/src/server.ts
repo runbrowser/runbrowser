@@ -724,15 +724,6 @@ export async function startRunBrowserCDPRelayServer({
         })
       }
 
-      // Ghost Browser API - forward to extension for chrome.ghostPublicAPI/ghostProxies/projects
-      case 'ghost-browser': {
-        return await sendToExtension({
-          extensionId: resolvedExtensionId,
-          method: 'ghost-browser',
-          params,
-        })
-      }
-
       case 'Runtime.enable': {
         if (!sessionId) {
           break
