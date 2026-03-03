@@ -58,6 +58,16 @@ export {
 } from './client.js'
 export type { ExtensionStatus, EnsureRelayServerOptions } from './client.js'
 
+// API client (HTTP client for relay server endpoints — used by CLI and MCP)
+export { RelayApiClient } from './api-client.js'
+export type {
+  RelayClientOptions,
+  ExecuteResult,
+  ResetResult,
+  SessionInfo,
+  SessionListEntry,
+} from './api-client.js'
+
 // Shared utilities
 export {
   EXTENSION_IDS,
@@ -120,5 +130,5 @@ export { RecordingRelay } from './recording.js'
 export type { ActiveRecording } from './recording.js'
 
 // Port management
-export { killPortProcess, getListeningPidsForPort } from './kill-port.js'
+export { killPortProcess, getListeningPidsForPort, isPortInUse } from './kill-port.js'
 export type { KillPortSignal } from './kill-port.js'
