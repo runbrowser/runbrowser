@@ -1,0 +1,190 @@
+      - role=link[name="Skip to content"]
+      - banner:
+          - role=link[name="Homepage"]
+            - navigation "Global":
+              - list:
+                - listitem:
+                  - role=button[name="Platform"]
+                - listitem:
+                  - role=button[name="Solutions"]
+                - listitem:
+                  - role=button[name="Resources"]
+                - listitem:
+                  - role=button[name="Open Source"]
+                - listitem:
+                  - role=button[name="Enterprise"]
+                - listitem:
+                  - role=link[name="Pricing"] >> nth=0
+              - role=button[name="Search or jump to…"]
+            - role=link[name="Sign in"]
+            - role=link[name="Sign up"]
+        - main:
+                - region "The future of building happens together"
+                  - form:
+                    - labeltext:
+                      - text: "Enter your email"
+                      - textbox "Enter your email" [id="hero_user_email"]
+                    - role=button[name="Sign up for GitHub"] >> nth=0
+                  - role=link[name="Try GitHub Copilot free"] >> nth=0
+                - role=button[name="Pause"]
+                    - role=video
+                  - role=tab[name="Code"]
+                  - role=tab[name="Plan"]
+                  - role=tab[name="Collaborate"]
+                  - role=tab[name="Automate"]
+                  - role=tab[name="Secure"]
+                  - role=button[name="Pause animation"]
+                - role=button[name="Pause video"]
+                    - role=video[name="Unable to play media."]
+                      - role=link[name="Explore GitHub Copilot"]
+                        - role=link[name="Read customer story"]
+                        - role=link[name="Read industry report"]
+                      - role=button[name="Automate your path to production"]
+                        - role=link[name="Explore GitHub Actions"]
+                      - role=button[name="Code instantly from anywhere"]
+                      - role=button[name="Keep momentum on the go"]
+                      - role=button[name="Shape your toolchain"]
+                    - role=link[name="Explore GitHub Advanced Security"]
+                        - role=link[name="Learn about GitHub Code Security"]
+                        - role=link[name="Learn about Dependabot"]
+                        - role=link[name="Learn about GitHub Secret Protection"]
+                          - link "Footnote 1" [id="footnote-1-ref-0"]
+                          - link "Footnote 1" [id="footnote-1-ref-1"]
+                      - role=link[name="Explore GitHub Projects"]
+                      - role=button[name="Keep track of your tasks"]
+                        - role=link[name="Explore GitHub Issues"]
+                      - role=button[name="Share ideas and ask questions"]
+                      - role=button[name="Review code changes together"]
+                      - role=button[name="Fund open source projects"]
+                    - role=tab[name="By industry"]
+                    - role=tab[name="By size"]
+                    - role=tab[name="By use case"]
+                  - role=link[name="Technology Figma streamlines development and strengthens security Read customer story"]
+                  - role=link[name="Automotive Mercedes-Benz standardizes source code and automates onboarding Read customer story"]
+                  - role=link[name="Financial services Mercado Libre cuts coding time by 50% Read customer story"]
+                    - role=link[name="Explore customer stories"]
+                    - role=link[name="View all solutions"]
+                        - form:
+                          - labeltext:
+                            - text: "Enter your email"
+                            - textbox "Enter your email" [id="bottom_cta_section_user_email"]
+                          - role=button[name="Sign up for GitHub"] >> nth=1
+                        - role=link[name="Try GitHub Copilot free"] >> nth=1
+                    - list:
+                      - listitem:
+                        - role=link[name="Back to content"]
+                - role=link[name="Back to top"]
+      - contentinfo:
+            - role=link[name="Go to GitHub homepage"]
+            - role=link[name="Subscribe"]
+            - navigation "Platform":
+              - list:
+                - listitem:
+                  - role=link[name="Features"]
+                - listitem:
+                  - role=link[name="Enterprise"]
+                - listitem:
+                  - role=link[name="Copilot"]
+                - listitem:
+                  - role=link[name="AI"]
+                - listitem:
+                  - role=link[name="Security"]
+                - listitem:
+                  - role=link[name="Pricing"] >> nth=1
+                - listitem:
+                  - role=link[name="Team"]
+                - listitem:
+                  - role=link[name="Resources"]
+                - listitem:
+                  - role=link[name="Roadmap"]
+                - listitem:
+                  - role=link[name="Compare GitHub"]
+            - navigation "Ecosystem":
+              - list:
+                - listitem:
+                  - role=link[name="Developer API"]
+                - listitem:
+                  - role=link[name="Partners"]
+                - listitem:
+                  - role=link[name="Education"]
+                - listitem:
+                  - role=link[name="GitHub CLI"]
+                - listitem:
+                  - role=link[name="GitHub Desktop"]
+                - listitem:
+                  - role=link[name="GitHub Mobile"]
+                - listitem:
+                  - role=link[name="GitHub Marketplace"]
+                - listitem:
+                  - role=link[name="MCP Registry"]
+            - navigation:
+              - list:
+                - listitem:
+                  - role=link[name="Docs"]
+                - listitem:
+                  - role=link[name="Community Forum"]
+                - listitem:
+                  - role=link[name="Professional Services"]
+                - listitem:
+                  - role=link[name="Premium Support"]
+                - listitem:
+                  - role=link[name="Skills"]
+                - listitem:
+                  - role=link[name="Status"]
+                - listitem:
+                  - role=link[name="Contact GitHub"]
+            - navigation "Company":
+              - list:
+                - listitem:
+                  - role=link[name="About"]
+                - listitem:
+                  - role=link[name="Why GitHub"]
+                - listitem:
+                  - role=link[name="Customer stories"]
+                - listitem:
+                  - role=link[name="Blog"]
+                - listitem:
+                  - role=link[name="The ReadME Project"]
+                - listitem:
+                  - role=link[name="Careers"]
+                - listitem:
+                  - role=link[name="Newsroom"]
+                - listitem:
+                  - role=link[name="Inclusion"]
+                - listitem:
+                  - role=link[name="Social Impact"]
+                - listitem:
+                  - role=link[name="Shop"]
+            - navigation "Legal and Resource Links":
+              - list:
+                - listitem
+                - listitem:
+                  - role=link[name="Terms"]
+                - listitem:
+                  - role=link[name="Privacy"]
+                  - role=link[name="(Updated 02/2024) 02/2024"]
+                - listitem:
+                  - role=link[name="Sitemap"]
+                - listitem:
+                  - role=link[name="What is Git?"]
+                - listitem:
+                  - role=button[name="Manage cookies"]
+                - listitem:
+                  - role=button[name="Do not share my personal information"]
+            - navigation "GitHub's Social Media Links":
+              - list:
+                - listitem:
+                  - role=link[name="GitHub on LinkedIn"]
+                - listitem:
+                  - role=link[name="GitHub on Instagram"]
+                - listitem:
+                  - role=link[name="GitHub on YouTube"]
+                - listitem:
+                  - role=link[name="GitHub on X"]
+                - listitem:
+                  - role=link[name="GitHub on TikTok"]
+                - listitem:
+                  - role=link[name="GitHub on Twitch"]
+                - listitem:
+                  - role=link[name="GitHub’s organization on GitHub"]
+              - button "English - Select language" [id="locale-selector-text"]

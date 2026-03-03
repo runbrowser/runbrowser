@@ -1,0 +1,307 @@
+      - role=link[name="Skip to content"]
+      - banner:
+        - heading "Navigation Menu"
+          - role=link[name="Homepage"]
+            - navigation "Global":
+              - list:
+                - listitem:
+                  - role=button[name="Platform"]
+                - listitem:
+                  - role=button[name="Solutions"]
+                - listitem:
+                  - role=button[name="Resources"]
+                - listitem:
+                  - role=button[name="Open Source"]
+                - listitem:
+                  - role=button[name="Enterprise"]
+                - listitem:
+                  - role=link[name="Pricing"] >> nth=0
+              - role=button[name="Search or jump to…"]
+            - role=link[name="Sign in"]
+            - role=link[name="Sign up"]
+        - main:
+                - text: "Mona the Octocat, Copilot, and Ducky float jubilantly upward from behind the GitHub product demo accompanied by a purple glow and a scattering of stars."
+                - region:
+                        - heading "The future of building happens together"
+                        - paragraph:
+                          - text: "Tools and trends evolve, but collaboration endures. With GitHub, developers, agents, and code come together on one platform."
+                  - form:
+                    - labeltext:
+                      - text: "Enter your email"
+                      - textbox "Enter your email" [id="hero_user_email"]
+                    - role=button[name="Sign up for GitHub"] >> nth=0
+                  - role=link[name="Try GitHub Copilot free"] >> nth=0
+                - heading "GitHub features"
+                - role=button[name="Pause"]
+                    - text: "A demonstration animation of a code editor using GitHub Copilot Chat, where the user requests GitHub Copilot to refactor duplicated logic and extract it into a reusable function for a given code snippet."
+                    - role=video
+                  - tablist:
+                    - role=tab[name="Code"]
+                    - role=tab[name="Plan"]
+                    - role=tab[name="Collaborate"]
+                    - role=tab[name="Automate"]
+                    - role=tab[name="Secure"]
+                - paragraph:
+                  - text: "Write, test, and fix code quickly with GitHub Copilot, from simple boilerplate to complex features."
+                  - heading "GITHUB CUSTOMERS"
+                    - image "American Airlines"
+                    - image "Duolingo"
+                    - image "Ernst and Young"
+                    - image "Ford"
+                    - image "InfoSys"
+                    - image "Mercado Libre"
+                    - image "Mercedes-Benz"
+                    - image "Shopify"
+                    - image "Philips"
+                    - image "Société Générale"
+                    - image "Spotify"
+                    - image "Vodafone"
+                  - role=button[name="Pause animation"]
+                - sectionheader:
+                  - heading "Accelerate your entire workflow"
+                  - paragraph:
+                    - text: "From your first line of code to final deployment, GitHub provides AI and automation tools to help you build and ship better software faster."
+                - role=button[name="Pause video"]
+                    - text: "A Copilot chat window with the 'Ask' mode enabled. The user switches from 'Ask' mode to 'Agent' mode from a dropdown menu, then sends the prompt 'Update the website to allow searching for running races by name.' Copilot analyzes the codebase, then explains the required edits for three files before generating them. Copilot then confirms completion and summarizes the implemented changes for the new functionality allowing users to search races by name and view paginated, filtered results."
+                    - role=video[name="Unable to play media."]
+                      - heading "Your AI partner everywhere. Copilot is ready to work with you at each step of the software development lifecycle."
+                      - role=link[name="Explore GitHub Copilot"]
+                        - paragraph:
+                          - text: "Duolingo boosts developer speed by 25% with GitHub Copilot"
+                        - role=link[name="Read customer story"]
+                        - paragraph:
+                          - text: "2025 Gartner® Magic Quadrant™ for AI Code Assistants"
+                        - role=link[name="Read industry report"]
+                    - descriptionlist:
+                        - term:
+                          - role=button[name="Automate your path to production"]:
+                              - heading "Automate your path to production"
+                        - definition:
+                            - paragraph:
+                              - text: "Ship faster with secure, reliable CI/CD."
+                            - role=link[name="Explore GitHub Actions"]
+                        - term:
+                          - role=button[name="Code instantly from anywhere"]:
+                              - heading "Code instantly from anywhere"
+                        - term:
+                          - role=button[name="Keep momentum on the go"]:
+                              - heading "Keep momentum on the go"
+                        - term:
+                          - role=button[name="Shape your toolchain"]:
+                              - heading "Shape your toolchain"
+                - sectionheader:
+                  - heading "Built-in application security where found means fixed"
+                  - paragraph:
+                    - text: "Use AI to find and fix vulnerabilities so your team can ship more secure software faster."
+                    - heading "Apply fixes in seconds. Spend less time debugging and more time building features with Copilot Autofix."
+                    - role=link[name="Explore GitHub Advanced Security"]
+                    - image "Copilot Autofix identifies vulnerable code and provides an explanation, together with a secure code suggestion to remediate the vulnerability."
+                        - paragraph:
+                          - text: "Security debt, solved."
+                          - text: "Leverage security campaigns and Copilot Autofix to reduce application vulnerabilities."
+                        - role=link[name="Learn about GitHub Code Security"]
+                      - image "A security campaign screen displays the campaign’s progress bar with 97% completed of 701 alerts. A total of 23 alerts are left with 13 in progress, and the campaign started 20 days ago. The status below shows that there are 7 days left in the campaign with a due date of November 15, 2024."
+                        - paragraph:
+                          - text: "Dependencies you can depend on."
+                          - text: "Update vulnerable dependencies with supported fixes for breaking changes."
+                        - role=link[name="Learn about Dependabot"]
+                      - image "List of dependencies defined in a requirements .txt file."
+                        - paragraph:
+                          - text: "Your secrets, your business."
+                          - text: "Detect, prevent, and remediate leaked secrets across your organization."
+                        - role=link[name="Learn about GitHub Secret Protection"]
+                      - image "GitHub push protection confirms and displays an active secret, and blocks the push."
+                        - paragraph:
+                          - text: "70% MTTR reduction"
+                            - text: "with Copilot Autofix"
+                            - superscript:
+                              - link "Footnote 1" [id="footnote-1-ref-0"]
+                        - paragraph:
+                          - text: "8.3M secret leaks stopped"
+                            - text: "in the past 12 months with push protection"
+                            - superscript:
+                              - link "Footnote 1" [id="footnote-1-ref-1"]
+                - sectionheader:
+                  - heading "Work together, achieve more"
+                  - paragraph:
+                    - text: "From planning and discussion to code review, GitHub keeps your team’s conversation and context next to your code."
+                    - image "A project management dashboard showing tasks for the ‘OctoArcade Invaders’ project, with tasks grouped under project phase categories like ‘Prototype,’ ‘Beta,’ and ‘Launch’ in a table layout. One of the columns displays sub-issue progress bars with percentages for each issue."
+                      - heading "Plan with clarity. Organize everything from high-level roadmaps to everyday tasks."
+                      - role=link[name="Explore GitHub Projects"]
+                    - figure:
+                      - blockquote:
+                          - text: "It helps us onboard new software engineers and get them productive right away. We have all our source code, issues, and pull requests in one place... GitHub is a complete platform that frees us from menial tasks and enables us to do our best work."
+                        - figcaption:
+                            - text: "Fabian Faulhaber"
+                            - text: "Application manager at Mercedes-Benz"
+                    - descriptionlist:
+                        - term:
+                          - role=button[name="Keep track of your tasks"]:
+                              - heading "Keep track of your tasks"
+                        - definition:
+                            - paragraph:
+                              - text: "Create issues and manage projects with tools that adapt to your code."
+                            - role=link[name="Explore GitHub Issues"]
+                        - term:
+                          - role=button[name="Share ideas and ask questions"]:
+                              - heading "Share ideas and ask questions"
+                        - term:
+                          - role=button[name="Review code changes together"]:
+                              - heading "Review code changes together"
+                        - term:
+                          - role=button[name="Fund open source projects"]:
+                              - heading "Fund open source projects"
+                - sectionheader:
+                  - heading "From startups to enterprises, GitHub scales with teams of any size in any industry."
+                    - tablist:
+                      - role=tab[name="By industry"]
+                      - role=tab[name="By size"]
+                      - role=tab[name="By use case"]
+                  - role=link[name="Technology Figma streamlines development and strengthens security Read customer story"]
+                  - role=link[name="Automotive Mercedes-Benz standardizes source code and automates onboarding Read customer story"]
+                  - role=link[name="Financial services Mercado Libre cuts coding time by 50% Read customer story"]
+                    - role=link[name="Explore customer stories"]
+                    - role=link[name="View all solutions"]
+                  - text: "A subtle purple glow fades in as Mona the Octocat, Copilot, and Ducky dramatically fall into place next to one another while gazing optimistically into the distance."
+                      - heading "Millions of developers and businesses call GitHub home"
+                      - paragraph:
+                        - text: "Whether you’re scaling your development process or just learning how to code, GitHub is where you belong. Join the world’s most widely adopted developer platform to build the technologies that shape what’s next."
+                        - form:
+                          - labeltext:
+                            - text: "Enter your email"
+                            - textbox "Enter your email" [id="bottom_cta_section_user_email"]
+                          - role=button[name="Sign up for GitHub"] >> nth=1
+                        - role=link[name="Try GitHub Copilot free"] >> nth=1
+                    - heading "Footnotes"
+                    - list:
+                      - listitem:
+                        - listmarker "1."
+                        - text: "GitHub internal customer data, 2025."
+                        - role=link[name="Back to content"]
+                - role=link[name="Back to top"]
+      - contentinfo:
+        - heading "Site-wide Links"
+            - role=link[name="Go to GitHub homepage"]
+            - heading "Subscribe to our developer newsletter"
+            - paragraph:
+              - text: "Get tips, technical guides, and best practices. Twice a month."
+            - role=link[name="Subscribe"]
+            - navigation:
+              - heading "Platform"
+              - list:
+                - listitem:
+                  - role=link[name="Features"]
+                - listitem:
+                  - role=link[name="Enterprise"]
+                - listitem:
+                  - role=link[name="Copilot"]
+                - listitem:
+                  - role=link[name="AI"]
+                - listitem:
+                  - role=link[name="Security"]
+                - listitem:
+                  - role=link[name="Pricing"] >> nth=1
+                - listitem:
+                  - role=link[name="Team"]
+                - listitem:
+                  - role=link[name="Resources"]
+                - listitem:
+                  - role=link[name="Roadmap"]
+                - listitem:
+                  - role=link[name="Compare GitHub"]
+            - navigation:
+              - heading "Ecosystem"
+              - list:
+                - listitem:
+                  - role=link[name="Developer API"]
+                - listitem:
+                  - role=link[name="Partners"]
+                - listitem:
+                  - role=link[name="Education"]
+                - listitem:
+                  - role=link[name="GitHub CLI"]
+                - listitem:
+                  - role=link[name="GitHub Desktop"]
+                - listitem:
+                  - role=link[name="GitHub Mobile"]
+                - listitem:
+                  - role=link[name="GitHub Marketplace"]
+                - listitem:
+                  - role=link[name="MCP Registry"]
+            - navigation:
+              - heading "Support"
+              - list:
+                - listitem:
+                  - role=link[name="Docs"]
+                - listitem:
+                  - role=link[name="Community Forum"]
+                - listitem:
+                  - role=link[name="Professional Services"]
+                - listitem:
+                  - role=link[name="Premium Support"]
+                - listitem:
+                  - role=link[name="Skills"]
+                - listitem:
+                  - role=link[name="Status"]
+                - listitem:
+                  - role=link[name="Contact GitHub"]
+            - navigation:
+              - heading "Company"
+              - list:
+                - listitem:
+                  - role=link[name="About"]
+                - listitem:
+                  - role=link[name="Why GitHub"]
+                - listitem:
+                  - role=link[name="Customer stories"]
+                - listitem:
+                  - role=link[name="Blog"]
+                - listitem:
+                  - role=link[name="The ReadME Project"]
+                - listitem:
+                  - role=link[name="Careers"]
+                - listitem:
+                  - role=link[name="Newsroom"]
+                - listitem:
+                  - role=link[name="Inclusion"]
+                - listitem:
+                  - role=link[name="Social Impact"]
+                - listitem:
+                  - role=link[name="Shop"]
+            - navigation "Legal and Resource Links":
+              - list:
+                - listitem:
+                  - text: "©"
+                  - time:
+                    - text: "2026"
+                  - text: "GitHub, Inc."
+                - listitem:
+                  - role=link[name="Terms"]
+                - listitem:
+                  - role=link[name="Privacy"]
+                  - role=link[name="(Updated 02/2024) 02/2024"]
+                - listitem:
+                  - role=link[name="Sitemap"]
+                - listitem:
+                  - role=link[name="What is Git?"]
+                - listitem:
+                  - role=button[name="Manage cookies"]
+                - listitem:
+                  - role=button[name="Do not share my personal information"]
+            - navigation "GitHub's Social Media Links":
+              - list:
+                - listitem:
+                  - role=link[name="GitHub on LinkedIn"]
+                - listitem:
+                  - role=link[name="GitHub on Instagram"]
+                - listitem:
+                  - role=link[name="GitHub on YouTube"]
+                - listitem:
+                  - role=link[name="GitHub on X"]
+                - listitem:
+                  - role=link[name="GitHub on TikTok"]
+                - listitem:
+                  - role=link[name="GitHub on Twitch"]
+                - listitem:
+                  - role=link[name="GitHub’s organization on GitHub"]
+              - button "English - Select language" [id="locale-selector-text"]

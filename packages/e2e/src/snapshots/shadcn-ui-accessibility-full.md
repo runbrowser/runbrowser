@@ -1,0 +1,192 @@
+[return value]   - banner:
+        - role=link[name="shadcn/ui"]
+        - navigation:
+          - role=link[name="Docs"]
+          - role=link[name="Components"]
+          - role=link[name="Blocks"]
+          - role=link[name="Charts"]
+          - role=link[name="Directory"]
+          - role=link[name="Create"]
+            - role=button[name="Search documentation..."]
+          - role=link[name="107k"]
+          - role=button[name="Toggle theme"]
+          - role=link[name="New Project"]
+  - main:
+          - role=link[name="RTL Support"]
+          - heading "The Foundation for your Design System"
+          - paragraph:
+            - text: "A set of beautifully designed components that you can customize, extend, and build on. Start here then make it your own. Open Source. Open Code."
+            - role=link[name="Get Started"]
+            - role=link[name="View Components"]
+              - layouttable:
+                  - role=link[name="Examples"]
+                  - role=link[name="Dashboard"]
+                  - role=link[name="Tasks"]
+                  - role=link[name="Playground"]
+                  - role=link[name="Authentication"]
+                  - role=link[name="RTL"]
+            - labeltext:
+              - text: "Theme"
+            - combobox "Theme" [id="theme-selector"]:
+                - text: "Neutral"
+            - role=button[name="Copy Code"]
+                  - group "Payment Method":
+                    - paragraph:
+                      - text: "All transactions are secure and encrypted"
+                      - labeltext:
+                        - text: "Name on Card"
+                      - textbox "Name on Card" [id="checkout-7j9-card-name-43j"]
+                        - labeltext:
+                          - text: "Card Number"
+                        - textbox "Card Number" [id="checkout-7j9-card-number-uw1"]
+                        - paragraph:
+                          - text: "Enter your 16-digit number."
+                        - labeltext:
+                          - text: "CVV"
+                        - textbox "CVV" [id="checkout-7j9-cvv"]
+                        - labeltext:
+                          - text: "Month"
+                        - combobox "Month" [id="checkout-7j9-exp-month-ts6"]:
+                            - text: "MM"
+                        - labeltext:
+                          - text: "Year"
+                        - combobox "Year" [id="checkout-7j9-exp-year-f59"]:
+                            - text: "YYYY"
+                  - group "Billing Address":
+                    - paragraph:
+                      - text: "The billing address associated with your payment method"
+                      - checkbox "Same as shipping address" [id="checkout-7j9-same-as-shipping-wgm"]
+                      - labeltext:
+                        - text: "Same as shipping address"
+                    - labeltext:
+                      - text: "Comments"
+                    - textbox "Comments" [id="checkout-7j9-optional-comments"]
+                  - role=button[name="Submit"]
+                  - role=button[name="Cancel"] >> nth=0
+                        - image "@shadcn"
+                        - image "@maxleiter"
+                        - image "@evilrabbit"
+                  - text: "No Team Members"
+                  - text: "Invite your team to collaborate on this project."
+                  - role=button[name="Invite Members"]
+                  - status "Loading"
+                  - text: "Syncing"
+                  - status "Loading"
+                  - text: "Updating"
+                  - status "Loading"
+                  - text: "Loading"
+              - role=button[name="Add"] >> nth=0
+              - role=textbox[name="Send a message..."]
+              - role=button[name="Voice Mode"]
+                  - text: "Price Range"
+                - paragraph:
+                  - text: "Set your budget range ($"
+                  - text: "200"
+                  - text: "-"
+                  - text: "800"
+                  - text: ")."
+                - generic "Price Range":
+                    - role=slider[name="Minimum"]
+                    - role=slider[name="Maximum"]
+                - role=textbox[name="Search..."]
+                - text: "12 results"
+                - role=textbox[name="example.com"]
+                  - text: "https://"
+                - role=button[name="Info"] >> nth=0
+                - role=textbox[name="Ask, Search or Chat..."]
+                - role=button[name="Add"] >> nth=1
+                - button "Auto" [id="radix-_R_2jlbav5uiuplb_"]
+                  - text: "52% used"
+                - role=button[name="Send"] >> nth=0
+                - role=textbox[name="@shadcn"]
+                - labeltext:
+                  - text: "Input Secure"
+                - textbox "Input Secure" [id="input-secure-19"]
+                - role=button[name="Info"] >> nth=1
+                - text: "https://"
+                - role=button[name="Favorite"]
+                      - text: "Two-factor authentication"
+                    - role=button[name="Enable"]
+                - role=link[name="Your profile has been verified."]
+                - text: "Appearance Settings"
+                - group "Compute Environment":
+                  - paragraph:
+                    - text: "Select the compute environment for your cluster."
+                  - radiogroup:
+                    - labeltext:
+                          - text: "Kubernetes"
+                        - paragraph:
+                          - text: "Run GPU workloads on a K8s configured cluster. This is the default."
+                      - radio "Kubernetes" [id="kubernetes-r2h"]
+                    - labeltext:
+                          - text: "Virtual Machine"
+                        - paragraph:
+                          - text: "Access a VM configured cluster to run workloads. (Coming soon)"
+                      - radio "Virtual Machine" [id="vm-z4k"]
+                  - labeltext:
+                    - text: "Number of GPUs"
+                  - paragraph:
+                    - text: "You can add more later."
+                - textbox "Number of GPUs" [id="number-of-gpus-f6l"]:
+                  - text: "8"
+                - role=button[name="Decrement"]
+                - role=button[name="Increment"]
+                  - labeltext:
+                    - text: "Wallpaper Tinting"
+                  - paragraph:
+                    - text: "Allow the wallpaper to be tinted."
+                - switch "Wallpaper Tinting" [id="tinting"]
+              - labeltext:
+                - text: "Prompt"
+              - textbox "Prompt" [id="notion-prompt"]
+              - role=button[name="Add context"]
+              - role=button[name="Attach file"]
+              - button "Auto" [id="radix-_R_1e6bav5uiuplb_"]
+              - button "All Sources" [id="radix-_R_1u6bav5uiuplb_"]
+              - role=button[name="Send"] >> nth=1
+              - role=button[name="Go Back"]
+              - role=button[name="Archive"]
+              - role=button[name="Report"]
+              - role=button[name="Snooze"]
+              - button "More Options" [id="radix-_R_babav5uiuplb_"]
+              - labeltext:
+                - "I agree to the terms and conditions" [id="checkbox-demo"]
+                - labeltext:
+                  - text: "I agree to the terms and conditions"
+                - role=button[name="1"]
+                - role=button[name="2"]
+                - role=button[name="3"]
+                - role=button[name="Previous"]
+                - role=button[name="Next"]
+                - role=button[name="Copilot"]
+                - role=button[name="Open Popover"]
+                    - group "How did you hear about us?":
+                      - paragraph:
+                        - text: "Select the option that best describes how you heard about us."
+                        - labeltext:
+                          - checkbox [id="social-media"]
+                            - text: "Social Media"
+                        - labeltext:
+                          - checkbox [id="search-engine"]
+                            - text: "Search Engine"
+                        - labeltext:
+                          - checkbox [id="referral"]
+                            - text: "Referral"
+                        - labeltext:
+                          - checkbox [id="other"]
+                            - text: "Other"
+                    - status "Loading"
+                  - text: "Processing your request"
+                  - text: "Please wait while we process your request. Do not refresh the page."
+                  - role=button[name="Cancel"] >> nth=1
+  - contentinfo:
+        - text: "Built by"
+        - role=link[name="shadcn"]
+        - text: "at"
+        - role=link[name="Vercel"]
+        - text: ". The source code is available on"
+        - role=link[name="GitHub"]
+        - text: "."
+  - region "Notifications alt+T"
+
+use refToLocator({ ref: 'e3' }) to get locators for ref strings.

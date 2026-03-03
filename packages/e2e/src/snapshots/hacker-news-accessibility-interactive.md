@@ -1,0 +1,42 @@
+[return value]           - role=link
+          - role=link[name="Hacker News"]
+          - role=link[name="new"]
+          - role=link[name="past"] >> nth=0
+          - role=link[name="comments"]
+          - role=link[name="ask"]
+          - role=link[name="show"]
+          - role=link[name="jobs"]
+          - role=link[name="submit"]
+          - role=link[name="login"]
+          - link [id="up_1"]
+          - role=link[name="Y Combinator"]
+          - role=link[name="ycombinator.com"]
+          - role=link[name="pg"] >> nth=0
+          - role=link[name="on Oct 9, 2006"] >> nth=0
+          - role=link[name="hide"]
+          - role=link[name="past"] >> nth=1
+          - role=link[name="favorite"]
+          - role=link[name="3 comments"]
+            - link [id="up_15"]
+            - role=link[name="sama"]
+            - role=link[name="on Oct 9, 2006"] >> nth=1
+            - link "[–]" [id="15"]
+            - link [id="up_17"]
+            - role=link[name="pg"] >> nth=1
+            - role=link[name="on Oct 9, 2006"] >> nth=2
+            - link "[–]" [id="17"]
+            - link [id="up_1079"]
+            - role=link[name="dmon"]
+            - role=link[name="on Feb 25, 2007"]
+            - link "[–]" [id="1079"]
+          - role=link[name="Guidelines"]
+          - role=link[name="FAQ"]
+          - role=link[name="Lists"]
+          - role=link[name="API"]
+          - role=link[name="Security"]
+          - role=link[name="Legal"]
+          - role=link[name="Apply to YC"]
+          - role=link[name="Contact"]
+          - role=textbox
+
+use refToLocator({ ref: 'e3' }) to get locators for ref strings.
