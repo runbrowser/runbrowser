@@ -3,29 +3,13 @@
   "version": "0.0.1",
   "description": "Control your running Chrome browser via Playwright — your logins, extensions, cookies already there",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./executor": {
-      "types": "./dist/executor.d.ts",
-      "import": "./dist/executor.js"
-    },
-    "./mcp": {
-      "types": "./dist/mcp.d.ts",
-      "import": "./dist/mcp.js"
-    },
     "./package.json": "./package.json"
   },
   "bin": "./bin.js",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run -u",
-    "test:watch": "vitest"
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "dist",
@@ -33,29 +17,12 @@
     "bin.js"
   ],
   "dependencies": {
-    "@runbrowser/core": "workspace:*",
     "@runbrowser/relay": "workspace:*",
-    "@runbrowser/mcp": "workspace:*",
-    "@hono/node-server": "^1.19.6",
-    "@hono/node-ws": "^1.2.0",
-    "@modelcontextprotocol/sdk": "^1.25.2",
     "cac": "^6.7.14",
-    "hono": "^4.10.6",
-    "picocolors": "^1.1.1",
-    "playwright-core": "^1.52.0",
-    "string-dedent": "^3.0.2",
-    "strip-ansi": "^7.1.2",
-    "ws": "^8.18.3",
-    "zod": "^4.3.5",
-    "zustand": "^5.0.8"
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.315",
     "@types/node": "^24.10.1",
-    "@types/ws": "^8.18.1",
-    "devtools-protocol": "^0.0.1568893",
-    "typescript": "^5.9.3",
-    "vite-node": "^5.3.0",
-    "vitest": "^4.0.8"
+    "typescript": "^5.9.3"
   }
 }
