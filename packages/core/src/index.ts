@@ -111,6 +111,9 @@ export { RecordingCursorOverlayController } from './recording-cursor-overlay.js'
 export { getTargetId, getSessionId, getFrameId, getSelector, isFrame } from './playwright-compat.js'
 export type { MouseActionEvent } from './playwright-compat.js'
 
+// Browser config
+export { getBrowserExecutablePath } from './browser-config.js'
+
 // Shared utilities (re-export from relay)
 export {
   EXTENSION_IDS,
