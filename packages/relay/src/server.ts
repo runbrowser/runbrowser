@@ -1703,11 +1703,11 @@ export async function startRunBrowserCDPRelayServer({
   }
 
   // ============================================================================
-  // Security middleware for privileged HTTP routes (/cli/*, /recording/*)
+  // Security middleware for privileged HTTP routes (/api/*, /recording/*)
   //
   // CORS alone does NOT prevent cross-origin POST attacks. Browsers skip the
   // preflight for "simple" requests (POST + Content-Type: text/plain), so a
-  // malicious website can fire-and-forget a POST to localhost:19988/cli/execute
+  // malicious website can fire-and-forget a POST to localhost:19988/api/execute
   // and the code executes before CORS even enters the picture.
   //
   // Two layers of defense:
@@ -1756,10 +1756,10 @@ export async function startRunBrowserCDPRelayServer({
     return next()
   }
 
-  app.use('/cli/*', privilegedRouteMiddleware)
+  app.use('/api/*', privilegedRouteMiddleware)
   app.use('/recording/*', privilegedRouteMiddleware)
 
-  app.post('/cli/execute', async (c) => {
+  app.post('/api/execute', async (c) => {
     try {
       const body = (await c.req.json()) as { sessionId: string | number; code: string; timeout?: number }
       const sessionId = normalizeSessionId(body.sessionId)
@@ -1786,7 +1786,7 @@ export async function startRunBrowserCDPRelayServer({
     }
   })
 
-  app.post('/cli/reset', async (c) => {
+  app.post('/api/reset', async (c) => {
     try {
       const body = (await c.req.json()) as { sessionId: string | number }
       const sessionId = normalizeSessionId(body.sessionId)
@@ -1813,16 +1813,16 @@ export async function startRunBrowserCDPRelayServer({
     }
   })
 
-  app.get('/cli/sessions', async (c) => {
+  app.get('/api/sessions', async (c) => {
     const manager = await getExecutorManager()
     return c.json({ sessions: manager.listSessions() })
   })
 
-  app.get('/cli/session/suggest', (c) => {
+  app.get('/api/session/suggest', (c) => {
     return c.json({ next: nextSessionNumber })
   })
 
-  app.post('/cli/session/new', async (c) => {
+  app.post('/api/session/new', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { extensionId?: string | null; cwd?: string }
     const sessionId = String(nextSessionNumber++)
     const extensionId = body.extensionId || null
@@ -1854,7 +1854,7 @@ export async function startRunBrowserCDPRelayServer({
     })
   })
 
-  app.get('/cli/session/:id', async (c) => {
+  app.get('/api/session/:id', async (c) => {
     const sessionId = c.req.param('id')
     const manager = await getExecutorManager()
     const executor = manager.getSession(sessionId)
@@ -1870,7 +1870,7 @@ export async function startRunBrowserCDPRelayServer({
     })
   })
 
-  app.post('/cli/session/delete', async (c) => {
+  app.post('/api/session/delete', async (c) => {
     try {
       const body = (await c.req.json()) as { sessionId: string | number }
       const sessionId = normalizeSessionId(body.sessionId)
