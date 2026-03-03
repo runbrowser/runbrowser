@@ -165,6 +165,29 @@ async function terminatePidWindows(pid: number): Promise<void> {
 }
 
 /**
+ * Check if a TCP port is currently in use (something is listening on it).
+ */
+export async function isPortInUse(port: number): Promise<boolean> {
+  const net = await import('node:net')
+  return new Promise<boolean>((resolve) => {
+    const socket = new net.Socket()
+    socket.setTimeout(500)
+    socket.on('connect', () => {
+      socket.destroy()
+      resolve(true)
+    })
+    socket.on('timeout', () => {
+      socket.destroy()
+      resolve(false)
+    })
+    socket.on('error', () => {
+      resolve(false)
+    })
+    socket.connect(port, '127.0.0.1')
+  })
+}
+
+/**
  * Kill any listening process bound to the provided TCP port.
  */
 export async function killPortProcess({
