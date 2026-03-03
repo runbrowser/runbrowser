@@ -11,197 +11,98 @@ import pc from 'picocolors'
 Buffer.prototype[util.inspect.custom] = function () {
   return `<Buffer ${this.length} bytes>`
 }
-import { killPortProcess } from '@runbrowser/relay'
-import { VERSION, LOG_FILE_PATH, LOG_CDP_FILE_PATH, parseRelayHost } from './utils.js'
+
 import {
-  ensureRelayServer,
+  killPortProcess,
+  isPortInUse,
+  VERSION,
+  LOG_FILE_PATH,
+  LOG_CDP_FILE_PATH,
   RELAY_PORT,
-  waitForConnectedExtensions,
   getExtensionOutdatedWarning,
-  getExtensionStatus,
-  type ExtensionStatus,
-} from '@runbrowser/relay/client'
+  RelayApiClient,
+} from '@runbrowser/relay'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const cliRelayEnv = { RUNBROWSER_AUTO_ENABLE: '1' }
 
+/** Create a RelayApiClient from CLI options */
+function createClient(options?: { host?: string; token?: string }): RelayApiClient {
+  return new RelayApiClient({
+    host: options?.host,
+    token: options?.token,
+    logger: console,
+  })
+}
+
 const cli = cac('runbrowser')
 
 cli
-  .command('', 'Start the MCP server or controls the browser with -e')
+  .command('', 'Control the browser with -e')
   .option('--host <host>', 'Remote relay server host to connect to (or use RUNBROWSER_HOST env var)')
   .option('--token <token>', 'Authentication token (or use RUNBROWSER_TOKEN env var)')
   .option('-s, --session <name>', 'Session ID (required for -e, get one with `runbrowser session new`)')
   .option('-e, --eval <code>', 'Execute JavaScript code and exit')
   .option('--timeout <ms>', 'Execution timeout in milliseconds', { default: 10000 })
   .action(async (options: { host?: string; token?: string; eval?: string; timeout?: number; session?: string }) => {
-    // If -e flag is provided, execute code via relay server
-    if (options.eval) {
-      await executeCode({
-        code: options.eval,
-        timeout: options.timeout || 10000,
-        sessionId: options.session,
-        host: options.host,
-        token: options.token,
-      })
+    if (!options.eval) {
+      // No -e flag: show help
+      cli.outputHelp()
       return
     }
 
-    // Otherwise start the MCP server
-    const { startMcp } = await import('./mcp.js')
-    await startMcp({
-      host: options.host,
-      token: options.token,
-    })
-  })
-
-async function getServerUrl(host?: string): Promise<string> {
-  const serverHost = host || process.env.RUNBROWSER_HOST || process.env.RUNBROWSER_HOST || '127.0.0.1'
-  const { httpBaseUrl } = parseRelayHost(serverHost, RELAY_PORT)
-  return httpBaseUrl
-}
-
-async function fetchExtensionsStatus(host?: string): Promise<ExtensionStatus[]> {
-  try {
-    const serverUrl = await getServerUrl(host)
-    const response = await fetch(`${serverUrl}/extensions/status`, {
-      signal: AbortSignal.timeout(2000),
-    })
-    if (!response.ok) {
-      const fallback = await fetch(`${serverUrl}/extension/status`, {
-        signal: AbortSignal.timeout(2000),
-      })
-      if (!fallback.ok) {
-        return []
-      }
-      const fallbackData = (await fallback.json()) as {
-        connected: boolean
-        activeTargets: number
-        browser: string | null
-        profile: { email: string; id: string } | null
-        extensionVersion?: string | null
-      }
-      if (!fallbackData?.connected) {
-        return []
-      }
-      return [
-        {
-          extensionId: 'default',
-          stableKey: undefined,
-          browser: fallbackData?.browser,
-          profile: fallbackData?.profile,
-          activeTargets: fallbackData?.activeTargets,
-          extensionVersion: fallbackData?.extensionVersion || null,
-        },
-      ]
-    }
-    const data = (await response.json()) as {
-      extensions: ExtensionStatus[]
-    }
-    return data?.extensions || []
-  } catch {
-    return []
-  }
-}
-
-async function executeCode(options: {
-  code: string
-  timeout: number
-  sessionId?: string
-  host?: string
-  token?: string
-}): Promise<void> {
-  const { code, timeout, host, token } = options
-  const cwd = process.cwd()
-  const sessionId = options.sessionId ? String(options.sessionId) : process.env.RUNBROWSER_SESSION || process.env.RUNBROWSER_SESSION
-
-  // Session is required
-  if (!sessionId) {
-    console.error('Error: -s/--session is required.')
-    console.error('Always run `runbrowser session new` first to get a session ID to use.')
-    process.exit(1)
-  }
-
-  const serverUrl = await getServerUrl(host)
-
-  // Ensure relay server is running (only for local)
-  if (!host && !process.env.RUNBROWSER_HOST && !process.env.RUNBROWSER_HOST) {
-    const restarted = await ensureRelayServer({ logger: console, env: cliRelayEnv })
-    if (restarted) {
-      const connectedExtensions = await waitForConnectedExtensions({
-        logger: console,
-        timeoutMs: 10000,
-        pollIntervalMs: 250,
-      })
-      if (connectedExtensions.length === 0) {
-        console.error('Warning: Extension not connected. Commands may fail.')
-      }
-    }
-  }
-
-  // Warn once if extension is outdated
-  const extensionStatus = await getExtensionStatus()
-  const outdatedWarning = getExtensionOutdatedWarning(extensionStatus?.extensionVersion)
-  if (outdatedWarning) {
-    console.error(outdatedWarning)
-  }
-
-  // Build request URL with token if provided
-  const executeUrl = `${serverUrl}/cli/execute`
-
-  try {
-    const response = await fetch(executeUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token || process.env.RUNBROWSER_TOKEN || process.env.RUNBROWSER_TOKEN
-          ? { Authorization: `Bearer ${token || process.env.RUNBROWSER_TOKEN || process.env.RUNBROWSER_TOKEN}` }
-          : {}),
-      },
-      body: JSON.stringify({ sessionId, code, timeout, cwd }),
-    })
-
-    if (!response.ok) {
-      const text = await response.text()
-      console.error(`Error: ${response.status} ${text}`)
+    const sessionId = options.session ? String(options.session) : process.env.RUNBROWSER_SESSION
+    if (!sessionId) {
+      console.error('Error: -s/--session is required.')
+      console.error('Always run `runbrowser session new` first to get a session ID to use.')
       process.exit(1)
     }
 
-    const result = (await response.json()) as {
-      text: string
-      images: Array<{ data: string; mimeType: string }>
-      isError: boolean
-    }
+    const client = createClient(options)
 
-    // Print output
-    if (result.text) {
+    try {
+      // Ensure relay server is running
+      await client.ensureServer(cliRelayEnv)
+
+      // Warn if extension is outdated
+      const extensions = await client.fetchExtensionsStatus()
+      for (const ext of extensions) {
+        const warning = getExtensionOutdatedWarning(ext.extensionVersion)
+        if (warning) {
+          console.error(warning)
+          break
+        }
+      }
+
+      const result = await client.execute(sessionId, options.eval, options.timeout || 10000)
+
+      if (result.text) {
+        if (result.isError) {
+          console.error(result.text)
+        } else {
+          console.log(result.text)
+        }
+      }
+
+      if (result.images && result.images.length > 0) {
+        console.log(`\n${result.images.length} screenshot(s) captured`)
+      }
+
       if (result.isError) {
-        console.error(result.text)
-      } else {
-        console.log(result.text)
+        process.exit(1)
       }
-    }
-
-    // Note: images are base64 encoded, we could save them to files if needed
-    if (result.images && result.images.length > 0) {
-      console.log(`\n${result.images.length} screenshot(s) captured`)
-    }
-
-    if (result.isError) {
+    } catch (error: any) {
+      if (error.cause?.code === 'ECONNREFUSED') {
+        console.error('Error: Cannot connect to relay server.')
+        console.error('The RunBrowser relay server should start automatically. Check logs at:')
+        console.error(`  ${LOG_FILE_PATH}`)
+      } else {
+        console.error(`Error: ${error.message}`)
+      }
       process.exit(1)
     }
-  } catch (error: any) {
-    if (error.cause?.code === 'ECONNREFUSED') {
-      console.error('Error: Cannot connect to relay server.')
-      console.error('The RunBrowser relay server should start automatically. Check logs at:')
-      console.error(`  ${LOG_FILE_PATH}`)
-    } else {
-      console.error(`Error: ${error.message}`)
-    }
-    process.exit(1)
-  }
-}
+  })
 
 // Session management commands
 cli
@@ -209,28 +110,15 @@ cli
   .option('--host <host>', 'Remote relay server host')
   .option('--browser <stableKey>', 'Stable browser key when multiple browsers are connected')
   .action(async (options: { host?: string; browser?: string }) => {
-    const isLocal = !options.host && !process.env.RUNBROWSER_HOST && !process.env.RUNBROWSER_HOST
+    const client = createClient(options)
 
-    let extensions: ExtensionStatus[] = []
+    // Ensure server and wait for extensions
+    await client.ensureServer(cliRelayEnv)
+    let extensions = await client.waitForExtensions({ timeoutMs: 12000, pollIntervalMs: 250 })
 
-    if (isLocal) {
-      await ensureRelayServer({ logger: console, env: cliRelayEnv })
-      extensions = await waitForConnectedExtensions({
-        timeoutMs: 12000,
-        pollIntervalMs: 250,
-        logger: console,
-      })
-
-      if (extensions.length === 0) {
-        console.log(pc.dim('Waiting briefly for extension to reconnect...'))
-        extensions = await waitForConnectedExtensions({
-          timeoutMs: 10000,
-          pollIntervalMs: 250,
-          logger: console,
-        })
-      }
-    } else {
-      extensions = await fetchExtensionsStatus(options.host)
+    if (extensions.length === 0) {
+      console.log(pc.dim('Waiting briefly for extension to reconnect...'))
+      extensions = await client.waitForExtensions({ timeoutMs: 10000, pollIntervalMs: 250 })
     }
 
     if (extensions.length === 0) {
@@ -238,7 +126,7 @@ cli
       process.exit(1)
     }
 
-    // Warn if any connected extension was built with an older runbrowser version
+    // Warn if any connected extension is outdated
     for (const ext of extensions) {
       const warning = getExtensionOutdatedWarning(ext.extensionVersion)
       if (warning) {
@@ -247,54 +135,38 @@ cli
       }
     }
 
-    let selectedExtension: ExtensionStatus | null = null
+    // Select extension
+    let selectedExtension = extensions[0]
 
-    if (extensions.length === 1) {
-      selectedExtension = extensions[0]
-    } else if (!options.browser) {
-      console.log('Multiple browsers detected:\n')
-      console.log('KEY                      BROWSER  PROFILE')
-      console.log('-----------------------  -------  -------')
-      for (const extension of extensions) {
-        const label = extension.profile?.email || '(not signed in)'
-        const stableKey = extension.stableKey || '-'
-        console.log(`${stableKey.padEnd(23)}  ${(extension.browser || 'Chrome').padEnd(7)}  ${label}`)
-      }
-      console.log('\nRun again with --browser <stableKey>.')
-      process.exit(1)
-    } else {
-      const browserArg = options.browser
-      selectedExtension = extensions.find((extension) => extension.stableKey === browserArg) || null
-      if (!selectedExtension) {
-        console.error(`Browser not found: ${browserArg}`)
+    if (extensions.length > 1) {
+      if (!options.browser) {
+        console.log('Multiple browsers detected:\n')
+        console.log('KEY                      BROWSER  PROFILE')
+        console.log('-----------------------  -------  -------')
+        for (const extension of extensions) {
+          const label = extension.profile?.email || '(not signed in)'
+          const stableKey = extension.stableKey || '-'
+          console.log(`${stableKey.padEnd(23)}  ${(extension.browser || 'Chrome').padEnd(7)}  ${label}`)
+        }
+        console.log('\nRun again with --browser <stableKey>.')
         process.exit(1)
       }
-    }
 
-    if (!selectedExtension) {
-      console.error('Unable to determine browser identity.')
-      process.exit(1)
+      const found = extensions.find((ext) => ext.stableKey === options.browser)
+      if (!found) {
+        console.error(`Browser not found: ${options.browser}`)
+        process.exit(1)
+      }
+      selectedExtension = found
     }
 
     try {
-      const serverUrl = await getServerUrl(options.host)
       const extensionId =
         selectedExtension.extensionId === 'default'
           ? null
           : selectedExtension.stableKey || selectedExtension.extensionId
-      const cwd = process.cwd()
-      const response = await fetch(`${serverUrl}/cli/session/new`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extensionId, cwd }),
-      })
-      if (!response.ok) {
-        const text = await response.text()
-        console.error(`Error: ${response.status} ${text}`)
-        process.exit(1)
-      }
-      const result = (await response.json()) as { id: string; extensionId: string | null }
-      console.log(`Session ${result.id} created. Use with: runbrowser -s ${result.id} -e "..."`)
+      const session = await client.createSession({ extensionId, cwd: process.cwd() })
+      console.log(`Session ${session.id} created. Use with: runbrowser -s ${session.id} -e "..."`)
     } catch (error: any) {
       console.error(`Error: ${error.message}`)
       process.exit(1)
@@ -305,80 +177,54 @@ cli
   .command('session list', 'List all active sessions')
   .option('--host <host>', 'Remote relay server host')
   .action(async (options: { host?: string }) => {
-    if (!options.host && !process.env.RUNBROWSER_HOST && !process.env.RUNBROWSER_HOST) {
-      await ensureRelayServer({ logger: console, env: cliRelayEnv })
-    }
-
-    const serverUrl = await getServerUrl(options.host)
-    let sessions: Array<{
-      id: string
-      stateKeys: string[]
-      browser: string | null
-      profile: { email: string; id: string } | null
-      extensionId: string | null
-    }> = []
+    const client = createClient(options)
+    await client.ensureServer(cliRelayEnv)
 
     try {
-      const response = await fetch(`${serverUrl}/cli/sessions`, {
-        signal: AbortSignal.timeout(2000),
-      })
-      if (!response.ok) {
-        console.error(`Error: ${response.status} ${await response.text()}`)
-        process.exit(1)
+      const sessions = await client.listSessions()
+
+      if (sessions.length === 0) {
+        console.log('No active sessions')
+        return
       }
-      const result = (await response.json()) as {
-        sessions: Array<{
-          id: string
-          stateKeys: string[]
-          browser: string | null
-          profile: { email: string; id: string } | null
-          extensionId: string | null
-        }>
+
+      const idWidth = Math.max(2, ...sessions.map((s) => String(s.id).length))
+      const browserWidth = Math.max(7, ...sessions.map((s) => (s.browser || 'Chrome').length))
+      const profileWidth = Math.max(7, ...sessions.map((s) => (s.profile?.email || '').length || 1))
+      const extensionWidth = Math.max(2, ...sessions.map((s) => (s.extensionId || '').length || 1))
+      const stateWidth = Math.max(10, ...sessions.map((s) => s.stateKeys.join(', ').length || 1))
+
+      console.log(
+        'ID'.padEnd(idWidth) +
+          '  ' +
+          'BROWSER'.padEnd(browserWidth) +
+          '  ' +
+          'PROFILE'.padEnd(profileWidth) +
+          '  ' +
+          'EXT'.padEnd(extensionWidth) +
+          '  ' +
+          'STATE KEYS',
+      )
+      console.log('-'.repeat(idWidth + browserWidth + profileWidth + extensionWidth + stateWidth + 8))
+
+      for (const session of sessions) {
+        const stateStr = session.stateKeys.length > 0 ? session.stateKeys.join(', ') : '-'
+        const profileLabel = session.profile?.email || '-'
+        console.log(
+          String(session.id).padEnd(idWidth) +
+            '  ' +
+            (session.browser || 'Chrome').padEnd(browserWidth) +
+            '  ' +
+            profileLabel.padEnd(profileWidth) +
+            '  ' +
+            (session.extensionId || '-').padEnd(extensionWidth) +
+            '  ' +
+            stateStr,
+        )
       }
-      sessions = result.sessions
     } catch (error: any) {
       console.error(`Error: ${error.message}`)
       process.exit(1)
-    }
-
-    if (sessions.length === 0) {
-      console.log('No active sessions')
-      return
-    }
-
-    const idWidth = Math.max(2, ...sessions.map((session) => String(session.id).length))
-    const browserWidth = Math.max(7, ...sessions.map((session) => (session.browser || 'Chrome').length))
-    const profileWidth = Math.max(7, ...sessions.map((session) => (session.profile?.email || '').length || 1))
-    const extensionWidth = Math.max(2, ...sessions.map((session) => (session.extensionId || '').length || 1))
-    const stateWidth = Math.max(10, ...sessions.map((session) => session.stateKeys.join(', ').length || 1))
-
-    console.log(
-      'ID'.padEnd(idWidth) +
-        '  ' +
-        'BROWSER'.padEnd(browserWidth) +
-        '  ' +
-        'PROFILE'.padEnd(profileWidth) +
-        '  ' +
-        'EXT'.padEnd(extensionWidth) +
-        '  ' +
-        'STATE KEYS',
-    )
-    console.log('-'.repeat(idWidth + browserWidth + profileWidth + extensionWidth + stateWidth + 8))
-
-    for (const session of sessions) {
-      const stateStr = session.stateKeys.length > 0 ? session.stateKeys.join(', ') : '-'
-      const profileLabel = session.profile?.email || '-'
-      console.log(
-        String(session.id).padEnd(idWidth) +
-          '  ' +
-          (session.browser || 'Chrome').padEnd(browserWidth) +
-          '  ' +
-          profileLabel.padEnd(profileWidth) +
-          '  ' +
-          (session.extensionId || '-').padEnd(extensionWidth) +
-          '  ' +
-          stateStr,
-      )
     }
   })
 
@@ -386,25 +232,11 @@ cli
   .command('session delete <sessionId>', 'Delete a session and clear its state')
   .option('--host <host>', 'Remote relay server host')
   .action(async (sessionId: string, options: { host?: string }) => {
-    const serverUrl = await getServerUrl(options.host)
-
-    if (!options.host && !process.env.RUNBROWSER_HOST && !process.env.RUNBROWSER_HOST) {
-      await ensureRelayServer({ logger: console, env: cliRelayEnv })
-    }
+    const client = createClient(options)
+    await client.ensureServer(cliRelayEnv)
 
     try {
-      const response = await fetch(`${serverUrl}/cli/session/delete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId }),
-      })
-
-      if (!response.ok) {
-        const result = (await response.json()) as { error: string }
-        console.error(`Error: ${result.error}`)
-        process.exit(1)
-      }
-
+      await client.deleteSession(sessionId)
       console.log(`Session ${sessionId} deleted.`)
     } catch (error: any) {
       console.error(`Error: ${error.message}`)
@@ -416,27 +248,11 @@ cli
   .command('session reset <sessionId>', 'Reset the browser connection for a session')
   .option('--host <host>', 'Remote relay server host')
   .action(async (sessionId: string, options: { host?: string }) => {
-    const cwd = process.cwd()
-    const serverUrl = await getServerUrl(options.host)
-
-    if (!options.host && !process.env.RUNBROWSER_HOST && !process.env.RUNBROWSER_HOST) {
-      await ensureRelayServer({ logger: console, env: cliRelayEnv })
-    }
+    const client = createClient(options)
+    await client.ensureServer(cliRelayEnv)
 
     try {
-      const response = await fetch(`${serverUrl}/cli/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, cwd }),
-      })
-
-      if (!response.ok) {
-        const text = await response.text()
-        console.error(`Error: ${response.status} ${text}`)
-        process.exit(1)
-      }
-
-      const result = (await response.json()) as { success: boolean; pageUrl: string; pagesCount: number }
+      const result = await client.reset(sessionId)
       console.log(
         `Connection reset successfully. ${result.pagesCount} page(s) available. Current page URL: ${result.pageUrl}`,
       )
@@ -455,7 +271,7 @@ cli
   .option('--token <token>', 'Authentication token, required when --host is 0.0.0.0 (or use RUNBROWSER_TOKEN env var)')
   .option('--replace', 'Kill existing server if running')
   .action(async (options: { host: string; token?: string; replace?: boolean }) => {
-    const token = options.token || process.env.RUNBROWSER_TOKEN || process.env.RUNBROWSER_TOKEN
+    const token = options.token || process.env.RUNBROWSER_TOKEN
     const isPublicHost = options.host === '0.0.0.0' || options.host === '::'
     if (isPublicHost && !token) {
       console.error('Error: Authentication token is required when binding to a public host.')
@@ -464,32 +280,15 @@ cli
     }
 
     // Check if server is already running on the port
-    const net = await import('node:net')
-    const isPortInUse = await new Promise<boolean>((resolve) => {
-      const socket = new net.Socket()
-      socket.setTimeout(500)
-      socket.on('connect', () => {
-        socket.destroy()
-        resolve(true)
-      })
-      socket.on('timeout', () => {
-        socket.destroy()
-        resolve(false)
-      })
-      socket.on('error', () => {
-        resolve(false)
-      })
-      socket.connect(RELAY_PORT, '127.0.0.1')
-    })
+    const portInUse = await isPortInUse(RELAY_PORT)
 
-    if (isPortInUse) {
+    if (portInUse) {
       if (!options.replace) {
         console.log(`RunBrowser server is already running on port ${RELAY_PORT}`)
         console.log('Tip: Use --replace to kill the existing server and start a new one.')
         process.exit(0)
       }
 
-      // Kill existing process on the port
       console.log(`Killing existing server on port ${RELAY_PORT}...`)
       await killPortProcess({ port: RELAY_PORT })
     }
