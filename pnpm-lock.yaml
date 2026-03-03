@@ -14,73 +14,22 @@ importers:
 
   packages/cli:
     dependencies:
-      '@hono/node-server':
-        specifier: ^1.19.6
-        version: 1.19.9(hono@4.12.3)
-      '@hono/node-ws':
-        specifier: ^1.2.0
-        version: 1.3.0(@hono/node-server@1.19.9(hono@4.12.3))(hono@4.12.3)
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.25.2
-        version: 1.27.1(zod@4.3.6)
-      '@runbrowser/core':
-        specifier: workspace:*
-        version: link:../core
-      '@runbrowser/mcp':
-        specifier: workspace:*
-        version: link:../mcp
       '@runbrowser/relay':
         specifier: workspace:*
         version: link:../relay
       cac:
         specifier: ^6.7.14
         version: 6.7.14
-      hono:
-        specifier: ^4.10.6
-        version: 4.12.3
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
-      playwright-core:
-        specifier: ^1.52.0
-        version: 1.58.2
-      string-dedent:
-        specifier: ^3.0.2
-        version: 3.0.2
-      strip-ansi:
-        specifier: ^7.1.2
-        version: 7.2.0
-      ws:
-        specifier: ^8.18.3
-        version: 8.19.0
-      zod:
-        specifier: ^4.3.5
-        version: 4.3.6
-      zustand:
-        specifier: ^5.0.8
-        version: 5.0.11
     devDependencies:
-      '@types/chrome':
-        specifier: ^0.0.315
-        version: 0.0.315
       '@types/node':
         specifier: ^24.10.1
         version: 24.11.0
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      devtools-protocol:
-        specifier: ^0.0.1568893
-        version: 0.0.1568893
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
-      vite-node:
-        specifier: ^5.3.0
-        version: 5.3.0(@types/node@24.11.0)(tsx@4.21.0)
-      vitest:
-        specifier: ^4.0.8
-        version: 4.0.18(@types/node@24.11.0)(tsx@4.21.0)
 
   packages/core:
     dependencies:
@@ -131,6 +80,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.0.8
+        version: 4.0.18(@types/node@24.11.0)(tsx@4.21.0)
 
   packages/extension:
     dependencies:
@@ -168,6 +120,9 @@ importers:
       '@runbrowser/core':
         specifier: workspace:*
         version: link:../core
+      '@runbrowser/relay':
+        specifier: workspace:*
+        version: link:../relay
       cac:
         specifier: ^6.7.14
         version: 6.7.14
@@ -221,6 +176,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.0.8
+        version: 4.0.18(@types/node@24.11.0)(tsx@4.21.0)
 
   packages/vite-plugin-extension-reload:
     dependencies:
@@ -1132,9 +1090,6 @@ packages:
   es-module-lexer@1.7.0:
     resolution: {integrity: sha512-jEQoCwk8hyb2AZziIOLhDqpm5+2ww5uIE6lkO/6jcOCusfk6LhMHpXXfBLXTZ7Ydyt0j4VoUQv6uGNYbdW+kBA==}
 
-  es-module-lexer@2.0.0:
-    resolution: {integrity: sha512-5POEcUuZybH7IdmGsD8wlf0AI55wMecM9rVBTI/qEAy2c1kTOm3DjFYjrBdI2K3BaJjJYfYFeRtM0t9ssnRuxw==}
-
   es-object-atoms@1.1.1:
     resolution: {integrity: sha512-FGgH2h8zKNim9ljj7dankFPcICIK9Cp5bm+c2gQSYePhpaG5+esrLODihIorn+Pe6FGJzWhXQotPv73jTaldXA==}
     engines: {node: '>= 0.4'}
@@ -1673,11 +1628,6 @@ packages:
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
-
-  vite-node@5.3.0:
-    resolution: {integrity: sha512-8f20COPYJujc3OKPX6OuyBy3ZIv2det4eRRU4GY1y2MjbeGSUmPjedxg1b72KnTagCofwvZ65ThzjxDW2AtQFQ==}
-    engines: {node: ^20.19.0 || >=22.12.0}
-    hasBin: true
 
   vite-plugin-static-copy@3.2.0:
     resolution: {integrity: sha512-g2k9z8B/1Bx7D4wnFjPLx9dyYGrqWMLTpwTtPHhcU+ElNZP2O4+4OsyaficiDClus0dzVhdGvoGFYMJxoXZ12Q==}
@@ -2510,8 +2460,6 @@ snapshots:
 
   es-module-lexer@1.7.0: {}
 
-  es-module-lexer@2.0.0: {}
-
   es-object-atoms@1.1.1:
     dependencies:
       es-errors: 1.3.0
@@ -3149,26 +3097,6 @@ snapshots:
   util-deprecate@1.0.2: {}
 
   vary@1.1.2: {}
-
-  vite-node@5.3.0(@types/node@24.11.0)(tsx@4.21.0):
-    dependencies:
-      cac: 6.7.14
-      es-module-lexer: 2.0.0
-      obug: 2.1.1
-      pathe: 2.0.3
-      vite: 7.3.1(@types/node@24.11.0)(tsx@4.21.0)
-    transitivePeerDependencies:
-      - '@types/node'
-      - jiti
-      - less
-      - lightningcss
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - terser
-      - tsx
-      - yaml
 
   vite-plugin-static-copy@3.2.0(vite@5.4.21(@types/node@24.11.0)):
     dependencies:
