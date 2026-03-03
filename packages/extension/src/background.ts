@@ -5,8 +5,8 @@ declare const __RUNBROWSER_VERSION__: string
 
 import { createStore } from 'zustand/vanilla'
 import type { ExtensionState, ConnectionState, TabState, TabInfo } from './types'
-import type { CDPEvent, Protocol } from 'runbrowser/src/cdp-types'
-import type { ExtensionCommandMessage, ExtensionResponseMessage, RelayToExtensionMessage } from 'runbrowser/src/protocol'
+import type { CDPEvent, Protocol } from '@runbrowser/relay/types'
+import type { ExtensionCommandMessage, ExtensionResponseMessage, RelayToExtensionMessage } from '@runbrowser/relay/protocol'
 
 import {
   getActiveRecordings,

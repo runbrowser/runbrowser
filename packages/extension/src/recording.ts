@@ -13,7 +13,7 @@ import type {
   ExtensionStopRecordingResult,
   IsRecordingResult,
   CancelRecordingResult,
-} from 'runbrowser/src/protocol'
+} from '@runbrowser/relay/protocol'
 import type {
   OffscreenStartRecordingResult,
   OffscreenStopRecordingResult,
