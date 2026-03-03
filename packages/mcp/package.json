@@ -34,6 +34,7 @@
   "license": "MIT",
   "dependencies": {
     "@runbrowser/core": "workspace:*",
+    "@runbrowser/relay": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "cac": "^6.7.14",
     "string-dedent": "^3.0.2",

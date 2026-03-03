@@ -3,126 +3,76 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import fs from 'node:fs'
 import path from 'node:path'
-import util from 'node:util'
 import { createRequire } from 'node:module'
 
-// Prevent Buffers from dumping hex bytes in util.inspect output.
-// Without this, returning a screenshot Buffer would log ~400+ chars of useless hex.
-Buffer.prototype[util.inspect.custom] = function () {
-  return `<Buffer ${this.length} bytes>`
-}
-
 import dedent from 'string-dedent'
-import { LOG_FILE_PATH, VERSION, parseRelayHost, ensureRelayServer, RELAY_PORT } from '@runbrowser/core'
-import { PlaywrightExecutor, CodeExecutionTimeoutError } from '@runbrowser/core/executor'
+import { LOG_FILE_PATH, VERSION } from '@runbrowser/relay'
+import { RelayApiClient } from '@runbrowser/relay/api'
 
 const require = createRequire(import.meta.url)
 
-// Single executor instance for MCP (created lazily)
-let executor: PlaywrightExecutor | null = null
+// ============================================================================
+// Relay API Client instance — single client for this MCP server process
+// ============================================================================
 
-interface RemoteConfig {
-  host: string
-  port: number
-  token?: string
-}
+let client: RelayApiClient | null = null
+let sessionId: string | null = null
 
-function getRemoteConfig(): RemoteConfig | null {
-  const host = process.env.RUNBROWSER_HOST
-  if (!host) {
-    return null
-  }
-  return {
-    host,
-    port: RELAY_PORT,
-    token: process.env.RUNBROWSER_TOKEN,
-  }
-}
-
-function getLogServerUrl(): string {
-  const remote = getRemoteConfig()
-  if (remote) {
-    const { httpBaseUrl } = parseRelayHost(remote.host, remote.port)
-    return `${httpBaseUrl}/mcp-log`
-  }
-  return `http://127.0.0.1:${RELAY_PORT}/mcp-log`
-}
-
-async function sendLogToRelayServer(level: string, ...args: any[]) {
-  try {
-    await fetch(getLogServerUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ level, args }),
-      signal: AbortSignal.timeout(1000),
+function getClient(): RelayApiClient {
+  if (!client) {
+    client = new RelayApiClient({
+      host: process.env.RUNBROWSER_HOST,
+      token: process.env.RUNBROWSER_TOKEN,
+      logger: mcpLogger,
     })
-  } catch {
-    // Silently fail if relay server is not available
   }
+  return client
 }
 
 /**
  * Log to both console.error (for early startup) and relay server log file.
- * Fire-and-forget to avoid blocking.
  */
 function mcpLog(...args: any[]) {
   console.error(...args)
-  sendLogToRelayServer('log', ...args)
+  getClient().sendLog('log', ...args)
 }
 
-/** MCP-specific logger for executor */
 const mcpLogger = {
   log: (...args: any[]) => mcpLog(...args),
   error: (...args: any[]) => {
     console.error(...args)
-    sendLogToRelayServer('error', ...args)
+    getClient().sendLog('error', ...args)
   },
 }
 
-async function ensureRelayServerForMcp(): Promise<void> {
-  await ensureRelayServer({ logger: mcpLogger })
-}
+/**
+ * Ensure relay server is running and we have a session.
+ */
+async function ensureSession(): Promise<string> {
+  const c = getClient()
 
-async function getOrCreateExecutor(): Promise<PlaywrightExecutor> {
-  if (executor) {
-    return executor
+  // Ensure relay server is running
+  if (!c.isRemote) {
+    await c.ensureServer()
   }
 
-  const remote = getRemoteConfig()
-  if (!remote) {
-    await ensureRelayServerForMcp()
+  if (sessionId) {
+    return sessionId
   }
 
-  // Pass config instead of pre-generated URL so executor can generate unique URLs for each connection
-  const cdpConfig = remote || { port: RELAY_PORT }
-  executor = new PlaywrightExecutor({
-    cdpConfig,
-    logger: mcpLogger,
-    cwd: process.cwd(),
-  })
+  // Wait for extension
+  await c.waitForExtensions({ timeoutMs: 15000, pollIntervalMs: 500 })
 
-  return executor
+  // Create session
+  const session = await c.createSession({ cwd: process.cwd() })
+  sessionId = session.id
+  mcpLog(`MCP session created: ${sessionId}`)
+  return sessionId
 }
 
-async function checkRemoteServer({ host, port }: { host: string; port: number }): Promise<void> {
-  const { httpBaseUrl } = parseRelayHost(host, port)
-  const versionUrl = `${httpBaseUrl}/version`
-  try {
-    const response = await fetch(versionUrl, { signal: AbortSignal.timeout(3000) })
-    if (!response.ok) {
-      throw new Error(`Server responded with status ${response.status}`)
-    }
-  } catch (error: any) {
-    const isConnectionError = error.cause?.code === 'ECONNREFUSED' || error.name === 'TimeoutError'
-    if (isConnectionError) {
-      throw new Error(
-        `Cannot connect to remote relay server at ${host}. ` +
-          `Make sure 'npx -y runbrowser serve' is running on the host machine.`,
-      )
-    }
-    throw new Error(`Failed to connect to remote relay server: ${error.message}`)
-  }
-}
+// ============================================================================
+// MCP Server Definition
+// ============================================================================
 
 /** Resolve a resource file from the @runbrowser/core package dist/ directory */
 function resolveCoreDistFile(filename: string): string {
@@ -189,16 +139,10 @@ server.tool(
   },
   async ({ code, timeout }) => {
     try {
-      // Check relay server on every execute to auto-recover from crashes
-      const remote = getRemoteConfig()
-      if (!remote) {
-        await ensureRelayServerForMcp()
-      }
+      const sid = await ensureSession()
+      const c = getClient()
+      const result = await c.execute(sid, code, timeout)
 
-      const exec = await getOrCreateExecutor()
-      const result = await exec.execute(code, timeout)
-
-      // Transform executor result to MCP format
       const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
         { type: 'text', text: result.text },
       ]
@@ -213,23 +157,25 @@ server.tool(
 
       return { content }
     } catch (error: any) {
-      const errorStack = error.stack || error.message
-      const isTimeoutError =
-        error instanceof CodeExecutionTimeoutError || error?.name === 'TimeoutError' || error?.name === 'AbortError'
+      const errorMessage = error.message || String(error)
+      const isTimeoutError = error.name === 'TimeoutError' || error.name === 'AbortError'
 
-      console.error('Error in execute tool:', errorStack)
+      console.error('Error in execute tool:', errorMessage)
       if (!isTimeoutError) {
-        sendLogToRelayServer('error', 'Error in execute tool:', errorStack)
+        getClient().sendLog('error', 'Error in execute tool:', errorMessage)
+      }
+
+      // Clear session on 404 so next call creates a new one
+      if (errorMessage.includes('404')) {
+        sessionId = null
       }
 
       const resetHint = isTimeoutError
         ? ''
         : '\n\n[HINT: If this is an internal Playwright error, page/browser closed, or connection issue, call the `reset` tool to reconnect. Do NOT reset for other non-connection non-internal errors.]'
 
-      // timeout stacks are internal noise (Promise.race / setTimeout); only show the message
-      const errorText = isTimeoutError ? error.message : errorStack
       return {
-        content: [{ type: 'text', text: `Error executing code: ${errorText}${resetHint}` }],
+        content: [{ type: 'text', text: `Error executing code: ${errorMessage}${resetHint}` }],
         isError: true,
       }
     }
@@ -250,24 +196,22 @@ server.tool(
   {},
   async () => {
     try {
-      // Check relay server to auto-recover from crashes
-      const remote = getRemoteConfig()
-      if (!remote) {
-        await ensureRelayServerForMcp()
-      }
+      const sid = await ensureSession()
+      const c = getClient()
+      const result = await c.reset(sid)
 
-      const exec = await getOrCreateExecutor()
-      const { page, context } = await exec.reset()
-      const pagesCount = context.pages().length
       return {
         content: [
           {
             type: 'text',
-            text: `Connection reset successfully. ${pagesCount} page(s) available. Current page URL: ${page.url()}`,
+            text: `Connection reset successfully. ${result.pagesCount} page(s) available. Current page URL: ${result.pageUrl}`,
           },
         ],
       }
     } catch (error: any) {
+      if (error.message?.includes('404')) {
+        sessionId = null
+      }
       return {
         content: [{ type: 'text', text: `Failed to reset connection: ${error.message}` }],
         isError: true,
@@ -289,15 +233,12 @@ server.tool(
   },
   async ({ search, interactiveOnly }) => {
     try {
-      const remote = getRemoteConfig()
-      if (!remote) {
-        await ensureRelayServerForMcp()
-      }
+      const sid = await ensureSession()
+      const c = getClient()
 
-      const exec = await getOrCreateExecutor()
       const searchPattern = search || undefined
       const code = `await snapshot({ page, search: ${searchPattern ? `"${searchPattern.replace(/"/g, '\\"')}"` : 'undefined'}, interactiveOnly: ${interactiveOnly} })`
-      const result = await exec.execute(code, 10000)
+      const result = await c.execute(sid, code, 10000)
 
       return {
         content: [{ type: 'text', text: result.text }],
@@ -323,13 +264,10 @@ server.tool(
   {},
   async () => {
     try {
-      const remote = getRemoteConfig()
-      if (!remote) {
-        await ensureRelayServerForMcp()
-      }
+      const sid = await ensureSession()
+      const c = getClient()
 
-      const exec = await getOrCreateExecutor()
-      const result = await exec.execute('await screenshotWithAccessibilityLabels({ page })', 20000)
+      const result = await c.execute(sid, 'await screenshotWithAccessibilityLabels({ page })', 20000)
 
       const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
         { type: 'text', text: result.text },
@@ -359,13 +297,12 @@ export async function startMcp(options: { host?: string; token?: string } = {}) 
     process.env.RUNBROWSER_TOKEN = options.token
   }
 
-  const remote = getRemoteConfig()
-  if (!remote) {
-    await ensureRelayServerForMcp()
-  } else {
-    mcpLog(`Using remote CDP relay server: ${remote.host}`)
-    await checkRemoteServer(remote)
+  // Initialize client and ensure server
+  const c = getClient()
+  if (c.isRemote) {
+    mcpLog(`Using remote CDP relay server: ${options.host}`)
   }
+  await c.ensureServer()
 
   const transport = new StdioServerTransport()
   await server.connect(transport)
