@@ -1753,7 +1753,7 @@ export async function startRunBrowserCDPRelayServer({
       const existingExecutor = manager.getSession(sessionId)
       if (!existingExecutor) {
         return c.json(
-          { text: `Session ${sessionId} not found. Run 'runbrowser session new' first.`, images: [], isError: true },
+          { text: `Session ${sessionId} not found. Run 'runbrowser session-new' first.`, images: [], isError: true },
           404,
         )
       }
@@ -1778,7 +1778,7 @@ export async function startRunBrowserCDPRelayServer({
       const manager = executorManager
       const existingExecutor = manager.getSession(sessionId)
       if (!existingExecutor) {
-        return c.json({ error: `Session ${sessionId} not found. Run 'runbrowser session new' first.` }, 404)
+        return c.json({ error: `Session ${sessionId} not found. Run 'runbrowser session-new' first.` }, 404)
       }
       const { page, context } = await existingExecutor.reset()
 

@@ -5,8 +5,8 @@ If `runbrowser` command is not found, install globally or use npx/bunx:
 ```bash
 npm install -g runbrowser@latest
 # or use without installing:
-npx runbrowser@latest session new
-bunx runbrowser@latest session new
+npx runbrowser@latest session-new
+bunx runbrowser@latest session-new
 ```
 
 If using npx or bunx always use @latest for the first session command. so we are sure of using the latest version of the package
@@ -22,7 +22,7 @@ Each session runs in an **isolated sandbox** with its own `state` object. Use se
 Get a new session ID to use in commands:
 
 ```bash
-runbrowser session new
+runbrowser session-new
 # outputs: 1
 ```
 
@@ -31,7 +31,7 @@ runbrowser session new
 List all active sessions with their state keys:
 
 ```bash
-runbrowser session list
+runbrowser session-list
 # ID  State Keys
 # --------------
 # 1   myPage, userData
@@ -41,39 +41,39 @@ runbrowser session list
 Reset a session if the browser connection is stale or broken:
 
 ```bash
-runbrowser session reset <sessionId>
+runbrowser session-reset <sessionId>
 ```
 
 ### Execute code
 
 ```bash
-runbrowser -s <sessionId> -e "<code>"
+runbrowser exec -s <sessionId> -e "<code>"
 ```
 
-The `-s` flag specifies a session ID (required). Get one with `runbrowser session new`. Use the same session to persist state across commands.
+The `-s` flag specifies a session ID (required). Get one with `runbrowser session-new`. Use the same session to persist state across commands.
 
-Default timeout is 10 seconds. you can increase the timeout with `--timeout <ms>`
+Default timeout is 10 seconds. You can increase the timeout with `--timeout <ms>`
 
 **Examples:**
 
 ```bash
 # Navigate to a page
-runbrowser -s 1 -e 'state.page = await context.newPage(); await state.page.goto("https://example.com")'
+runbrowser exec -s 1 -e 'state.page = await context.newPage(); await state.page.goto("https://example.com")'
 
 # Click a button
-runbrowser -s 1 -e 'await state.page.click("button")'
+runbrowser exec -s 1 -e 'await state.page.click("button")'
 
 # Get page title
-runbrowser -s 1 -e 'await state.page.title()'
+runbrowser exec -s 1 -e 'await state.page.title()'
 
 # Take a screenshot
-runbrowser -s 1 -e 'await state.page.screenshot({ path: "screenshot.png", scale: "css" })'
+runbrowser exec -s 1 -e 'await state.page.screenshot({ path: "screenshot.png", scale: "css" })'
 
 # Get accessibility snapshot
-runbrowser -s 1 -e 'await snapshot({ page: state.page })'
+runbrowser exec -s 1 -e 'await snapshot({ page: state.page })'
 
 # Get accessibility snapshot for a specific iframe
-runbrowser -s 1 -e 'const frame = await state.page.locator("iframe").contentFrame(); await snapshot({ frame })'
+runbrowser exec -s 1 -e 'const frame = await state.page.locator("iframe").contentFrame(); await snapshot({ frame })'
 ```
 
 **Why single quotes?** Always wrap `-e` code in single quotes (`'...'`) to prevent bash from interpreting `$`, backticks, and other special characters inside your JS code. Use double quotes or backtick template literals for strings inside the JS code.
@@ -82,7 +82,7 @@ runbrowser -s 1 -e 'const frame = await state.page.locator("iframe").contentFram
 
 ```bash
 # Preferred: use heredoc with quoted delimiter (disables all bash expansion)
-runbrowser -s 1 -e "$(cat <<'EOF'
+runbrowser exec -s 1 -e "$(cat <<'EOF'
 const links = await state.page.$$eval('a', els => els.map(e => e.href));
 console.log('Found', links.length, 'links');
 const price = text.match(/\$[\d.]+/);
@@ -91,7 +91,7 @@ EOF
 
 # Alternative: $'...' syntax (but beware: \n and \t become special, and
 # single quotes inside must be escaped as \')
-runbrowser -s 1 -e $'
+runbrowser exec -s 1 -e $'
 const title = await state.page.title();
 const url = state.page.url();
 console.log({ title, url });
@@ -341,13 +341,13 @@ Bash parses `$`, backticks, and `\` inside double-quoted strings. This silently 
 
 ```bash
 # BAD: double quotes — bash interprets $ and backticks in your JS
-runbrowser -s 1 -e "const price = text.match(/\$[\d.]+/)"
+runbrowser exec -s 1 -e "const price = text.match(/\$[\d.]+/)"
 
 # GOOD: single quotes — bash passes everything through literally
-runbrowser -s 1 -e 'await state.page.locator(`[id="_r_a_"]`).click()'
+runbrowser exec -s 1 -e 'await state.page.locator(`[id="_r_a_"]`).click()'
 
 # GOOD: heredoc for complex code with mixed quotes
-runbrowser -s 1 -e "$(cat <<'EOF'
+runbrowser exec -s 1 -e "$(cat <<'EOF'
 await state.page.locator('[id="_r_a_"]').click()
 const match = html.match(/\$[\d.]+/g)
 EOF

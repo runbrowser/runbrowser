@@ -1,6 +1,6 @@
 {
   "name": "@agmod/runbrowser",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Control your running Chrome browser via Playwright — your logins, extensions, cookies already there",
   "type": "module",
   "exports": {
@@ -42,11 +42,12 @@
   },
   "dependencies": {
     "@agmod/runbrowser-relay": "workspace:*",
-    "cac": "^6.7.14",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@types/yargs": "^17.0.35",
     "typescript": "^5.9.3"
   }
 }

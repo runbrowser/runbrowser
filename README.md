@@ -39,10 +39,10 @@ Click the extension icon on a tab. It turns **green** when connected.
 npm i -g @agmod/runbrowser
 
 # create a session
-runbrowser session new
+runbrowser session-new
 
 # navigate to a URL in the active tab
-runbrowser -s 1 -e "await page.goto('https://example.com')"
+runbrowser exec -s 1 -e "await page.goto('https://example.com')"
 ```
 
 ### 5. Add the Skill to Your Agent (Optional)
@@ -66,16 +66,16 @@ npx -y skills add yuanjiwei/runbrowser
 
 ```bash
 # create a stateful sandbox, outputs session id (e.g. 1)
-runbrowser session new
+runbrowser session-new
 
 # navigate to a URL
-runbrowser -s 1 -e "await page.goto('https://example.com')"
+runbrowser exec -s 1 -e "await page.goto('https://example.com')"
 
 # get the accessibility tree of the page
-runbrowser -s 1 -e "console.log(await snapshot({ page }))"
+runbrowser exec -s 1 -e "console.log(await snapshot({ page }))"
 
 # click an element by its accessibility reference
-runbrowser -s 1 -e "await page.locator('aria-ref=e5').click()"
+runbrowser exec -s 1 -e "await page.locator('aria-ref=e5').click()"
 ```
 
 > **Tip:** Always use single quotes for `-e` to prevent bash from interpreting `$`, backticks, and `\` in your JS code. Use double quotes for strings inside the JS.
@@ -86,14 +86,14 @@ Each session has **isolated state**. Browser tabs are **shared** across sessions
 
 ```bash
 # Session management
-runbrowser session new              # creates stateful sandbox, outputs id (e.g. 1)
-runbrowser session list             # show sessions + state keys
-runbrowser session reset <id>       # fix connection issues
+runbrowser session-new              # creates stateful sandbox, outputs id (e.g. 1)
+runbrowser session-list             # show sessions + state keys
+runbrowser session-reset <id>       # fix connection issues
 
 # Execute (always use -s)
-runbrowser -s 1 -e 'await page.goto("https://example.com")'
-runbrowser -s 1 -e 'await page.click("button")'
-runbrowser -s 1 -e 'console.log(await page.title())'
+runbrowser exec -s 1 -e 'await page.goto("https://example.com")'
+runbrowser exec -s 1 -e 'await page.click("button")'
+runbrowser exec -s 1 -e 'console.log(await page.title())'
 
 # High-level commands
 runbrowser navigate <url> -s 1
