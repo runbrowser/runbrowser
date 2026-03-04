@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @runbrowser/relay build && pnpm --filter @runbrowser/core build && pnpm --filter @runbrowser/mcp --filter runbrowser build",
+    "build": "pnpm --filter @agmod/runbrowser-relay build && pnpm --filter @agmod/runbrowser-core build && pnpm --filter @agmod/runbrowser-mcp --filter @agmod/runbrowser build",
     "build:extension": "pnpm --filter mcp-extension build",
     "dev:extension": "pnpm --filter mcp-extension dev",
     "build:all": "pnpm run build && pnpm run build:extension",
-    "typecheck": "pnpm --filter @runbrowser/core typecheck && pnpm --filter @runbrowser/mcp typecheck && pnpm --filter runbrowser typecheck",
-    "test": "pnpm --filter runbrowser test"
+    "typecheck": "pnpm --filter @agmod/runbrowser-core typecheck && pnpm --filter @agmod/runbrowser-mcp typecheck && pnpm --filter @agmod/runbrowser typecheck",
+    "test": "pnpm --filter @agmod/runbrowser test",
+    "publish:all": "pnpm run build && pnpm --filter @agmod/runbrowser-relay publish --no-git-checks && pnpm --filter @agmod/runbrowser-core publish --no-git-checks && pnpm --filter @agmod/runbrowser-mcp publish --no-git-checks && pnpm --filter @agmod/runbrowser publish --no-git-checks"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
