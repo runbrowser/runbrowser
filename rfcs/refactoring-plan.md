@@ -293,10 +293,10 @@ These files import Playwright types but may still be useful:
 
 ```bash
 # packages/core/package.json
-pnpm remove playwright-core --filter @runbrowser/core
+pnpm remove playwright-core --filter @agmod/runbrowser-core
 
 # packages/relay/package.json  
-pnpm remove playwright-core --filter @runbrowser/relay
+pnpm remove playwright-core --filter @agmod/runbrowser-relay
 
 # packages/e2e/package.json
 pnpm remove playwright-core --filter @runbrowser/e2e
