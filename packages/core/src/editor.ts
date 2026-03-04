@@ -1,4 +1,4 @@
-import type { ICDPSession } from './cdp-session.js'
+import type { ICDPSession } from './cdp-types.js'
 
 export interface ReadResult {
   content: string

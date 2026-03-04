@@ -1,4 +1,4 @@
-import type { ICDPSession } from './cdp-session.js'
+import type { ICDPSession } from './cdp-types.js'
 import type { Protocol } from 'devtools-protocol'
 
 export interface BreakpointInfo {

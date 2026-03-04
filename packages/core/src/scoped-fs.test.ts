@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ScopedFS } from '@runbrowser/core'
+import { ScopedFS } from '@agmod/runbrowser-core'
 
 function withTempSandbox(
   fn: (paths: {

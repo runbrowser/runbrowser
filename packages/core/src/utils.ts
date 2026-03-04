@@ -1,5 +1,5 @@
 /**
- * Shared utilities — re-exported from @runbrowser/relay.
+ * Shared utilities — re-exported from runbrowser-relay.
  *
  * The canonical source lives in the relay-server package.
  * This module re-exports everything so existing internal CLI imports
@@ -13,4 +13,4 @@ export {
   LOG_CDP_FILE_PATH,
   VERSION,
   sleep,
-} from '@runbrowser/relay/utils'
+} from '@agmod/runbrowser-relay/utils'

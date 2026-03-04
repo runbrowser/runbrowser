@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shouldAutoReturn, wrapCode } from '@runbrowser/core/executor'
+import { shouldAutoReturn, wrapCode } from '@agmod/runbrowser-core/executor'
 
 describe('shouldAutoReturn', () => {
   it('returns true for simple expressions', () => {

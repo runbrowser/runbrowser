@@ -1,7 +1,7 @@
 {
-  "name": "@runbrowser/core",
-  "version": "0.0.1",
-  "description": "Shared core library for RunBrowser — executor, ffmpeg, recording, snapshots, and browser automation utilities",
+  "name": "@agmod/runbrowser-core",
+  "version": "0.0.2",
+  "description": "Shared core library for RunBrowser — debugger, editor, ffmpeg, diff, and browser utilities",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,25 +10,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./executor": {
-      "types": "./dist/executor.d.ts",
-      "import": "./dist/executor.js"
-    },
     "./ffmpeg": {
       "types": "./dist/ffmpeg.d.ts",
       "import": "./dist/ffmpeg.js"
-    },
-    "./screen-recording": {
-      "types": "./dist/screen-recording.d.ts",
-      "import": "./dist/screen-recording.js"
-    },
-    "./aria-snapshot": {
-      "types": "./dist/aria-snapshot.d.ts",
-      "import": "./dist/aria-snapshot.js"
-    },
-    "./cdp-session": {
-      "types": "./dist/cdp-session.d.ts",
-      "import": "./dist/cdp-session.js"
     },
     "./package.json": "./package.json"
   },
@@ -56,24 +40,20 @@
   },
   "homepage": "https://github.com/yuanjiwei/runbrowser",
   "license": "MIT",
-  "dependencies": {
-    "@runbrowser/relay": "workspace:*",
-    "acorn": "^8.15.0",
-    "async-sema": "^3.1.1",
-    "diff": "^8.0.2",
-    "dom-accessibility-api": "^0.7.1",
-    "playwright-core": "^1.52.0",
-    "posthtml": "^0.16.7",
-    "posthtml-beautify": "^0.7.0",
-    "ws": "^8.18.3"
+  "publishConfig": {
+    "access": "public"
   },
-  "optionalDependencies": {
-    "sharp": "^0.34.5"
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@agmod/runbrowser-relay": "workspace:*",
+    "diff": "^8.0.2",
+    "posthtml": "^0.16.7",
+    "posthtml-beautify": "^0.7.0"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.315",
     "@types/node": "^24.10.1",
-    "@types/ws": "^8.18.1",
     "devtools-protocol": "^0.0.1568893",
     "typescript": "^5.9.3",
     "vitest": "^4.0.8"
