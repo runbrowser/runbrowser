@@ -1,15 +1,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import fs from 'node:fs'
-import path from 'node:path'
-import { createRequire } from 'node:module'
 
 import dedent from 'string-dedent'
-import { LOG_FILE_PATH, VERSION } from '@runbrowser/relay'
-import { RelayApiClient } from '@runbrowser/relay/api'
-
-const require = createRequire(import.meta.url)
+import { LOG_FILE_PATH, VERSION } from '@agmod/runbrowser-relay'
+import { RelayApiClient } from '@agmod/runbrowser-relay/api'
 
 // ============================================================================
 // Relay API Client instance — single client for this MCP server process
@@ -74,217 +69,269 @@ async function ensureSession(): Promise<string> {
 // MCP Server Definition
 // ============================================================================
 
-/** Resolve a resource file from the @runbrowser/core package dist/ directory */
-function resolveCoreDistFile(filename: string): string {
-  const corePkgDir = path.dirname(require.resolve('@runbrowser/core/package.json'))
-  return fs.readFileSync(path.join(corePkgDir, 'dist', filename), 'utf-8')
-}
-
 const server = new McpServer({
   name: 'runbrowser',
-  title: 'Control your running Chrome browser via Playwright — your logins, extensions, cookies already there.',
+  title: 'Control your running Chrome browser — your logins, extensions, cookies already there.',
   version: VERSION,
 })
 
-const promptContent =
-  resolveCoreDistFile('prompt.md') +
-  `\n\nfor debugging internal runbrowser errors, check runbrowser relay server logs at: ${LOG_FILE_PATH}`
+// System prompt teaching AI agents how to use the new tool set
+const systemPrompt = dedent`
+  You are controlling a real Chrome browser. The browser already has the user's logins, extensions, and cookies.
 
-server.resource(
-  'debugger-api',
-  'runbrowser://resources/debugger-api.md',
-  { mimeType: 'text/plain' },
-  async () => {
-    const content = resolveCoreDistFile('debugger-api.md')
-    return {
-      contents: [{ uri: 'runbrowser://resources/debugger-api.md', text: content, mimeType: 'text/plain' }],
-    }
-  },
-)
+  ## Workflow
+  1. Use \`snapshot\` to see the current page (returns accessibility tree with @ref labels on interactive elements)
+  2. Use @ref labels from snapshot to interact: \`click @e1\`, \`fill @e2 with "text"\`
+  3. Use \`evaluate\` for complex JS operations the high-level tools can't do
+  4. Re-snapshot after actions to verify results
+  5. Use \`screenshot\` when you need visual layout information
 
-server.resource(
-  'editor-api',
-  'runbrowser://resources/editor-api.md',
-  { mimeType: 'text/plain' },
-  async () => {
-    const content = resolveCoreDistFile('editor-api.md')
-    return {
-      contents: [{ uri: 'runbrowser://resources/editor-api.md', text: content, mimeType: 'text/plain' }],
-    }
-  },
-)
+  ## Element References
+  - \`snapshot\` returns elements tagged with @e1, @e2, etc.
+  - Pass these refs to \`click\`, \`fill\`, \`hover\`, \`get_text\`
+  - Refs are valid until the next \`snapshot\` call
 
-server.resource(
-  'styles-api',
-  'runbrowser://resources/styles-api.md',
-  { mimeType: 'text/plain' },
-  async () => {
-    const content = resolveCoreDistFile('styles-api.md')
-    return {
-      contents: [{ uri: 'runbrowser://resources/styles-api.md', text: content, mimeType: 'text/plain' }],
+  for debugging internal runbrowser errors, check runbrowser relay server logs at: ${LOG_FILE_PATH}
+`
+
+// ============================================================================
+// Helper: wrap tool handler with error handling and 404 session reset
+// ============================================================================
+function toolHandler<T extends Record<string, unknown>>(
+  fn: (args: T) => Promise<{ content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean }>,
+): (args: T) => Promise<{ content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean }> {
+  return async (args) => {
+    try {
+      return await fn(args)
+    } catch (error: any) {
+      const msg = error.message || String(error)
+      if (msg.includes('404')) sessionId = null
+      return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true }
     }
-  },
-)
+  }
+}
+
+// ============================================================================
+// MCP Tools
+// ============================================================================
 
 server.tool(
-  'execute',
-  promptContent,
-  {
-    code: z
-      .string()
-      .describe(
-        'js playwright code, has {page, state, context} in scope. Should be one line, using ; to execute multiple statements. you MUST call execute multiple times instead of writing complex scripts in a single tool call.',
-      ),
-    timeout: z.number().default(10000).describe('Timeout in milliseconds for code execution (default: 10000ms)'),
-  },
-  async ({ code, timeout }) => {
-    try {
-      const sid = await ensureSession()
-      const c = getClient()
-      const result = await c.execute(sid, code, timeout)
-
-      const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
-        { type: 'text', text: result.text },
-      ]
-
-      for (const image of result.images) {
-        content.push({ type: 'image', data: image.data, mimeType: image.mimeType })
-      }
-
-      if (result.isError) {
-        return { content, isError: true }
-      }
-
-      return { content }
-    } catch (error: any) {
-      const errorMessage = error.message || String(error)
-      const isTimeoutError = error.name === 'TimeoutError' || error.name === 'AbortError'
-
-      console.error('Error in execute tool:', errorMessage)
-      if (!isTimeoutError) {
-        getClient().sendLog('error', 'Error in execute tool:', errorMessage)
-      }
-
-      // Clear session on 404 so next call creates a new one
-      if (errorMessage.includes('404')) {
-        sessionId = null
-      }
-
-      const resetHint = isTimeoutError
-        ? ''
-        : '\n\n[HINT: If this is an internal Playwright error, page/browser closed, or connection issue, call the `reset` tool to reconnect. Do NOT reset for other non-connection non-internal errors.]'
-
-      return {
-        content: [{ type: 'text', text: `Error executing code: ${errorMessage}${resetHint}` }],
-        isError: true,
-      }
-    }
-  },
-)
-
-server.tool(
-  'reset',
-  dedent`
-    Recreates the CDP connection and resets the browser/page/context. Use this when the MCP stops responding, you get connection errors, if there are no pages in context, assertion failures, page closed, or other issues.
-
-    After calling this tool, the page and context variables are automatically updated in the execution environment.
-
-    This tools also removes any custom properties you may have added to the global scope AND clearing all keys from the \`state\` object. Only \`page\`, \`context\`, \`state\` (empty), \`console\`, and utility functions will remain.
-
-    if playwright always returns all pages as about:blank urls and evaluate does not work you should ask the user to restart Chrome. This is a known Chrome bug.
-  `,
-  {},
-  async () => {
-    try {
-      const sid = await ensureSession()
-      const c = getClient()
-      const result = await c.reset(sid)
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Connection reset successfully. ${result.pagesCount} page(s) available. Current page URL: ${result.pageUrl}`,
-          },
-        ],
-      }
-    } catch (error: any) {
-      if (error.message?.includes('404')) {
-        sessionId = null
-      }
-      return {
-        content: [{ type: 'text', text: `Failed to reset connection: ${error.message}` }],
-        isError: true,
-      }
-    }
-  },
+  'navigate',
+  'Navigate to a URL in the browser.',
+  { url: z.string().describe('The URL to navigate to') },
+  toolHandler(async ({ url }) => {
+    const sid = await ensureSession()
+    const result = await getClient().navigate(sid, url)
+    return { content: [{ type: 'text', text: `Navigated to ${result.url}\nTitle: ${result.title}` }] }
+  }),
 )
 
 server.tool(
   'snapshot',
-  dedent`
-    Take an accessibility snapshot of the current page. Returns a text representation of the page's accessibility tree showing all interactive elements with their roles, names, and locator selectors.
-    
-    This is the primary way to understand page state. Use it before and after every action to verify what happened. Much cheaper and faster than screenshots.
-  `,
-  {
-    search: z.string().optional().describe('Filter snapshot results by string or regex pattern'),
-    interactiveOnly: z.boolean().default(false).describe('Only include interactive elements (default: false)'),
-  },
-  async ({ search, interactiveOnly }) => {
-    try {
-      const sid = await ensureSession()
-      const c = getClient()
-
-      const searchPattern = search || undefined
-      const code = `await snapshot({ page, search: ${searchPattern ? `"${searchPattern.replace(/"/g, '\\"')}"` : 'undefined'}, interactiveOnly: ${interactiveOnly} })`
-      const result = await c.execute(sid, code, 10000)
-
-      return {
-        content: [{ type: 'text', text: result.text }],
-        isError: result.isError,
-      }
-    } catch (error: any) {
-      return {
-        content: [{ type: 'text', text: `Failed to take snapshot: ${error.message}` }],
-        isError: true,
-      }
-    }
-  },
+  systemPrompt + '\n\nTake an accessibility snapshot of the current page. Returns a text representation with @ref labels on interactive elements. Use refs for click/fill/hover.',
+  { interactiveOnly: z.boolean().default(false).describe('Only include interactive elements') },
+  toolHandler(async ({ interactiveOnly }) => {
+    const sid = await ensureSession()
+    const result = await getClient().snapshot(sid, { interactiveOnly })
+    return { content: [{ type: 'text', text: result.snapshot }] }
+  }),
 )
 
 server.tool(
   'screenshot',
-  dedent`
-    Take a screenshot of the current page with accessibility labels overlaid on interactive elements (Vimium-style).
-    Returns both the image and the accessibility snapshot text.
-    
-    Use this when you need visual/spatial information — for text content, use the snapshot tool instead.
-  `,
+  'Take a screenshot of the current page. Use when you need visual/spatial information.',
   {},
-  async () => {
-    try {
-      const sid = await ensureSession()
-      const c = getClient()
-
-      const result = await c.execute(sid, 'await screenshotWithAccessibilityLabels({ page })', 20000)
-
-      const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
-        { type: 'text', text: result.text },
-      ]
-
-      for (const image of result.images) {
-        content.push({ type: 'image', data: image.data, mimeType: image.mimeType })
-      }
-
-      return { content, isError: result.isError }
-    } catch (error: any) {
-      return {
-        content: [{ type: 'text', text: `Failed to take screenshot: ${error.message}` }],
-        isError: true,
-      }
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    const result = await getClient().captureScreenshot(sid)
+    return {
+      content: [
+        { type: 'text', text: 'Screenshot captured.' },
+        { type: 'image', data: result.data, mimeType: result.mimeType },
+      ],
     }
+  }),
+)
+
+server.tool(
+  'click',
+  'Click an element by its @ref from snapshot (e.g. "@e1") or CSS selector.',
+  { ref: z.string().describe('Element ref from snapshot (e.g. "@e1") or CSS selector') },
+  toolHandler(async ({ ref }) => {
+    const sid = await ensureSession()
+    await getClient().click(sid, ref)
+    return { content: [{ type: 'text', text: `Clicked ${ref}` }] }
+  }),
+)
+
+server.tool(
+  'fill',
+  'Fill an input field by its @ref from snapshot or CSS selector.',
+  {
+    ref: z.string().describe('Element ref from snapshot (e.g. "@e2") or CSS selector'),
+    value: z.string().describe('Value to fill in'),
   },
+  toolHandler(async ({ ref, value }) => {
+    const sid = await ensureSession()
+    await getClient().fill(sid, ref, value)
+    return { content: [{ type: 'text', text: `Filled ${ref} with "${value}"` }] }
+  }),
+)
+
+server.tool(
+  'type',
+  'Type text with the keyboard at the current focus position.',
+  { text: z.string().describe('Text to type') },
+  toolHandler(async ({ text }) => {
+    const sid = await ensureSession()
+    await getClient().type(sid, text)
+    return { content: [{ type: 'text', text: `Typed "${text}"` }] }
+  }),
+)
+
+server.tool(
+  'press',
+  'Press a keyboard key (Enter, Tab, Escape, ArrowDown, etc.).',
+  { key: z.string().describe('Key name: Enter, Tab, Escape, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, etc.') },
+  toolHandler(async ({ key }) => {
+    const sid = await ensureSession()
+    await getClient().press(sid, key)
+    return { content: [{ type: 'text', text: `Pressed ${key}` }] }
+  }),
+)
+
+server.tool(
+  'scroll',
+  'Scroll the page in a direction.',
+  {
+    direction: z.enum(['up', 'down', 'left', 'right']).describe('Scroll direction'),
+    amount: z.number().optional().describe('Scroll amount in pixels (default: 300)'),
+  },
+  toolHandler(async ({ direction, amount }) => {
+    const sid = await ensureSession()
+    await getClient().scroll(sid, direction, amount)
+    return { content: [{ type: 'text', text: `Scrolled ${direction}${amount ? ` by ${amount}px` : ''}` }] }
+  }),
+)
+
+server.tool(
+  'hover',
+  'Hover over an element by its @ref from snapshot.',
+  { ref: z.string().describe('Element ref from snapshot (e.g. "@e3")') },
+  toolHandler(async ({ ref }) => {
+    const sid = await ensureSession()
+    await getClient().hover(sid, ref)
+    return { content: [{ type: 'text', text: `Hovered over ${ref}` }] }
+  }),
+)
+
+server.tool(
+  'evaluate',
+  'Run JavaScript code directly in the browser. The code runs in the page context.',
+  {
+    code: z.string().describe('JavaScript code to execute in the browser. Top-level await is supported.'),
+    timeout: z.number().default(10000).describe('Timeout in milliseconds'),
+  },
+  toolHandler(async ({ code, timeout }) => {
+    const sid = await ensureSession()
+    const result = await getClient().evaluate(sid, code, timeout)
+    const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
+      { type: 'text', text: result.text },
+    ]
+    for (const img of result.images) {
+      content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
+    }
+    return { content, isError: result.isError }
+  }),
+)
+
+server.tool(
+  'get_url',
+  'Get the current page URL.',
+  {},
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    const result = await getClient().getUrl(sid)
+    return { content: [{ type: 'text', text: result.url }] }
+  }),
+)
+
+server.tool(
+  'get_title',
+  'Get the current page title.',
+  {},
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    const result = await getClient().getTitle(sid)
+    return { content: [{ type: 'text', text: result.title }] }
+  }),
+)
+
+server.tool(
+  'back',
+  'Navigate back in browser history.',
+  {},
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    await getClient().back(sid)
+    return { content: [{ type: 'text', text: 'Navigated back' }] }
+  }),
+)
+
+server.tool(
+  'forward',
+  'Navigate forward in browser history.',
+  {},
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    await getClient().forward(sid)
+    return { content: [{ type: 'text', text: 'Navigated forward' }] }
+  }),
+)
+
+server.tool(
+  'reload',
+  'Reload the current page.',
+  {},
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    await getClient().reload(sid)
+    return { content: [{ type: 'text', text: 'Page reloaded' }] }
+  }),
+)
+
+server.tool(
+  'reset',
+  'Reset the browser connection. Use when you get connection errors or the browser seems stuck.',
+  {},
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    const result = await getClient().reset(sid)
+    return {
+      content: [{ type: 'text', text: `Connection reset. Current URL: ${result.pageUrl}` }],
+    }
+  }),
+)
+
+// Keep execute tool for backwards compatibility with existing MCP clients
+server.tool(
+  'execute',
+  'Run JavaScript in the browser context. Prefer using the specific tools (navigate, click, fill, snapshot) instead. Use this for complex operations not covered by other tools.',
+  {
+    code: z.string().describe('JavaScript code to execute in the browser. Top-level await is supported.'),
+    timeout: z.number().default(10000).describe('Timeout in milliseconds'),
+  },
+  toolHandler(async ({ code, timeout }) => {
+    const sid = await ensureSession()
+    const result = await getClient().evaluate(sid, code, timeout)
+    const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
+      { type: 'text', text: result.text },
+    ]
+    for (const img of result.images) {
+      content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
+    }
+    return { content, isError: result.isError }
+  }),
 )
 
 export { server }

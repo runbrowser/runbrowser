@@ -1,4 +1,4 @@
-# @runbrowser/mcp
+# @agmod/runbrowser-mcp
 
 Standalone MCP (Model Context Protocol) server for [RunBrowser](https://github.com/yuanjiwei/runbrowser) — control your running Chrome browser via Playwright with your logins, extensions, and cookies already there.
 
@@ -6,7 +6,7 @@ Standalone MCP (Model Context Protocol) server for [RunBrowser](https://github.c
 
 ### Prerequisites
 
-1. [**Install the RunBrowser Extension**](https://chromewebstore.google.com/detail/runbrowser-mcp/jfeammnjpkecdekppnclgkkffahnhfhe) from Chrome Web Store
+1. [**Install the RunBrowser Extension**](https://chromewebstore.google.com/detail/@agmod/runbrowser-mcp/jfeammnjpkecdekppnclgkkffahnhfhe) from Chrome Web Store
 2. Click the extension icon on a tab → turns green when connected
 
 ### MCP Client Configuration
@@ -18,7 +18,7 @@ Add to your MCP client settings (e.g., Claude Desktop, Cursor, etc.):
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "@runbrowser/mcp@latest"]
+      "args": ["-y", "@agmod/runbrowser-mcp@latest"]
     }
   }
 }
@@ -54,7 +54,7 @@ Auto-create a tab when Playwright connects (no manual extension click needed).
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "@runbrowser/mcp@latest"],
+      "args": ["-y", "@agmod/runbrowser-mcp@latest"],
       "env": {
         "RUNBROWSER_AUTO_ENABLE": "1"
       }
@@ -70,7 +70,7 @@ Run agents in isolated environments while controlling Chrome on your host.
 **On host (where Chrome runs):**
 
 ```bash
-npx -y runbrowser serve --token <secret>
+npx -y @agmod/runbrowser serve --token <secret>
 ```
 
 **In container/VM (where agent runs):**
@@ -80,7 +80,7 @@ npx -y runbrowser serve --token <secret>
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "@runbrowser/mcp@latest", "--host", "host.docker.internal", "--token", "<secret>"]
+      "args": ["-y", "@agmod/runbrowser-mcp@latest", "--host", "host.docker.internal", "--token", "<secret>"]
     }
   }
 }
@@ -93,7 +93,7 @@ Or with environment variables:
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "@runbrowser/mcp@latest"],
+      "args": ["-y", "@agmod/runbrowser-mcp@latest"],
       "env": {
         "RUNBROWSER_HOST": "host.docker.internal",
         "RUNBROWSER_TOKEN": "<secret>"
@@ -108,7 +108,7 @@ Use `host.docker.internal` for devcontainers, or your host's IP for VMs/SSH.
 ## Programmatic Usage
 
 ```ts
-import { startMcp } from '@runbrowser/mcp'
+import { startMcp } from '@agmod/runbrowser-mcp'
 
 // Start MCP server (connects to stdio transport)
 await startMcp()

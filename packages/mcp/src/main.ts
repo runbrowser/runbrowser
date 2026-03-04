@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * @runbrowser/mcp — standalone MCP server entry point.
+ * runbrowser-mcp — standalone MCP server entry point.
  *
  * Usage:
- *   npx @runbrowser/mcp
- *   npx @runbrowser/mcp --host <remote-host> --token <secret>
+ *   npx runbrowser-mcp
+ *   npx runbrowser-mcp --host <remote-host> --token <secret>
  */
 
 import { cac } from 'cac'
