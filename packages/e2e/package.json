@@ -10,8 +10,8 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "@runbrowser/core": "workspace:*",
-    "@runbrowser/relay": "workspace:*",
+    "@agmod/runbrowser-core": "workspace:*",
+    "@agmod/runbrowser-relay": "workspace:*",
     "@types/node": "^24.10.1",
     "devtools-protocol": "^0.0.1568893",
     "image-size": "^2.0.2",
