@@ -1,11 +1,6 @@
 # RunBrowser
 
-Control your running Chrome browser via Playwright — your logins, extensions,
-and cookies already there. **No Playwright fork required.**
-
-Based on [playwriter](https://github.com/remorses/playwriter) with all
-functionality preserved, but using standard `playwright-core` instead of
-maintaining a custom fork (`@xmorse/playwright-core`).
+> Getting Started with RunBrowser — Control your browser via Playwright API. Uses extension + CLI. No context bloat.
 
 Other browser MCPs spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. RunBrowser connects to **your running browser** instead. One Chrome extension, full Playwright API, everything you're already logged into.
 
@@ -19,24 +14,68 @@ Other browser MCPs spawn a fresh Chrome — no logins, no extensions, instantly 
 
 ## Installation
 
-1. [**Install Extension**](https://chromewebstore.google.com/detail/runbrowser-mcp/jfeammnjpkecdekppnclgkkffahnhfhe) from Chrome Web Store
+### 1. Install the Extension
 
-2. Click extension icon on a tab → turns green when connected
+Load the extension in Chrome:
 
-3. Install the CLI and start automating the browser:
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (toggle in top-right corner)
+3. Click **"Load unpacked"** and select the `packages/extension/dist` folder
 
-   ```bash
-   npm i -g runbrowser
-   runbrowser -s 1 -e 'await page.goto("https://example.com")'
-   ```
+> Or install from [Chrome Web Store](https://chromewebstore.google.com/detail/runbrowser/jfeammnjpkecdekppnclgkkffahnhfhe) once available.
 
-## Quick Start
+### 2. Pin the Extension
+
+Click the puzzle icon in Chrome's toolbar, then pin **RunBrowser** so it's always visible.
+
+### 3. Enable a Tab
+
+Click the extension icon on a tab. It turns **green** when connected.
+
+### 4. Install the CLI and Run a Command
 
 ```bash
-runbrowser session new  # creates stateful sandbox, outputs session id (e.g. 1)
-runbrowser -s 1 -e 'await page.goto("https://example.com")'
-runbrowser -s 1 -e 'console.log(await snapshot({ page }))'
-runbrowser -s 1 -e 'await page.locator("aria-ref=e5").click()'
+# install the CLI globally
+npm i -g @agmod/runbrowser
+
+# create a session
+runbrowser session new
+
+# navigate to a URL in the active tab
+runbrowser -s 1 -e "await page.goto('https://example.com')"
+```
+
+### 5. Add the Skill to Your Agent (Optional)
+
+Install the RunBrowser skill so your coding agent can call the CLI:
+
+```bash
+npx -y skills add yuanjiwei/runbrowser
+```
+
+## Icon States
+
+| Icon   | Meaning                                |
+| ------ | -------------------------------------- |
+| Gray   | Not connected to any tab               |
+| Green  | Successfully connected and ready       |
+| Orange badge (...) | Connecting to relay server |
+| Red badge (!)      | Error occurred             |
+
+## CLI Examples
+
+```bash
+# create a stateful sandbox, outputs session id (e.g. 1)
+runbrowser session new
+
+# navigate to a URL
+runbrowser -s 1 -e "await page.goto('https://example.com')"
+
+# get the accessibility tree of the page
+runbrowser -s 1 -e "console.log(await snapshot({ page }))"
+
+# click an element by its accessibility reference
+runbrowser -s 1 -e "await page.locator('aria-ref=e5').click()"
 ```
 
 > **Tip:** Always use single quotes for `-e` to prevent bash from interpreting `$`, backticks, and `\` in your JS code. Use double quotes for strings inside the JS.
@@ -55,29 +94,44 @@ runbrowser session reset <id>       # fix connection issues
 runbrowser -s 1 -e 'await page.goto("https://example.com")'
 runbrowser -s 1 -e 'await page.click("button")'
 runbrowser -s 1 -e 'console.log(await page.title())'
+
+# High-level commands
+runbrowser navigate <url> -s 1
+runbrowser snapshot -s 1
+runbrowser screenshot -s 1 --output shot.png
+runbrowser click <ref> -s 1
+runbrowser fill <ref> <value> -s 1
+runbrowser type <text> -s 1
+runbrowser press <key> -s 1
+runbrowser scroll <direction> -s 1
+
+# Start relay server (foreground, for remote access)
+runbrowser serve --host 0.0.0.0 --token <secret>
 ```
 
-## MCP Setup
+## How It Works
 
-For direct MCP server configuration, see [MCP.md](./MCP.md).
+- **No new Chrome instances**: Works with your current browser session
+- **No CDP mode required**: No need to restart Chrome with special flags
+- **Full CDP access**: Complete Chrome DevTools Protocol capabilities
+- **Visual feedback**: Extension icon changes color to indicate connection status
+
+## MCP Setup (Optional)
+
+The CLI is the recommended way to use RunBrowser. If you need MCP server setup, auto-configure it with:
 
 ```json
 {
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "runbrowser@latest"]
+      "args": ["-y", "@agmod/runbrowser-mcp@latest"]
     }
   }
 }
 ```
 
-### MCP Tools
-
-- **`execute`** — Run Playwright code snippets with `{page, state, context}` in scope
-- **`reset`** — Recreate CDP connection and reset browser/page/context
-- **`snapshot`** — Take accessibility snapshot of the current page (fast, text-based)
-- **`screenshot`** — Take screenshot with Vimium-style accessibility labels overlaid
+For full MCP instructions, see [MCP.md](./MCP.md).
 
 ## Visual Labels
 
@@ -91,25 +145,23 @@ await page.locator('aria-ref=e5').click()
 
 Color-coded: yellow=links, orange=buttons, coral=inputs, pink=checkboxes, peach=sliders, salmon=menus, amber=tabs.
 
-## Differences from Upstream Playwriter
+## Playwright API
 
-The upstream project maintains a [fork of playwright-core](https://github.com/remorses/playwright.git)
-to expose internal CDP APIs. RunBrowser achieves full feature parity using standard `playwright-core`:
+Connect programmatically (without CLI):
 
-| Upstream (fork required) | RunBrowser (standard playwright-core) |
-|---|---|
-| `page.targetId()` | `getTargetId(page)` via `_delegate._targetId` |
-| `page.sessionId()` | `getSessionId(page)` via `_mainFrameSession._client._sessionId` |
-| `frame.frameId()` | `getFrameId(frame)` via `frame._id` |
-| `locator.selector()` | `getSelector(locator)` via `locator._selector` |
-| `context.getExistingCDPSession(page)` | `getCDPSessionForPage()` with `RelayCDPSession` fallback |
-| `page.onMouseAction` callback | Ghost cursor via `page.evaluate()` injection |
+```typescript
+import { chromium } from 'playwright-core'
+import { startRunBrowserCDPRelayServer, getCdpUrl } from '@agmod/runbrowser-relay'
 
-### Key files
+const server = await startRunBrowserCDPRelayServer()
+const browser = await chromium.connectOverCDP(getCdpUrl())
+const page = browser.contexts()[0].pages()[0]
 
-- **`playwright-compat.ts`** — All private property access centralized here
-- **`cdp-session.ts`** — `getCDPSessionForPage()` with adapter + fallback
-- **`recording-ghost-cursor.ts`** — Rewritten to use `page.evaluate()` injection
+await page.goto('https://example.com')
+await page.screenshot({ path: 'screenshot.png' })
+// Don't call browser.close() - it closes the user's Chrome
+server.close()
+```
 
 ## Architecture
 
@@ -130,24 +182,6 @@ to expose internal CDP APIs. RunBrowser achieves full feature parity using stand
 +---------------------+     (no extension click)      +-----------------+
 ```
 
-## Playwright API
-
-Connect programmatically (without CLI):
-
-```typescript
-import { chromium } from 'playwright-core'
-import { startRunBrowserCDPRelayServer, getCdpUrl } from 'runbrowser'
-
-const server = await startRunBrowserCDPRelayServer()
-const browser = await chromium.connectOverCDP(getCdpUrl())
-const page = browser.contexts()[0].pages()[0]
-
-await page.goto('https://example.com')
-await page.screenshot({ path: 'screenshot.png' })
-// Don't call browser.close() - it closes the user's Chrome
-server.close()
-```
-
 ## Environment Variables
 
 | Variable | Description |
@@ -155,19 +189,17 @@ server.close()
 | `RUNBROWSER_HOST` | Remote relay server host |
 | `RUNBROWSER_TOKEN` | Authentication token |
 | `RUNBROWSER_PORT` | Relay server port (default: 19988) |
+| `RUNBROWSER_SESSION` | Default session ID (avoids `-s` flag) |
 | `RUNBROWSER_AUTO_ENABLE` | Auto-create tab on connect |
-| `RUNBROWSER_BROWSER_PATH` | Custom Chrome executable path |
-| `RUNBROWSER_LOG_FILE_PATH` | Custom log file path |
 
+## Privacy & Security
 
-
-## Security
+RunBrowser runs locally in your browser and does not send any data to external servers. All browser control happens through the standard Chrome DevTools Protocol on your machine.
 
 - **Local only**: WebSocket server on `localhost:19988`
-- **Origin validation**: Only allowed extension IDs (browsers can't spoof Origin)
+- **Origin validation**: Only allowed extension IDs
 - **Explicit consent**: Only tabs where you clicked the extension icon
 - **Visible automation**: Chrome shows automation banner on controlled tabs
-- **No remote access**: Malicious websites cannot connect
 
 ## Troubleshooting
 
@@ -183,6 +215,14 @@ runbrowser logfile  # prints the log file path
 - If all pages return `about:blank`, restart Chrome (Chrome bug in `chrome.debugger` API)
 - Browser may switch to light mode on connect ([Playwright issue](https://github.com/microsoft/playwright/issues/37627))
 
+## Need Help?
+
+For issues, feature requests, or contributions, visit the [GitHub repository](https://github.com/yuanjiwei/runbrowser).
+
 ## Credits
 
 Based on [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi.
+
+## License
+
+MIT

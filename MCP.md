@@ -9,7 +9,7 @@ Add to your MCP client settings:
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "runbrowser@latest"]
+      "args": ["-y", "@agmod/runbrowser-mcp@latest"]
     }
   }
 }
@@ -41,7 +41,7 @@ Auto-create a tab when Playwright connects (no manual extension click needed).
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "runbrowser@latest"],
+      "args": ["-y", "@agmod/runbrowser-mcp@latest"],
       "env": {
         "RUNBROWSER_AUTO_ENABLE": "1"
       }
@@ -59,7 +59,7 @@ Run agents in isolated environments while controlling Chrome on your host.
 **On host (where Chrome runs):**
 
 ```bash
-npx -y runbrowser serve --token <secret>
+npx -y @agmod/runbrowser serve --token <secret>
 ```
 
 **In container/VM (where agent runs):**
@@ -69,7 +69,7 @@ npx -y runbrowser serve --token <secret>
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "runbrowser@latest", "--host", "host.docker.internal", "--token", "<secret>"]
+      "args": ["-y", "@agmod/runbrowser-mcp@latest", "--host", "host.docker.internal", "--token", "<secret>"]
     }
   }
 }
@@ -82,7 +82,7 @@ Or with environment variables:
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "runbrowser@latest"],
+      "args": ["-y", "@agmod/runbrowser-mcp@latest"],
       "env": {
         "RUNBROWSER_HOST": "host.docker.internal",
         "RUNBROWSER_TOKEN": "<secret>"
