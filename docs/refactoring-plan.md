@@ -39,8 +39,7 @@ MCP Tools:                     Relay Server:              Extension → Chrome:
   fill(ref, value)       →       Runtime.evaluate + Input →  chrome.debugger
   snapshot()             →       Accessibility.getFullAXTree → chrome.debugger
   screenshot()           →       Page.captureScreenshot  →   chrome.debugger
-  evaluate(code)         →       Runtime.evaluate        →   chrome.debugger
-  execute(code)          →       Runtime.evaluate        →   chrome.debugger (complex/batch)
+  evaluate(code)         →       Runtime.evaluate        →   chrome.debugger (simple & complex)
 ```
 
 ---
@@ -203,8 +202,7 @@ scroll(direction, amount?)       → Scroll page
 hover(ref_or_selector)           → Hover element
 snapshot(options?)               → Accessibility tree with refs
 screenshot(options?)             → Screenshot (with optional annotations)
-evaluate(code)                   → Run JS in browser (simple operations)
-execute(code)                    → Run JS in browser (complex/batch operations)
+evaluate(code)                   → Run JS in browser (via Runtime.evaluate)
 get_text(ref_or_selector)        → Get text content
 get_url()                        → Get current URL
 get_title()                      → Get page title
@@ -235,20 +233,29 @@ Update the tool descriptions and system prompt to teach AI agents:
 3. Use `evaluate(code)` for complex operations
 4. Re-snapshot after actions to verify
 
-### 3.4 Keep `execute` for backward compatibility
+### 3.4 `evaluate` replaces both old `execute` and `evaluate`
 
-The `execute` tool still works, but now runs JS in the browser via `Runtime.evaluate` instead of a Playwright sandbox. AI writes browser JS instead of Playwright code:
+There's no need for separate `execute` and `evaluate` tools — they both use `Runtime.evaluate` under the hood. One `evaluate` tool handles everything:
 
 ```javascript
-// Before (Playwright)
-await page.goto('https://example.com')
-const title = await page.title()
-return title
+// Simple expression
+evaluate("document.title")
 
-// After (Browser JS)
-const title = document.title
-return title
+// Complex batch operation
+evaluate(`
+  const rows = document.querySelectorAll('tr.item')
+  const data = []
+  for (const row of rows) {
+    data.push({ name: row.querySelector('.name').textContent })
+  }
+  JSON.stringify(data)
+`)
+
+// Async operations
+evaluate("await fetch('/api/data').then(r => r.json())")
 ```
+
+AI writes browser JS instead of Playwright code — simpler and more natural.
 
 **Files changed:**
 - Modified: `packages/mcp/src/server.ts` (add new tools, update existing)
