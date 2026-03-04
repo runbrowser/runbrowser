@@ -18,20 +18,24 @@ import {
   VERSION,
   LOG_FILE_PATH,
   LOG_CDP_FILE_PATH,
+  CONFIG_FILE_PATH,
   RELAY_PORT,
   getExtensionOutdatedWarning,
   RelayApiClient,
-} from '@runbrowser/relay'
+  readConfig,
+  writeConfig,
+} from '@agmod/runbrowser-relay'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const cliRelayEnv = { RUNBROWSER_AUTO_ENABLE: '1' }
 
-/** Create a RelayApiClient from CLI options */
+/** Create a RelayApiClient from CLI options, env vars, then config file (in that priority order) */
 function createClient(options?: { host?: string; token?: string }): RelayApiClient {
+  const config = readConfig()
   return new RelayApiClient({
-    host: options?.host,
-    token: options?.token,
+    host: options?.host || process.env.RUNBROWSER_HOST || config.host,
+    token: options?.token || process.env.RUNBROWSER_TOKEN || config.token,
     logger: console,
   })
 }
@@ -262,12 +266,308 @@ cli
     }
   })
 
+// ============================================================================
+// High-level browser commands (Phase 5)
+// ============================================================================
+
+/** Shared helper: get sessionId from options or env */
+function requireSession(options: { session?: string }): string {
+  const sessionId = options.session ? String(options.session) : process.env.RUNBROWSER_SESSION
+  if (!sessionId) {
+    console.error('Error: -s/--session is required.')
+    console.error('Run `runbrowser session new` first to get a session ID.')
+    process.exit(1)
+  }
+  return sessionId!
+}
+
+/** Shared helper: ensure server running and create client */
+async function initClient(options: { host?: string; token?: string }) {
+  const client = createClient(options)
+  await client.ensureServer(cliRelayEnv)
+  return client
+}
+
+cli
+  .command('navigate <url>', 'Navigate to a URL')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (url: string, options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      const result = await client.navigate(sessionId, url)
+      console.log(`Navigated to ${result.url}\nTitle: ${result.title}`)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('snapshot', 'Take an accessibility snapshot of the current page')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .option('--interactive', 'Show only interactive elements', { default: false })
+  .action(async (options: { host?: string; token?: string; session?: string; interactive?: boolean }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      const result = await client.snapshot(sessionId, { interactiveOnly: options.interactive })
+      console.log(result.snapshot)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('screenshot', 'Take a screenshot of the current page')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .option('--output <path>', 'Save screenshot to file (base64 JPEG by default)')
+  .action(async (options: { host?: string; token?: string; session?: string; output?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      const result = await client.captureScreenshot(sessionId)
+      if (options.output) {
+        const fs = await import('node:fs')
+        fs.writeFileSync(options.output, Buffer.from(result.data, 'base64'))
+        console.log(`Screenshot saved to ${options.output}`)
+      } else {
+        console.log(`Screenshot captured (${result.mimeType}, ${result.data.length} base64 chars)`)
+      }
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('click <ref>', 'Click an element by @ref or CSS selector')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (ref: string, options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.click(sessionId, ref)
+      console.log(`Clicked ${ref}`)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('fill <ref> <value>', 'Fill an input field by @ref or CSS selector')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (ref: string, value: string, options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.fill(sessionId, ref, value)
+      console.log(`Filled ${ref} with "${value}"`)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('type <text>', 'Type text at the current focus position')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (text: string, options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.type(sessionId, text)
+      console.log(`Typed "${text}"`)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('press <key>', 'Press a keyboard key (Enter, Tab, Escape, etc.)')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (key: string, options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.press(sessionId, key)
+      console.log(`Pressed ${key}`)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('scroll <direction>', 'Scroll the page (up/down/left/right)')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .option('--amount <px>', 'Scroll amount in pixels')
+  .action(async (direction: string, options: { host?: string; token?: string; session?: string; amount?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      const dir = direction as 'up' | 'down' | 'left' | 'right'
+      const amount = options.amount ? parseInt(options.amount, 10) : undefined
+      await client.scroll(sessionId, dir, amount)
+      console.log(`Scrolled ${direction}${amount ? ` by ${amount}px` : ''}`)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('hover <ref>', 'Hover over an element by @ref or CSS selector')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (ref: string, options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.hover(sessionId, ref)
+      console.log(`Hovered over ${ref}`)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('evaluate <code>', 'Run JavaScript code in the browser')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .option('--timeout <ms>', 'Execution timeout in milliseconds', { default: 10000 })
+  .action(async (code: string, options: { host?: string; token?: string; session?: string; timeout?: number }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      const result = await client.evaluate(sessionId, code, options.timeout)
+      if (result.text) {
+        if (result.isError) {
+          console.error(result.text)
+        } else {
+          console.log(result.text)
+        }
+      }
+      if (result.isError) process.exit(1)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('get-url', 'Get the current page URL')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      const result = await client.getUrl(sessionId)
+      console.log(result.url)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('get-title', 'Get the current page title')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      const result = await client.getTitle(sessionId)
+      console.log(result.title)
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('back', 'Navigate back in browser history')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.back(sessionId)
+      console.log('Navigated back')
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('forward', 'Navigate forward in browser history')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.forward(sessionId)
+      console.log('Navigated forward')
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
+cli
+  .command('reload', 'Reload the current page')
+  .option('--host <host>', 'Remote relay server host')
+  .option('--token <token>', 'Authentication token')
+  .option('-s, --session <name>', 'Session ID')
+  .action(async (options: { host?: string; token?: string; session?: string }) => {
+    const sessionId = requireSession(options)
+    const client = await initClient(options)
+    try {
+      await client.reload(sessionId)
+      console.log('Page reloaded')
+    } catch (error: any) {
+      console.error(`Error: ${error.message}`)
+      process.exit(1)
+    }
+  })
+
 cli
   .command(
     'serve',
     `Start the relay server on this machine (must be the same host where Chrome is running). Remote clients (Docker, other machines) connect via RUNBROWSER_HOST. Use --host localhost for Docker (no token needed) — containers reach it via host.docker.internal. Use --host 0.0.0.0 for LAN/internet access (requires --token).`,
   )
-  .option('--host <host>', 'Host to bind to (use "localhost" for Docker, "0.0.0.0" for remote access)', { default: '0.0.0.0' })
+  .option('--host <host>', 'Host to bind to (default: 127.0.0.1, use "0.0.0.0" for remote/Docker access)', { default: '127.0.0.1' })
   .option('--token <token>', 'Authentication token, required when --host is 0.0.0.0 (or use RUNBROWSER_TOKEN env var)')
   .option('--replace', 'Kill existing server if running')
   .action(async (options: { host: string; token?: string; replace?: boolean }) => {
@@ -294,7 +594,7 @@ cli
     }
 
     // Lazy-load heavy dependencies only when serve command is used
-    const { createFileLogger, startRunBrowserCDPRelayServer } = await import('@runbrowser/relay')
+    const { createFileLogger, startRunBrowserCDPRelayServer } = await import('@agmod/runbrowser-relay')
 
     const logger = createFileLogger()
 
@@ -345,6 +645,47 @@ cli.command('logfile', 'Print the path to the relay server log file').action(() 
   console.log(`relay: ${LOG_FILE_PATH}`)
   console.log(`cdp: ${LOG_CDP_FILE_PATH}`)
 })
+
+// ============================================================================
+// Config commands — store token and host in ~/.runbrowser/config.json
+// ============================================================================
+
+cli
+  .command('config set <key> <value>', 'Set a config value (token, host)')
+  .action((key: string, value: string) => {
+    const allowed = ['token', 'host']
+    if (!allowed.includes(key)) {
+      console.error(`Error: Unknown config key "${key}". Allowed keys: ${allowed.join(', ')}`)
+      process.exit(1)
+    }
+    const config = readConfig()
+    ;(config as any)[key] = value
+    writeConfig(config)
+    console.log(`Config saved: ${key} = ${key === 'token' ? '***' : value}`)
+    console.log(`Config file: ${CONFIG_FILE_PATH}`)
+  })
+
+cli
+  .command('config unset <key>', 'Remove a config value (token, host)')
+  .action((key: string) => {
+    const config = readConfig()
+    delete (config as any)[key]
+    writeConfig(config)
+    console.log(`Config removed: ${key}`)
+  })
+
+cli
+  .command('config show', 'Show current config')
+  .action(() => {
+    const config = readConfig()
+    console.log(`Config file: ${CONFIG_FILE_PATH}`)
+    if (Object.keys(config).length === 0) {
+      console.log('(empty)')
+      return
+    }
+    if (config.host) console.log(`  host:  ${config.host}`)
+    if (config.token) console.log(`  token: ${'*'.repeat(config.token.length)}`)
+  })
 
 cli.command('skill', 'Print the full runbrowser usage instructions').action(() => {
   const skillPath = path.join(__dirname, '..', 'src', 'skill.md')
