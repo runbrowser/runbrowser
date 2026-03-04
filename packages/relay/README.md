@@ -1,4 +1,4 @@
-# @runbrowser/relay
+# @agmod/runbrowser-relay
 
 CDP (Chrome DevTools Protocol) relay server for [RunBrowser](https://github.com/yuanjiwei/runbrowser). This package bridges Chrome extension WebSocket connections to Playwright CDP clients, enabling browser automation over your running Chrome browser.
 
@@ -26,7 +26,7 @@ The relay server:
 ## Installation
 
 ```bash
-npm install @runbrowser/relay
+npm install @agmod/runbrowser-relay
 ```
 
 ## Usage
@@ -34,7 +34,7 @@ npm install @runbrowser/relay
 ### Programmatic
 
 ```ts
-import { startRunBrowserCDPRelayServer } from '@runbrowser/relay'
+import { startRunBrowserCDPRelayServer } from '@agmod/runbrowser-relay'
 
 const server = await startRunBrowserCDPRelayServer({
   port: 19988,
@@ -51,7 +51,7 @@ server.close()
 To enable `/cli/*` endpoints, provide an executor manager factory:
 
 ```ts
-import { startRunBrowserCDPRelayServer } from '@runbrowser/relay'
+import { startRunBrowserCDPRelayServer } from '@agmod/runbrowser-relay'
 
 const server = await startRunBrowserCDPRelayServer({
   port: 19988,
@@ -65,7 +65,7 @@ const server = await startRunBrowserCDPRelayServer({
 ### Standalone Binary
 
 ```bash
-npx @runbrowser/relay
+npx @agmod/runbrowser-relay
 ```
 
 ## Client Utilities
@@ -73,7 +73,7 @@ npx @runbrowser/relay
 The package also provides client-side utilities for connecting to the relay server:
 
 ```ts
-import { ensureRelayServer, RELAY_PORT, waitForConnectedExtensions } from '@runbrowser/relay/client'
+import { ensureRelayServer, RELAY_PORT, waitForConnectedExtensions } from '@agmod/runbrowser-relay/client'
 
 // Start relay server if not running
 await ensureRelayServer({ logger: console })
@@ -89,12 +89,12 @@ const extensions = await waitForConnectedExtensions({
 
 | Subpath | Description |
 |---------|-------------|
-| `@runbrowser/relay` | Core server, state management, types, utilities |
-| `@runbrowser/relay/client` | Client utilities (ensureRelayServer, version checks) |
-| `@runbrowser/relay/types` | CDP protocol types |
-| `@runbrowser/relay/protocol` | Extension message protocol types |
-| `@runbrowser/relay/utils` | Shared utilities (EXTENSION_IDS, VERSION, log paths) |
-| `@runbrowser/relay/logger` | File logger |
+| `@agmod/runbrowser-relay` | Core server, state management, types, utilities |
+| `@agmod/runbrowser-relay/client` | Client utilities (ensureRelayServer, version checks) |
+| `@agmod/runbrowser-relay/types` | CDP protocol types |
+| `@agmod/runbrowser-relay/protocol` | Extension message protocol types |
+| `@agmod/runbrowser-relay/utils` | Shared utilities (EXTENSION_IDS, VERSION, log paths) |
+| `@agmod/runbrowser-relay/logger` | File logger |
 
 ## Key Types
 

@@ -1,5 +1,5 @@
 /**
- * @runbrowser/relay — CDP relay server for RunBrowser.
+ * runbrowser-relay — CDP relay server for RunBrowser.
  *
  * Bridges Chrome extension WebSocket connections to Playwright CDP clients.
  * This package provides the core relay server functionality, shared types,
@@ -12,8 +12,13 @@ export type {
   RelayServer,
   ExecutorManagerLike,
   ExecutorLike,
-  ExecutorManagerFactory,
 } from './server.js'
+
+// CDP Executor (replaces PlaywrightExecutor)
+export { CDPExecutor } from './cdp-executor.js'
+export type { CDPExecutorOptions, SendToExtension, GetExtensionEntry } from './cdp-executor.js'
+export { CDPExecutorManager } from './cdp-executor-manager.js'
+export type { CDPExecutorManagerOptions } from './cdp-executor-manager.js'
 
 // State management
 export {
@@ -74,10 +79,15 @@ export {
   VERSION,
   LOG_FILE_PATH,
   LOG_CDP_FILE_PATH,
+  CONFIG_FILE_PATH,
+  RUNBROWSER_DIR,
+  readConfig,
+  writeConfig,
   parseRelayHost,
   getCdpUrl,
   sleep,
 } from './utils.js'
+export type { RunBrowserConfig } from './utils.js'
 
 // Logger
 export { createFileLogger } from './create-logger.js'

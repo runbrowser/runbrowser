@@ -16,6 +16,7 @@ import type {
   CancelRecordingParams,
   IsRecordingParams,
 } from './protocol.js'
+import { CDPExecutorManager } from './cdp-executor-manager.js'
 import pc from 'picocolors'
 import util from 'node:util'
 
@@ -103,30 +104,18 @@ export interface ExecutorLike {
   }
 }
 
-/**
- * Factory function type for creating an ExecutorManager.
- * Called lazily when the first CLI endpoint is accessed.
- */
-export type ExecutorManagerFactory = (config: {
-  cdpConfig: { host: string; port: number }
-  logger: { log(...args: any[]): void; error(...args: any[]): void }
-}) => Promise<ExecutorManagerLike> | ExecutorManagerLike
-
 export async function startRunBrowserCDPRelayServer({
   port = 19988,
   host = '127.0.0.1',
   token,
   logger,
   cdpLogger,
-  executorManagerFactory,
 }: {
   port?: number
   host?: string
   token?: string
   logger?: { log(...args: any[]): void; error(...args: any[]): void }
   cdpLogger?: CdpLogger
-  /** Optional factory to create an ExecutorManager for CLI execute endpoints. */
-  executorManagerFactory?: ExecutorManagerFactory
 } = {}): Promise<RelayServer> {
   const emitter = new EventEmitter()
   const store = relayState.createRelayStore()
@@ -1686,21 +1675,12 @@ export async function startRunBrowserCDPRelayServer({
   // Session counter for suggesting next session number
   let nextSessionNumber = 1
 
-  // Lazy-load ExecutorManager via injected factory to avoid circular package dependencies
-  let executorManager: ExecutorManagerLike | null = null
-
-  const getExecutorManager = async (): Promise<ExecutorManagerLike> => {
-    if (!executorManager) {
-      if (!executorManagerFactory) {
-        throw new Error('CLI execute endpoints require an executorManagerFactory. Pass one in server config.')
-      }
-      executorManager = await executorManagerFactory({
-        cdpConfig: { host: '127.0.0.1', port },
-        logger: logger || { log: console.error, error: console.error },
-      })
-    }
-    return executorManager
-  }
+  // Built-in CDPExecutorManager — sends CDP commands directly through the Extension WebSocket.
+  const executorManager = new CDPExecutorManager({
+    sendToExtension,
+    getExtensionEntry: (stableKeyOrId) => getExtensionConnection(stableKeyOrId, { allowFallback: true }),
+    logger,
+  })
 
   // ============================================================================
   // Security middleware for privileged HTTP routes (/api/*, /recording/*)
@@ -1769,7 +1749,7 @@ export async function startRunBrowserCDPRelayServer({
         return c.json({ error: 'sessionId and code are required' }, 400)
       }
 
-      const manager = await getExecutorManager()
+      const manager = executorManager
       const existingExecutor = manager.getSession(sessionId)
       if (!existingExecutor) {
         return c.json(
@@ -1795,7 +1775,7 @@ export async function startRunBrowserCDPRelayServer({
         return c.json({ error: 'sessionId is required' }, 400)
       }
 
-      const manager = await getExecutorManager()
+      const manager = executorManager
       const existingExecutor = manager.getSession(sessionId)
       if (!existingExecutor) {
         return c.json({ error: `Session ${sessionId} not found. Run 'runbrowser session new' first.` }, 404)
@@ -1814,7 +1794,7 @@ export async function startRunBrowserCDPRelayServer({
   })
 
   app.get('/api/sessions', async (c) => {
-    const manager = await getExecutorManager()
+    const manager = executorManager
     return c.json({ sessions: manager.listSessions() })
   })
 
@@ -1835,7 +1815,7 @@ export async function startRunBrowserCDPRelayServer({
         : 'Multiple extensions connected. Specify extensionId.'
       return c.json({ error }, 404)
     }
-    const manager = await getExecutorManager()
+    const manager = executorManager
     const executor = manager.getExecutor({
       sessionId,
       cwd,
@@ -1856,7 +1836,7 @@ export async function startRunBrowserCDPRelayServer({
 
   app.get('/api/session/:id', async (c) => {
     const sessionId = c.req.param('id')
-    const manager = await getExecutorManager()
+    const manager = executorManager
     const executor = manager.getSession(sessionId)
     if (!executor) {
       return c.json({ error: 'not found' }, 404)
@@ -1879,7 +1859,7 @@ export async function startRunBrowserCDPRelayServer({
         return c.json({ error: 'sessionId is required' }, 400)
       }
 
-      const manager = await getExecutorManager()
+      const manager = executorManager
       const deleted = manager.deleteExecutor(sessionId)
 
       if (!deleted) {
@@ -1888,6 +1868,228 @@ export async function startRunBrowserCDPRelayServer({
       return c.json({ success: true })
     } catch (error: any) {
       logger?.error('Delete session endpoint error:', error)
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  // ============================================================================
+  // High-Level CDP Command Endpoints (Phase 2)
+  // ============================================================================
+
+  /** Helper to get a CDPExecutor by session ID for high-level command endpoints. */
+  const getCDPExecutor = (sessionId: string) => {
+    const executor = executorManager.getSession(sessionId)
+    if (!executor) return null
+    // CDPExecutor has high-level methods not in ExecutorLike
+    return executor as import('./cdp-executor.js').CDPExecutor
+  }
+
+  app.post('/api/navigate', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; url: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.url) return c.json({ error: 'sessionId and url are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const result = await executor.navigate(body.url)
+      return c.json(result)
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/snapshot', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; interactiveOnly?: boolean }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const result = await executor.snapshot({ interactiveOnly: body.interactiveOnly })
+      return c.json({ snapshot: result.snapshot, refs: result.refs })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/screenshot', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const data = await executor.screenshot()
+      return c.json({ data, mimeType: 'image/jpeg' })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/click', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.click(body.ref)
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/fill', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string; value: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.fill(body.ref, body.value ?? '')
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/type', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; text: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.type(body.text ?? '')
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/press', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; key: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.key) return c.json({ error: 'sessionId and key are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.press(body.key)
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/scroll', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; direction: 'up' | 'down' | 'left' | 'right'; amount?: number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.direction) return c.json({ error: 'sessionId and direction are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.scroll(body.direction, body.amount)
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/hover', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.hover(body.ref)
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/evaluate', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; code: string; timeout?: number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.code) return c.json({ error: 'sessionId and code are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const result = await executor.execute(body.code, body.timeout ?? 10000)
+      return c.json(result)
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/get-url', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const url = await executor.getUrl()
+      return c.json({ url })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/get-title', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const title = await executor.getTitle()
+      return c.json({ title })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/back', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.goBack()
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/forward', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.goForward()
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/reload', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.reload()
+      return c.json({ success: true })
+    } catch (error: any) {
       return c.json({ error: error.message }, 500)
     }
   })

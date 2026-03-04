@@ -1,4 +1,4 @@
-import { startRunBrowserCDPRelayServer, type ExecutorManagerFactory } from './server.js'
+import { startRunBrowserCDPRelayServer } from './server.js'
 import { createFileLogger } from './create-logger.js'
 import { LOG_CDP_FILE_PATH } from './utils.js'
 
@@ -24,19 +24,16 @@ export async function startServer({
   port = Number(process.env.RUNBROWSER_PORT) || 19988,
   host = '127.0.0.1',
   token,
-  executorManagerFactory,
 }: {
   port?: number
   host?: string
   token?: string
-  executorManagerFactory?: ExecutorManagerFactory
 } = {}) {
   const server = await startRunBrowserCDPRelayServer({
     port,
     host,
     token,
     logger,
-    executorManagerFactory,
   })
 
   console.log('CDP Relay Server running. Press Ctrl+C to stop.')

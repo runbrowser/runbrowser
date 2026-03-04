@@ -331,4 +331,83 @@ export class RelayApiClient {
 
     return (await response.json()) as ResetResult
   }
+
+  // --------------------------------------------------------------------------
+  // High-level browser commands (Phase 2+)
+  // --------------------------------------------------------------------------
+
+  private async post<T>(path: string, body: Record<string, unknown>, timeoutMs = 15000): Promise<T> {
+    const baseUrl = this.getBaseUrl()
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`${path} failed: ${response.status} ${text}`)
+    }
+    return (await response.json()) as T
+  }
+
+  async navigate(sessionId: string, url: string): Promise<{ url: string; title: string }> {
+    return this.post('/api/navigate', { sessionId, url })
+  }
+
+  async snapshot(sessionId: string, options?: { interactiveOnly?: boolean }): Promise<{ snapshot: string; refs: unknown[] }> {
+    return this.post('/api/snapshot', { sessionId, ...options })
+  }
+
+  async captureScreenshot(sessionId: string): Promise<{ data: string; mimeType: string }> {
+    return this.post('/api/screenshot', { sessionId })
+  }
+
+  async click(sessionId: string, ref: string): Promise<void> {
+    await this.post('/api/click', { sessionId, ref })
+  }
+
+  async fill(sessionId: string, ref: string, value: string): Promise<void> {
+    await this.post('/api/fill', { sessionId, ref, value })
+  }
+
+  async type(sessionId: string, text: string): Promise<void> {
+    await this.post('/api/type', { sessionId, text })
+  }
+
+  async press(sessionId: string, key: string): Promise<void> {
+    await this.post('/api/press', { sessionId, key })
+  }
+
+  async scroll(sessionId: string, direction: 'up' | 'down' | 'left' | 'right', amount?: number): Promise<void> {
+    await this.post('/api/scroll', { sessionId, direction, amount })
+  }
+
+  async hover(sessionId: string, ref: string): Promise<void> {
+    await this.post('/api/hover', { sessionId, ref })
+  }
+
+  async evaluate(sessionId: string, code: string, timeout?: number): Promise<ExecuteResult> {
+    return this.post('/api/evaluate', { sessionId, code, timeout })
+  }
+
+  async getUrl(sessionId: string): Promise<{ url: string }> {
+    return this.post('/api/get-url', { sessionId })
+  }
+
+  async getTitle(sessionId: string): Promise<{ title: string }> {
+    return this.post('/api/get-title', { sessionId })
+  }
+
+  async back(sessionId: string): Promise<void> {
+    await this.post('/api/back', { sessionId })
+  }
+
+  async forward(sessionId: string): Promise<void> {
+    await this.post('/api/forward', { sessionId })
+  }
+
+  async reload(sessionId: string): Promise<void> {
+    await this.post('/api/reload', { sessionId })
+  }
 }

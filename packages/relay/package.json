@@ -1,6 +1,6 @@
 {
-  "name": "@runbrowser/relay",
-  "version": "0.0.1",
+  "name": "@agmod/runbrowser-relay",
+  "version": "0.0.3",
   "description": "CDP relay for RunBrowser — bridges Chrome extension WebSocket to Playwright CDP clients",
   "type": "module",
   "main": "dist/index.js",
@@ -70,6 +70,12 @@
   },
   "homepage": "https://github.com/yuanjiwei/runbrowser",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@hono/node-server": "^1.19.6",
     "@hono/node-ws": "^1.2.0",
