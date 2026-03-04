@@ -7,7 +7,7 @@ import {
   filterInteractiveSnapshotTree,
   finalizeSnapshotOutput,
   type SnapshotNode,
-} from '@runbrowser/core/aria-snapshot'
+} from '@agmod/runbrowser-core/aria-snapshot'
 
 const roleValue = (value: string): Protocol.Accessibility.AXValue => {
   return { type: 'role', value }
