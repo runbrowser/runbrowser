@@ -233,7 +233,258 @@ export async function getText(
   if (!resolved?.backendNodeId) {
     throw new Error(`Ref "${ref}" not found in last snapshot`)
   }
-  // Use DOM.getOuterHTML or Runtime.evaluate with the node
+  // Resolve to a JS object, get innerText
+  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
+  const objectId = obj?.object?.objectId
+  if (!objectId) {
+    // Fallback to outerHTML
+    const html = (await sendCDP('DOM.getOuterHTML', { backendNodeId: resolved.backendNodeId })) as any
+    return html?.outerHTML || ''
+  }
+  const result = (await sendCDP('Runtime.callFunctionOn', {
+    objectId,
+    functionDeclaration: 'function() { return this.innerText || this.textContent || "" }',
+    returnByValue: true,
+  })) as any
+  return result?.result?.value || ''
+}
+
+export async function getHtml(
+  sendCDP: SendCDP,
+  ref: string,
+  refMap: Map<string, SnapshotRef>,
+): Promise<string> {
+  const resolved = resolveRef(ref, refMap)
+  if (!resolved?.backendNodeId) {
+    throw new Error(`Ref "${ref}" not found in last snapshot`)
+  }
   const result = (await sendCDP('DOM.getOuterHTML', { backendNodeId: resolved.backendNodeId })) as any
   return result?.outerHTML || ''
+}
+
+export async function getValue(
+  sendCDP: SendCDP,
+  ref: string,
+  refMap: Map<string, SnapshotRef>,
+): Promise<string> {
+  const resolved = resolveRef(ref, refMap)
+  if (!resolved?.backendNodeId) {
+    throw new Error(`Ref "${ref}" not found in last snapshot`)
+  }
+  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
+  const objectId = obj?.object?.objectId
+  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
+  const result = (await sendCDP('Runtime.callFunctionOn', {
+    objectId,
+    functionDeclaration: 'function() { return this.value ?? "" }',
+    returnByValue: true,
+  })) as any
+  return result?.result?.value ?? ''
+}
+
+export async function getAttribute(
+  sendCDP: SendCDP,
+  ref: string,
+  attr: string,
+  refMap: Map<string, SnapshotRef>,
+): Promise<string | null> {
+  const resolved = resolveRef(ref, refMap)
+  if (!resolved?.backendNodeId) {
+    throw new Error(`Ref "${ref}" not found in last snapshot`)
+  }
+  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
+  const objectId = obj?.object?.objectId
+  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
+  const result = (await sendCDP('Runtime.callFunctionOn', {
+    objectId,
+    functionDeclaration: `function() { return this.getAttribute(${JSON.stringify(attr)}) }`,
+    returnByValue: true,
+  })) as any
+  return result?.result?.value ?? null
+}
+
+export async function isVisible(
+  sendCDP: SendCDP,
+  ref: string,
+  refMap: Map<string, SnapshotRef>,
+): Promise<boolean> {
+  const resolved = resolveRef(ref, refMap)
+  if (!resolved?.backendNodeId) {
+    throw new Error(`Ref "${ref}" not found in last snapshot`)
+  }
+  const box = await getElementBox(sendCDP, resolved.backendNodeId)
+  return box != null && box.width > 0 && box.height > 0
+}
+
+export async function isChecked(
+  sendCDP: SendCDP,
+  ref: string,
+  refMap: Map<string, SnapshotRef>,
+): Promise<boolean> {
+  const resolved = resolveRef(ref, refMap)
+  if (!resolved?.backendNodeId) {
+    throw new Error(`Ref "${ref}" not found in last snapshot`)
+  }
+  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
+  const objectId = obj?.object?.objectId
+  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
+  const result = (await sendCDP('Runtime.callFunctionOn', {
+    objectId,
+    functionDeclaration: 'function() { return !!this.checked }',
+    returnByValue: true,
+  })) as any
+  return !!result?.result?.value
+}
+
+export async function selectOption(
+  sendCDP: SendCDP,
+  ref: string,
+  value: string,
+  refMap: Map<string, SnapshotRef>,
+): Promise<void> {
+  const resolved = resolveRef(ref, refMap)
+  if (!resolved?.backendNodeId) {
+    throw new Error(`Ref "${ref}" not found in last snapshot`)
+  }
+  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
+  const objectId = obj?.object?.objectId
+  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
+  await sendCDP('Runtime.callFunctionOn', {
+    objectId,
+    functionDeclaration: `function() {
+      this.value = ${JSON.stringify(value)};
+      this.dispatchEvent(new Event('input', { bubbles: true }));
+      this.dispatchEvent(new Event('change', { bubbles: true }));
+    }`,
+    returnByValue: true,
+  })
+}
+
+export async function waitFor(
+  sendCDP: SendCDP,
+  options: { ref?: string; text?: string; url?: string; ms?: number; load?: string; fn?: string },
+  refMap: Map<string, SnapshotRef>,
+  timeout: number = 10000,
+): Promise<void> {
+  // Simple sleep
+  if (options.ms) {
+    await new Promise((resolve) => setTimeout(resolve, options.ms))
+    return
+  }
+
+  const deadline = Date.now() + timeout
+  const poll = async (check: () => Promise<boolean>) => {
+    while (Date.now() < deadline) {
+      if (await check()) return
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+    throw new Error(`Wait timed out after ${timeout}ms`)
+  }
+
+  if (options.ref) {
+    const resolved = resolveRef(options.ref, refMap)
+    if (!resolved?.backendNodeId) {
+      throw new Error(`Ref "${options.ref}" not found in last snapshot`)
+    }
+    await poll(async () => {
+      const box = await getElementBox(sendCDP, resolved.backendNodeId!)
+      return box != null && box.width > 0 && box.height > 0
+    })
+    return
+  }
+
+  if (options.text) {
+    const searchText = options.text
+    await poll(async () => {
+      const result = (await sendCDP('Runtime.evaluate', {
+        expression: `document.body?.innerText?.includes(${JSON.stringify(searchText)}) ?? false`,
+        returnByValue: true,
+      })) as any
+      return !!result?.result?.value
+    })
+    return
+  }
+
+  if (options.url) {
+    const urlPattern = options.url
+    await poll(async () => {
+      const result = (await sendCDP('Runtime.evaluate', {
+        expression: 'window.location.href',
+        returnByValue: true,
+      })) as any
+      const currentUrl = result?.result?.value || ''
+      // Support glob patterns: ** = anything
+      const regex = new RegExp('^' + urlPattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*') + '$')
+      return regex.test(currentUrl)
+    })
+    return
+  }
+
+  if (options.load) {
+    if (options.load === 'domcontentloaded' || options.load === 'load') {
+      await poll(async () => {
+        const result = (await sendCDP('Runtime.evaluate', {
+          expression: 'document.readyState',
+          returnByValue: true,
+        })) as any
+        const state = result?.result?.value || ''
+        if (options.load === 'domcontentloaded') return state === 'interactive' || state === 'complete'
+        return state === 'complete'
+      })
+    } else if (options.load === 'networkidle') {
+      // Simple heuristic: wait for document complete + short idle period
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await poll(async () => {
+        const result = (await sendCDP('Runtime.evaluate', {
+          expression: 'document.readyState',
+          returnByValue: true,
+        })) as any
+        return result?.result?.value === 'complete'
+      })
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+    return
+  }
+
+  if (options.fn) {
+    const expression = options.fn
+    await poll(async () => {
+      const result = (await sendCDP('Runtime.evaluate', {
+        expression,
+        returnByValue: true,
+      })) as any
+      if (result?.exceptionDetails) {
+        throw new Error(`wait --fn error: ${result.exceptionDetails.text || result.exceptionDetails.exception?.description || 'evaluation failed'}`)
+      }
+      return !!result?.result?.value
+    })
+    return
+  }
+
+  throw new Error('wait requires one of: <ref>, --text, --url, --load, --fn, or <ms>')
+}
+
+export async function viewport(
+  sendCDP: SendCDP,
+  width: number,
+  height: number,
+): Promise<void> {
+  await sendCDP('Emulation.setDeviceMetricsOverride', {
+    width,
+    height,
+    deviceScaleFactor: 1,
+    mobile: false,
+  })
+}
+
+// ============================================================================
+// Raw CDP passthrough
+// ============================================================================
+
+export async function rawCDP(
+  sendCDP: SendCDP,
+  method: string,
+  params?: unknown,
+): Promise<unknown> {
+  return sendCDP(method, params)
 }

@@ -410,4 +410,45 @@ export class RelayApiClient {
   async reload(sessionId: string): Promise<void> {
     await this.post('/api/reload', { sessionId })
   }
+
+  async getText(sessionId: string, ref: string): Promise<{ text: string }> {
+    return this.post('/api/get-text', { sessionId, ref })
+  }
+
+  async getHtml(sessionId: string, ref: string): Promise<{ html: string }> {
+    return this.post('/api/get-html', { sessionId, ref })
+  }
+
+  async getValue(sessionId: string, ref: string): Promise<{ value: string }> {
+    return this.post('/api/get-value', { sessionId, ref })
+  }
+
+  async getAttribute(sessionId: string, ref: string, attr: string): Promise<{ value: string | null }> {
+    return this.post('/api/get-attr', { sessionId, ref, attr })
+  }
+
+  async isVisible(sessionId: string, ref: string): Promise<{ visible: boolean }> {
+    return this.post('/api/is-visible', { sessionId, ref })
+  }
+
+  async isChecked(sessionId: string, ref: string): Promise<{ checked: boolean }> {
+    return this.post('/api/is-checked', { sessionId, ref })
+  }
+
+  async selectOption(sessionId: string, ref: string, value: string): Promise<void> {
+    await this.post('/api/select', { sessionId, ref, value })
+  }
+
+  async waitFor(sessionId: string, options: { ref?: string; text?: string; url?: string; ms?: number; load?: string; fn?: string; timeout?: number }): Promise<void> {
+    const timeoutMs = (options.timeout || 10000) + 5000
+    await this.post('/api/wait', { sessionId, ...options }, timeoutMs)
+  }
+
+  async viewport(sessionId: string, width: number, height: number): Promise<void> {
+    await this.post('/api/viewport', { sessionId, width, height })
+  }
+
+  async cdp(sessionId: string, method: string, params?: unknown): Promise<{ result: unknown }> {
+    return this.post('/api/cdp', { sessionId, method, params })
+  }
 }

@@ -1,8 +1,8 @@
 # RunBrowser
 
-> Getting Started with RunBrowser — Control your browser via Playwright API. Uses extension + CLI. No context bloat.
+> Getting Started with RunBrowser — Control your browser via CDP. Uses extension + CLI. No context bloat.
 
-Other browser MCPs spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. RunBrowser connects to **your running browser** instead. One Chrome extension, full Playwright API, everything you're already logged into.
+Other browser MCPs spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. RunBrowser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
 
 |               | Playwright MCP    | RunBrowser                        |
 | ------------- | ----------------- | --------------------------------- |
@@ -41,8 +41,11 @@ npm i -g @agmod/runbrowser
 # create a session
 runbrowser session-new
 
-# navigate to a URL in the active tab
-runbrowser exec -s 1 -e "await page.goto('https://example.com')"
+# navigate to a URL
+runbrowser navigate https://example.com -s 1
+
+# or execute browser JavaScript directly
+runbrowser exec -s 1 -e "document.title"
 ```
 
 ### 5. Add the Skill to Your Agent (Optional)
@@ -65,20 +68,24 @@ npx -y skills add yuanjiwei/runbrowser
 ## CLI Examples
 
 ```bash
-# create a stateful sandbox, outputs session id (e.g. 1)
+# create a session, outputs session id (e.g. 1)
 runbrowser session-new
 
 # navigate to a URL
-runbrowser exec -s 1 -e "await page.goto('https://example.com')"
+runbrowser navigate https://example.com -s 1
 
 # get the accessibility tree of the page
-runbrowser exec -s 1 -e "console.log(await snapshot({ page }))"
+runbrowser snapshot -s 1
 
-# click an element by its accessibility reference
-runbrowser exec -s 1 -e "await page.locator('aria-ref=e5').click()"
+# click an element by its @ref from snapshot (e.g. @e5)
+runbrowser click @e5 -s 1
+
+# execute browser JavaScript via CDP Runtime.evaluate
+runbrowser exec -s 1 -e 'document.title'
+
+# evaluate JS and get console output
+runbrowser evaluate 'document.querySelectorAll("a").length' -s 1
 ```
-
-> **Tip:** Always use single quotes for `-e` to prevent bash from interpreting `$`, backticks, and `\` in your JS code. Use double quotes for strings inside the JS.
 
 ## CLI Usage
 
@@ -88,12 +95,13 @@ Each session has **isolated state**. Browser tabs are **shared** across sessions
 # Session management
 runbrowser session-new              # creates stateful sandbox, outputs id (e.g. 1)
 runbrowser session-list             # show sessions + state keys
+runbrowser session-delete <id>      # delete a session and clear its state
 runbrowser session-reset <id>       # fix connection issues
 
-# Execute (always use -s)
-runbrowser exec -s 1 -e 'await page.goto("https://example.com")'
-runbrowser exec -s 1 -e 'await page.click("button")'
-runbrowser exec -s 1 -e 'console.log(await page.title())'
+# Execute browser JS via CDP (always use -s)
+runbrowser exec -s 1 -e 'document.title'
+runbrowser exec -s 1 -e 'document.querySelector("button").click()'
+runbrowser exec -s 1 -e 'window.location.href'
 
 # High-level commands
 runbrowser navigate <url> -s 1
@@ -104,6 +112,30 @@ runbrowser fill <ref> <value> -s 1
 runbrowser type <text> -s 1
 runbrowser press <key> -s 1
 runbrowser scroll <direction> -s 1
+runbrowser hover <ref> -s 1
+runbrowser evaluate <code> -s 1
+runbrowser get-url -s 1
+runbrowser get-title -s 1
+runbrowser back -s 1
+runbrowser forward -s 1
+runbrowser reload -s 1
+
+# Wait for conditions
+runbrowser wait @e5 -s 1                              # wait for element to be visible
+runbrowser wait 2000 -s 1                              # wait 2 seconds
+runbrowser wait --text "Welcome" -s 1                  # wait for text to appear
+runbrowser wait --url "**/dashboard" -s 1              # wait for URL pattern
+runbrowser wait --load networkidle -s 1                # wait for load state
+runbrowser wait --fn "document.querySelectorAll('.item').length >= 10" -s 1  # wait for JS condition
+
+# Config management (persistent settings in ~/.runbrowser/config.json)
+runbrowser config-set <key> <value>   # set token or host
+runbrowser config-unset <key>         # remove a config value
+runbrowser config-show                # show current config
+
+# Utilities
+runbrowser logfile                    # print log file paths
+runbrowser skill                     # print full usage instructions
 
 # Start relay server (foreground, for remote access)
 runbrowser serve --host 0.0.0.0 --token <secret>
@@ -111,10 +143,14 @@ runbrowser serve --host 0.0.0.0 --token <secret>
 
 ## How It Works
 
+RunBrowser uses the **Chrome DevTools Protocol (CDP)** directly — no Playwright dependency required for CLI or MCP usage. The extension bridges CDP commands over WebSocket to your running browser.
+
 - **No new Chrome instances**: Works with your current browser session
 - **No CDP mode required**: No need to restart Chrome with special flags
 - **Full CDP access**: Complete Chrome DevTools Protocol capabilities
 - **Visual feedback**: Extension icon changes color to indicate connection status
+
+The `exec` command runs JavaScript in the **browser page context** via `Runtime.evaluate` — it's plain browser JS, not a Node.js/Playwright sandbox.
 
 ## MCP Setup (Optional)
 
@@ -131,23 +167,35 @@ The CLI is the recommended way to use RunBrowser. If you need MCP server setup, 
 }
 ```
 
+The MCP server exposes these tools: `navigate`, `snapshot`, `screenshot`, `click`, `fill`, `type`, `press`, `scroll`, `hover`, `evaluate`, `get_url`, `get_title`, `back`, `forward`, `reload`, `reset`, and `execute`.
+
 For full MCP instructions, see [MCP.md](./MCP.md).
 
-## Visual Labels
+## Accessibility Snapshots
 
-Vimium-style labels for AI agents to identify elements:
+Snapshots return a text-based accessibility tree with `@ref` labels on interactive elements:
 
-```javascript
-await screenshotWithAccessibilityLabels({ page })
-// Returns screenshot + accessibility snapshot with aria-ref selectors
-await page.locator('aria-ref=e5').click()
+```
+- banner:
+  - link "Home" @e1
+  - navigation:
+    - link "Docs" @e2
+    - link "Blog" @e3
 ```
 
-Color-coded: yellow=links, orange=buttons, coral=inputs, pink=checkboxes, peach=sliders, salmon=menus, amber=tabs.
+Use refs to interact with elements:
 
-## Playwright API
+```bash
+# Via high-level CLI commands
+runbrowser click @e3 -s 1
 
-Connect programmatically (without CLI):
+# Via exec (browser JS)
+runbrowser exec -s 1 -e 'document.querySelector("a[href=\"/blog\"]").click()'
+```
+
+## Playwright API (Optional)
+
+The relay server also exposes a standard CDP WebSocket endpoint, so you can optionally connect with Playwright for its full API (locators, auto-waiting, etc.):
 
 ```typescript
 import { chromium } from 'playwright-core'
@@ -163,11 +211,13 @@ await page.screenshot({ path: 'screenshot.png' })
 server.close()
 ```
 
+> **Note:** The CLI and MCP use CDP directly and do **not** require `playwright-core` as a dependency.
+
 ## Architecture
 
 ```
 +---------------------+     +-------------------+     +-----------------+
-|   BROWSER           |     |   LOCALHOST       |     |   MCP CLIENT    |
+|   BROWSER           |     |   LOCALHOST        |     |   CLIENT        |
 |                     |     |                   |     |                 |
 |  +---------------+  |     | WebSocket Server  |     |  +-----------+  |
 |  |   Extension   |<--------->  :19988         |     |  | AI Agent  |  |
@@ -175,10 +225,10 @@ server.close()
 |          |          |     |  /extension       |     |        |        |
 |    chrome.debugger  |     |       |           |     |        v        |
 |          v          |     |       v           |     |  +-----------+  |
-|  +---------------+  |     |  /cdp/:id <--------------> |  execute  |  |
+|  +---------------+  |     |  /cdp/:id <--------------> |  CLI/MCP  |  |
 |  | Tab 1 (green) |  |     +-------------------+  WS |  +-----------+  |
 |  | Tab 2 (green) |  |                               |        |        |
-|  | Tab 3 (gray)  |  |     Tab 3 not controlled      |  Playwright API |
+|  | Tab 3 (gray)  |  |     Tab 3 not controlled      |    CDP API      |
 +---------------------+     (no extension click)      +-----------------+
 ```
 
@@ -191,6 +241,8 @@ server.close()
 | `RUNBROWSER_PORT` | Relay server port (default: 19988) |
 | `RUNBROWSER_SESSION` | Default session ID (avoids `-s` flag) |
 | `RUNBROWSER_AUTO_ENABLE` | Auto-create tab on connect |
+| `RUNBROWSER_LOG_FILE_PATH` | Custom path for relay server log file |
+| `RUNBROWSER_CDP_LOG_FILE_PATH` | Custom path for CDP JSONL log file |
 
 ## Privacy & Security
 
@@ -206,8 +258,9 @@ RunBrowser runs locally in your browser and does not send any data to external s
 View relay server logs to debug issues:
 
 ```bash
-runbrowser logfile  # prints the log file path
-# typically: ~/.runbrowser/relay-server.log
+runbrowser logfile  # prints the log file paths
+# relay: ~/.runbrowser/relay-server.log
+# cdp:   ~/.runbrowser/cdp.jsonl
 ```
 
 ## Known Issues

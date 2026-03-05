@@ -232,6 +232,50 @@ export class CDPExecutor implements ExecutorLike {
     return commands.getText(sendCDP, ref, this.lastRefMap)
   }
 
+  async getHtml(ref: string): Promise<string> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.getHtml(sendCDP, ref, this.lastRefMap)
+  }
+
+  async getValue(ref: string): Promise<string> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.getValue(sendCDP, ref, this.lastRefMap)
+  }
+
+  async getAttribute(ref: string, attr: string): Promise<string | null> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.getAttribute(sendCDP, ref, attr, this.lastRefMap)
+  }
+
+  async isVisible(ref: string): Promise<boolean> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.isVisible(sendCDP, ref, this.lastRefMap)
+  }
+
+  async isChecked(ref: string): Promise<boolean> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.isChecked(sendCDP, ref, this.lastRefMap)
+  }
+
+  async selectOption(ref: string, value: string): Promise<void> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.selectOption(sendCDP, ref, value, this.lastRefMap)
+  }
+
+  async waitFor(options: { ref?: string; text?: string; url?: string; ms?: number; load?: string; fn?: string }, timeout?: number): Promise<void> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.waitFor(sendCDP, options, this.lastRefMap, timeout)
+  }
+
+  async viewport(width: number, height: number): Promise<void> {
+    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
+    return commands.viewport(sendCDP, width, height)
+  }
+
+  async rawCDP(method: string, params?: unknown): Promise<unknown> {
+    return this.sendCDP(method, params)
+  }
+
   async goBack(): Promise<void> {
     const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
     return commands.goBack(sendCDP)

@@ -2095,6 +2095,150 @@ export async function startRunBrowserCDPRelayServer({
   })
 
   // ============================================================================
+  // New high-level commands
+  // ============================================================================
+
+  app.post('/api/get-text', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const text = await executor.getText(body.ref)
+      return c.json({ text })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/get-html', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const html = await executor.getHtml(body.ref)
+      return c.json({ html })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/get-value', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const value = await executor.getValue(body.ref)
+      return c.json({ value })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/get-attr', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string; attr: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref || !body.attr) return c.json({ error: 'sessionId, ref and attr are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const value = await executor.getAttribute(body.ref, body.attr)
+      return c.json({ value })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/is-visible', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const visible = await executor.isVisible(body.ref)
+      return c.json({ visible })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/is-checked', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref) return c.json({ error: 'sessionId and ref are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const checked = await executor.isChecked(body.ref)
+      return c.json({ checked })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/select', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref: string; value: string }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.ref || body.value == null) return c.json({ error: 'sessionId, ref and value are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.selectOption(body.ref, body.value)
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/wait', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; ref?: string; text?: string; url?: string; ms?: number; load?: string; fn?: string; timeout?: number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.waitFor({ ref: body.ref, text: body.text, url: body.url, ms: body.ms, load: body.load, fn: body.fn }, body.timeout)
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/viewport', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; width: number; height: number }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.width || !body.height) return c.json({ error: 'sessionId, width and height are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      await executor.viewport(body.width, body.height)
+      return c.json({ success: true })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  app.post('/api/cdp', async (c) => {
+    try {
+      const body = (await c.req.json()) as { sessionId: string | number; method: string; params?: unknown }
+      const sessionId = normalizeSessionId(body.sessionId)
+      if (!sessionId || !body.method) return c.json({ error: 'sessionId and method are required' }, 400)
+      const executor = getCDPExecutor(sessionId)
+      if (!executor) return c.json({ error: `Session ${sessionId} not found` }, 404)
+      const result = await executor.rawCDP(body.method, body.params)
+      return c.json({ result })
+    } catch (error: any) {
+      return c.json({ error: error.message }, 500)
+    }
+  })
+
+  // ============================================================================
   // Recording Endpoints - For screen recording via chrome.tabCapture
   // ============================================================================
 
