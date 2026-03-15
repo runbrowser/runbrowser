@@ -30,6 +30,7 @@ import { parseArgs, resolveUnknownFlags, type ParsedArgs, type FlagDef } from '.
 import { printMainHelp, printCommandHelp } from './help.js'
 
 
+
 // Import command registrations (side-effect: registers commands)
 import './commands/navigation.js'
 import './commands/observation.js'
@@ -139,20 +140,28 @@ async function main() {
     return
   }
 
-  // ── Try site command: `runbrowser <site> <name>` ──
-  // TODO: Load site commands from ~/.runbrowser/commands/ and relay server
-  // For now, show error
+  // ── Try custom command: `runbrowser <site> <name>` ──
   if (args.subcommand) {
-    const key = `${args.command}/${args.subcommand}`
+    const site = args.command!
+    const name = args.subcommand
 
-    // Check if --help
-    if (args.help) {
-      // TODO: Look up site command def and show help
-      throw new Error(`Unknown command: ${args.command} ${args.subcommand}`)
+    const { sessionId, client } = await resolveSession(args)
+
+    try {
+      const result = await client.runCommand(sessionId, site, name, Object.fromEntries(args.flags))
+
+      if (args.json) {
+        console.log(JSON.stringify(result.data))
+      } else {
+        const { formatTable } = await import('./output.js')
+        const fmt = (args.format as string) || 'table'
+        console.log(formatTable(result.data, result.columns, fmt))
+      }
+    } catch (e: any) {
+      console.error(`Error: ${e.message}`)
+      process.exit(1)
     }
-
-    // TODO: Execute site command
-    throw new Error(`Unknown command: ${args.command} ${args.subcommand}\nSite commands not yet implemented. Run 'runbrowser --help' for available commands.`)
+    return
   }
 
   // ── Unknown command ──

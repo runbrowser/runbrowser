@@ -31,6 +31,7 @@ import { registerCdpDiscoveryRoutes } from './routes/cdp-discovery.js'
 import { registerApiCommandRoutes } from './routes/api-commands.js'
 import { registerApiSessionRoutes } from './routes/api-sessions.js'
 import { registerApiRecordingRoutes } from './routes/api-recording.js'
+import { registerApiCustomCommandRoutes } from './routes/api-custom-commands.js'
 import { registerExtensionWsRoute } from './routes/extension-ws.js'
 import { registerPlaywrightWsRoute } from './routes/playwright-ws.js'
 import { createPrivilegedMiddleware } from './middleware/privileged.js'
@@ -550,6 +551,7 @@ export async function startRunBrowserCDPRelayServer({
   registerApiSessionRoutes(app, ctx)
   registerApiCommandRoutes(app, ctx)
   registerApiRecordingRoutes(app, ctx)
+  registerApiCustomCommandRoutes(app, ctx)
 
   // ========================================================================
   // Start server

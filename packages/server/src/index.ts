@@ -144,6 +144,10 @@ export type {
 export { RecordingRelay } from './recording.js'
 export type { ActiveRecording } from './recording.js'
 
+// Custom commands
+export { listCustomCommands, loadCommand } from './custom-commands.js'
+export type { CommandDef, CommandModule, CommandContext, CommandArg } from './custom-commands.js'
+
 // Port management
 export { killPortProcess, getListeningPidsForPort, isPortInUse } from './kill-port.js'
 export type { KillPortSignal } from './kill-port.js'

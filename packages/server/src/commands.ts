@@ -49,14 +49,32 @@ async function cdpGetOuterHTML(sendCDP: SendCDP, backendNodeId: number): Promise
 export async function navigate(sendCDP: SendCDP, url: string): Promise<{ url: string; title: string }> {
   await sendCDP('Page.enable')
   await sendCDP('Page.navigate', { url })
-  // Wait a moment for the page to load
-  await new Promise((resolve) => setTimeout(resolve, 500))
-  const titleResult = await cdpEvaluate(sendCDP, 'document.title')
-  const urlResult = await cdpEvaluate(sendCDP, 'window.location.href')
-  return {
-    url: String(urlResult.result.value ?? url),
-    title: String(titleResult.result.value ?? ''),
+
+  // Wait for navigation to complete by polling readyState.
+  // Cross-origin navigations may destroy the execution context temporarily.
+  const maxWait = 10000
+  const start = Date.now()
+
+  while (Date.now() - start < maxWait) {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const readyResult = await cdpEvaluate(sendCDP, 'document.readyState')
+      const ready = String(readyResult.result.value ?? '')
+      if (ready === 'complete' || ready === 'interactive') {
+        const titleResult = await cdpEvaluate(sendCDP, 'document.title')
+        const urlResult = await cdpEvaluate(sendCDP, 'window.location.href')
+        return {
+          url: String(urlResult.result.value ?? url),
+          title: String(titleResult.result.value ?? ''),
+        }
+      }
+    } catch {
+      // Execution context destroyed during navigation — retry
+    }
   }
+
+  // Fallback: return target URL even if we couldn't confirm load
+  return { url, title: '' }
 }
 
 export async function goBack(sendCDP: SendCDP): Promise<void> {

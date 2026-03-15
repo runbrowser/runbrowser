@@ -169,7 +169,7 @@ runbrowser diff screenshot -b baseline.png -s 1           # compare screenshots
 
 ### Recording
 
-Record browser tab video (H.264 MP4, QuickTime compatible). Requires `ffmpeg` installed.
+Record browser tab video (H.264 MP4). Requires `ffmpeg` installed.
 
 ```bash
 runbrowser record start -o recording.mp4 -s 1   # start recording
