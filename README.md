@@ -169,25 +169,22 @@ runbrowser diff screenshot -b baseline.png -s 1           # compare screenshots
 
 ### Recording
 
+Record browser tab video (H.264 MP4, QuickTime compatible). Requires `ffmpeg` installed.
+
 ```bash
 runbrowser record start -o recording.mp4 -s 1   # start recording
-runbrowser record stop -s 1                       # stop and save
+runbrowser record stop -s 1                       # stop and save (auto-transcodes to H.264)
 runbrowser record status -s 1                     # check if recording
 runbrowser record cancel -s 1                     # cancel without saving
 ```
 
-### Playwright API (via exec)
-
-The `exec` command runs code in a **stateful Playwright sandbox** with `page`, `context`, `state`, `snapshot()`, and all utility functions:
+For automated recording without clicking the extension icon, restart Chrome with:
 
 ```bash
-runbrowser exec -s 1 -e 'await page.goto("https://example.com")'
-runbrowser exec -s 1 -e 'console.log(await snapshot({ page }))'
-runbrowser exec -s 1 -e 'await page.locator("button").click()'
-runbrowser exec -s 1 -e 'await screenshotWithAccessibilityLabels({ page })'
+# macOS (set your profile name first)
+runbrowser config set profile "Profile 11"
+open -a "Google Chrome" --args --auto-accept-this-tab-capture --profile-directory="Profile 11"
 ```
-
-> Always use **single quotes** for `-e` to prevent bash from interpreting `$` and backticks.
 
 ### Configuration
 
@@ -222,53 +219,6 @@ runbrowser fill @e3 "search term" -s 1
 runbrowser get text @e4 -s 1
 ```
 
-## Site Commands
-
-Turn any website into a **CLI command**. Site commands are TypeScript plugins that encapsulate navigation, scraping, and data extraction into reusable commands — one command instead of navigate → snapshot → parse.
-
-```bash
-runbrowser github trending --limit 5
-
-# RANK  NAME                 STARS   LANGUAGE
-# 1     denoland/deno        5.2k    Rust
-# 2     tauri-apps/tauri     3.8k    Rust
-# 3     nickel-org/nickel    2.1k    Rust
-
-runbrowser github trending --limit 3 --json   # JSON for agents
-```
-
-Write your own by dropping a `.ts` file into `~/.runbrowser/commands/`:
-
-```typescript
-// ~/.runbrowser/commands/github/trending.ts
-import { command } from '@jiweiyuan/commands'
-
-export default command({
-  site: 'github',
-  name: 'trending',
-  description: 'GitHub trending repositories',
-  args: {
-    limit: { type: 'number', default: 20, description: 'Number of items' },
-    language: { type: 'string', description: 'Filter by language' },
-  },
-  columns: ['rank', 'name', 'stars', 'language'],
-
-  async run(browser, args) {
-    await browser.navigate('https://github.com/trending')
-    const data = await browser.evaluate(`
-      [...document.querySelectorAll('article.Box-row')].map(el => ({
-        name: el.querySelector('h2 a')?.textContent?.trim(),
-        stars: el.querySelector('.octicon-star')?.parentElement?.textContent?.trim(),
-        language: el.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim(),
-      }))
-    `)
-    return data.slice(0, args.limit).map((item, i) => ({ rank: i + 1, ...item }))
-  },
-})
-```
-
-Commands are loaded by the relay server via jiti. Agents discover commands through MCP `skill` and execute via `run`. Output supports `--json`, `--csv`, table, and markdown formats.
-
 ## MCP Setup
 
 The CLI is the recommended way to use RunBrowser. For MCP server integration:
@@ -284,7 +234,7 @@ The CLI is the recommended way to use RunBrowser. For MCP server integration:
 }
 ```
 
-MCP tools: `navigate`, `snapshot`, `screenshot`, `click`, `fill`, `type`, `press`, `scroll`, `hover`, `evaluate`, `get_url`, `get_title`, `back`, `forward`, `reload`, `reset`, `execute`, `skill`, `run`.
+MCP tools: `navigate`, `snapshot`, `screenshot`, `click`, `fill`, `type`, `press`, `scroll`, `hover`, `evaluate`, `get_url`, `get_title`, `back`, `forward`, `reload`, `reset`.
 
 For full MCP instructions, see [MCP.md](./MCP.md).
 
@@ -340,7 +290,7 @@ server.close()
 
 ```
 packages/
-├── cli/          # @jiweiyuan/runbrowser — CLI + Playwright sandbox
+├── cli/          # @jiweiyuan/runbrowser — CLI
 ├── core/         # @jiweiyuan/runbrowser-core — shared: a11y, debugger, editor, recording
 ├── server/       # @jiweiyuan/runbrowser-server — WebSocket relay, CDP bridge, site commands
 ├── mcp/          # @jiweiyuan/runbrowser-mcp — MCP server (thin HTTP wrapper)
