@@ -293,13 +293,13 @@ These files import Playwright types but may still be useful:
 
 ```bash
 # packages/core/package.json
-pnpm remove playwright-core --filter @agmod/runbrowser-core
+pnpm remove playwright-core --filter @jiweiyuan/runbrowser-core
 
 # packages/relay/package.json  
-pnpm remove playwright-core --filter @agmod/runbrowser-relay
+pnpm remove playwright-core --filter @jiweiyuan/runbrowser-relay
 
 # packages/e2e/package.json
-pnpm remove playwright-core --filter @runbrowser/e2e
+pnpm remove playwright-core --filter @jiweiyuan/e2e
 ```
 
 ### 4.4 Remove `executorManagerFactory` pattern from Relay

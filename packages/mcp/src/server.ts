@@ -1,13 +1,15 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-import dedent from 'string-dedent'
-import { LOG_FILE_PATH, VERSION } from '@agmod/runbrowser-server'
-import { RelayApiClient } from '@agmod/runbrowser-server/api'
+import { LOG_FILE_PATH, VERSION } from '@jiweiyuan/runbrowser-server'
+import { RelayApiClient } from '@jiweiyuan/runbrowser-server/api'
 
 // ============================================================================
-// Relay API Client instance — single client for this MCP server process
+// Relay API Client
 // ============================================================================
 
 let client: RelayApiClient | null = null
@@ -24,9 +26,6 @@ function getClient(): RelayApiClient {
   return client
 }
 
-/**
- * Log to both console.error (for early startup) and relay server log file.
- */
 function mcpLog(...args: any[]) {
   console.error(...args)
   getClient().sendLog('log', ...args)
@@ -40,13 +39,9 @@ const mcpLogger = {
   },
 }
 
-/**
- * Ensure relay server is running and we have a session.
- */
 async function ensureSession(): Promise<string> {
   const c = getClient()
 
-  // Ensure relay server is running
   if (!c.isRemote) {
     await c.ensureServer()
   }
@@ -55,10 +50,8 @@ async function ensureSession(): Promise<string> {
     return sessionId
   }
 
-  // Wait for extension
   await c.waitForExtensions({ timeoutMs: 15000, pollIntervalMs: 500 })
 
-  // Create session
   const session = await c.createSession({ cwd: process.cwd() })
   sessionId = session.id
   mcpLog(`MCP session created: ${sessionId}`)
@@ -66,37 +59,9 @@ async function ensureSession(): Promise<string> {
 }
 
 // ============================================================================
-// MCP Server Definition
+// Helper
 // ============================================================================
 
-const server = new McpServer({
-  name: 'runbrowser',
-  title: 'Control your running Chrome browser — your logins, extensions, cookies already there.',
-  version: VERSION,
-})
-
-// System prompt teaching AI agents how to use the new tool set
-const systemPrompt = dedent`
-  You are controlling a real Chrome browser. The browser already has the user's logins, extensions, and cookies.
-
-  ## Workflow
-  1. Use \`snapshot\` to see the current page (returns accessibility tree with @ref labels on interactive elements)
-  2. Use @ref labels from snapshot to interact: \`click @e1\`, \`fill @e2 with "text"\`
-  3. Use \`evaluate\` for complex JS operations the high-level tools can't do
-  4. Re-snapshot after actions to verify results
-  5. Use \`screenshot\` when you need visual layout information
-
-  ## Element References
-  - \`snapshot\` returns elements tagged with @e1, @e2, etc.
-  - Pass these refs to \`click\`, \`fill\`, \`hover\`, \`get_text\`
-  - Refs are valid until the next \`snapshot\` call
-
-  for debugging internal runbrowser errors, check runbrowser relay server logs at: ${LOG_FILE_PATH}
-`
-
-// ============================================================================
-// Helper: wrap tool handler with error handling and 404 session reset
-// ============================================================================
 function toolHandler<T extends Record<string, unknown>>(
   fn: (args: T) => Promise<{ content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean }>,
 ): (args: T) => Promise<{ content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean }> {
@@ -112,227 +77,295 @@ function toolHandler<T extends Record<string, unknown>>(
 }
 
 // ============================================================================
-// MCP Tools
+// MCP Server — Two Tools: skill + run
 // ============================================================================
 
-server.tool(
-  'navigate',
-  'Navigate to a URL in the browser.',
-  { url: z.string().describe('The URL to navigate to') },
-  toolHandler(async ({ url }) => {
-    const sid = await ensureSession()
-    const result = await getClient().navigate(sid, url)
-    return { content: [{ type: 'text', text: `Navigated to ${result.url}\nTitle: ${result.title}` }] }
-  }),
-)
+const server = new McpServer({
+  name: 'runbrowser',
+  title: 'Control your running Chrome browser — your logins, extensions, cookies already there.',
+  version: VERSION,
+})
+
+// ── skill: discover available commands and CLI usage ──
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+function loadSkillContent(): string {
+  // Try multiple paths (src vs dist)
+  const candidates = [
+    path.join(__dirname, '..', 'src', 'skill.md'),
+    path.join(__dirname, '..', '..', 'src', 'skill.md'),
+    path.join(__dirname, 'skill.md'),
+  ]
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return fs.readFileSync(p, 'utf-8')
+  }
+  return 'RunBrowser skill file not found. Use `runbrowser --help` for available commands.'
+}
 
 server.tool(
-  'snapshot',
-  systemPrompt + '\n\nTake an accessibility snapshot of the current page. Returns a text representation with @ref labels on interactive elements. Use refs for click/fill/hover.',
-  { interactiveOnly: z.boolean().default(false).describe('Only include interactive elements') },
-  toolHandler(async ({ interactiveOnly }) => {
-    const sid = await ensureSession()
-    const result = await getClient().snapshot(sid, { interactiveOnly })
-    return { content: [{ type: 'text', text: result.snapshot }] }
-  }),
-)
-
-server.tool(
-  'screenshot',
-  'Take a screenshot of the current page. Use when you need visual/spatial information.',
+  'skill',
+  `Show RunBrowser CLI usage, available commands, and site commands.
+Call this first to learn how to control the browser and what site commands are available.
+Returns full documentation including command syntax, examples, and options.`,
   {},
   toolHandler(async () => {
+    let content = loadSkillContent()
+
+    // Append site commands from relay if available
+    try {
+      const c = getClient()
+      await c.ensureServer()
+      const commands = await c.listCommands()
+      if (commands && commands.length > 0) {
+        content += '\n\n## Site Commands\n\n'
+        content += commands.map((cmd: any) => {
+          const argStr = cmd.args
+            ? Object.entries(cmd.args).map(([name, def]: [string, any]) =>
+                def.required ? ` <${name}>` : ` [--${name}]`
+              ).join('')
+            : ''
+          return `runbrowser ${cmd.site} ${cmd.name}${argStr}  # ${cmd.description}`
+        }).join('\n')
+      }
+    } catch {
+      // Relay not running — just return static skill content
+    }
+
+    return { content: [{ type: 'text', text: content }] }
+  }),
+)
+
+// ── run: execute any runbrowser command ──
+
+server.tool(
+  'run',
+  `Execute a RunBrowser CLI command. Translates to the equivalent of running \`runbrowser <command>\` in a terminal.
+
+Use the \`skill\` tool first to discover available commands and their syntax.
+
+Examples:
+  run({ command: "navigate https://github.com" })
+  run({ command: "snapshot" })
+  run({ command: "click @e1" })
+  run({ command: "eval document.title" })
+  run({ command: "github trending --limit 5" })
+
+The command string follows the same syntax as the CLI. Output is returned as JSON when possible.`,
+  {
+    command: z.string().describe('The runbrowser command to execute (e.g. "navigate https://example.com", "snapshot", "click @e1", "github trending --limit 5")'),
+  },
+  toolHandler(async ({ command }) => {
     const sid = await ensureSession()
-    const result = await getClient().captureScreenshot(sid)
-    return {
-      content: [
-        { type: 'text', text: 'Screenshot captured.' },
-        { type: 'image', data: result.data, mimeType: result.mimeType },
-      ],
+    const c = getClient()
+
+    // Parse the command string into parts
+    const parts = parseCommandString(command)
+    if (parts.length === 0) {
+      return { content: [{ type: 'text', text: 'Error: empty command' }], isError: true }
+    }
+
+    const cmd = parts[0]
+    const rest = parts.slice(1)
+
+    // ── Built-in browser commands ──
+    switch (cmd) {
+      case 'navigate':
+      case 'open':
+      case 'goto': {
+        const url = rest[0]
+        if (!url) return { content: [{ type: 'text', text: 'Error: URL required' }], isError: true }
+        const result = await c.navigate(sid, url)
+        return { content: [{ type: 'text', text: `Navigated to ${result.url}\nTitle: ${result.title}` }] }
+      }
+
+      case 'snapshot': {
+        const interactiveOnly = rest.includes('--interactive') || rest.includes('-i')
+        const result = await c.snapshot(sid, { interactiveOnly })
+        return { content: [{ type: 'text', text: result.snapshot }] }
+      }
+
+      case 'screenshot': {
+        const result = await c.captureScreenshot(sid)
+        return {
+          content: [
+            { type: 'text', text: 'Screenshot captured.' },
+            { type: 'image', data: result.data, mimeType: result.mimeType },
+          ],
+        }
+      }
+
+      case 'click': {
+        const ref = rest[0]
+        if (!ref) return { content: [{ type: 'text', text: 'Error: ref required' }], isError: true }
+        await c.click(sid, ref)
+        return { content: [{ type: 'text', text: `Clicked ${ref}` }] }
+      }
+
+      case 'fill': {
+        const ref = rest[0]
+        const value = rest.slice(1).join(' ')
+        if (!ref || !value) return { content: [{ type: 'text', text: 'Error: ref and value required' }], isError: true }
+        await c.fill(sid, ref, value)
+        return { content: [{ type: 'text', text: `Filled ${ref} with "${value}"` }] }
+      }
+
+      case 'type': {
+        const text = rest.join(' ')
+        if (!text) return { content: [{ type: 'text', text: 'Error: text required' }], isError: true }
+        await c.type(sid, text)
+        return { content: [{ type: 'text', text: `Typed "${text}"` }] }
+      }
+
+      case 'press': {
+        const key = rest[0]
+        if (!key) return { content: [{ type: 'text', text: 'Error: key required' }], isError: true }
+        await c.press(sid, key)
+        return { content: [{ type: 'text', text: `Pressed ${key}` }] }
+      }
+
+      case 'scroll': {
+        const direction = (rest[0] || 'down') as 'up' | 'down' | 'left' | 'right'
+        const amount = rest[1] ? Number(rest[1]) : undefined
+        await c.scroll(sid, direction, amount)
+        return { content: [{ type: 'text', text: `Scrolled ${direction}${amount ? ` by ${amount}px` : ''}` }] }
+      }
+
+      case 'hover': {
+        const ref = rest[0]
+        if (!ref) return { content: [{ type: 'text', text: 'Error: ref required' }], isError: true }
+        await c.hover(sid, ref)
+        return { content: [{ type: 'text', text: `Hovered over ${ref}` }] }
+      }
+
+      case 'eval':
+      case 'evaluate': {
+        const code = rest.join(' ')
+        if (!code) return { content: [{ type: 'text', text: 'Error: code required' }], isError: true }
+        const result = await c.evaluate(sid, code)
+        const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
+          { type: 'text', text: result.text },
+        ]
+        for (const img of result.images) {
+          content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
+        }
+        return { content, isError: result.isError }
+      }
+
+      case 'back': {
+        await c.back(sid)
+        return { content: [{ type: 'text', text: 'Navigated back' }] }
+      }
+
+      case 'forward': {
+        await c.forward(sid)
+        return { content: [{ type: 'text', text: 'Navigated forward' }] }
+      }
+
+      case 'reload': {
+        await c.reload(sid)
+        return { content: [{ type: 'text', text: 'Page reloaded' }] }
+      }
+
+      case 'reset': {
+        const result = await c.reset(sid)
+        return { content: [{ type: 'text', text: `Connection reset. Current URL: ${result.pageUrl}` }] }
+      }
+
+      case 'get': {
+        const what = rest[0]
+        if (what === 'url') {
+          const result = await c.getUrl(sid)
+          return { content: [{ type: 'text', text: result.url }] }
+        }
+        if (what === 'title') {
+          const result = await c.getTitle(sid)
+          return { content: [{ type: 'text', text: result.title }] }
+        }
+        return { content: [{ type: 'text', text: `Error: unknown get target: ${what}` }], isError: true }
+      }
+
+      case 'wait': {
+        const target = rest[0]
+        if (!target) return { content: [{ type: 'text', text: 'Error: wait target required' }], isError: true }
+        const n = Number(target)
+        if (!isNaN(n) && !target.startsWith('@')) {
+          await c.waitFor(sid, { ms: n })
+        } else {
+          await c.waitFor(sid, { ref: target })
+        }
+        return { content: [{ type: 'text', text: 'Wait completed' }] }
+      }
+
+      default: {
+        // ── Site command: `<site> <name> [--args]` ──
+        const subcommand = rest[0]
+        if (subcommand) {
+          const args = parseFlags(rest.slice(1))
+          const result = await c.runCommand(sid, cmd, subcommand, args)
+          return { content: [{ type: 'text', text: JSON.stringify(result.data, null, 2) }] }
+        }
+
+        return { content: [{ type: 'text', text: `Unknown command: ${cmd}. Use the skill tool to see available commands.` }], isError: true }
+      }
     }
   }),
 )
 
-server.tool(
-  'click',
-  'Click an element by its @ref from snapshot (e.g. "@e1") or CSS selector.',
-  { ref: z.string().describe('Element ref from snapshot (e.g. "@e1") or CSS selector') },
-  toolHandler(async ({ ref }) => {
-    const sid = await ensureSession()
-    await getClient().click(sid, ref)
-    return { content: [{ type: 'text', text: `Clicked ${ref}` }] }
-  }),
-)
+// ============================================================================
+// Helpers
+// ============================================================================
 
-server.tool(
-  'fill',
-  'Fill an input field by its @ref from snapshot or CSS selector.',
-  {
-    ref: z.string().describe('Element ref from snapshot (e.g. "@e2") or CSS selector'),
-    value: z.string().describe('Value to fill in'),
-  },
-  toolHandler(async ({ ref, value }) => {
-    const sid = await ensureSession()
-    await getClient().fill(sid, ref, value)
-    return { content: [{ type: 'text', text: `Filled ${ref} with "${value}"` }] }
-  }),
-)
+/** Parse a command string into parts, respecting quotes */
+function parseCommandString(input: string): string[] {
+  const parts: string[] = []
+  let current = ''
+  let inQuote: string | null = null
 
-server.tool(
-  'type',
-  'Type text with the keyboard at the current focus position.',
-  { text: z.string().describe('Text to type') },
-  toolHandler(async ({ text }) => {
-    const sid = await ensureSession()
-    await getClient().type(sid, text)
-    return { content: [{ type: 'text', text: `Typed "${text}"` }] }
-  }),
-)
-
-server.tool(
-  'press',
-  'Press a keyboard key (Enter, Tab, Escape, ArrowDown, etc.).',
-  { key: z.string().describe('Key name: Enter, Tab, Escape, Backspace, Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, etc.') },
-  toolHandler(async ({ key }) => {
-    const sid = await ensureSession()
-    await getClient().press(sid, key)
-    return { content: [{ type: 'text', text: `Pressed ${key}` }] }
-  }),
-)
-
-server.tool(
-  'scroll',
-  'Scroll the page in a direction.',
-  {
-    direction: z.enum(['up', 'down', 'left', 'right']).describe('Scroll direction'),
-    amount: z.number().optional().describe('Scroll amount in pixels (default: 300)'),
-  },
-  toolHandler(async ({ direction, amount }) => {
-    const sid = await ensureSession()
-    await getClient().scroll(sid, direction, amount)
-    return { content: [{ type: 'text', text: `Scrolled ${direction}${amount ? ` by ${amount}px` : ''}` }] }
-  }),
-)
-
-server.tool(
-  'hover',
-  'Hover over an element by its @ref from snapshot.',
-  { ref: z.string().describe('Element ref from snapshot (e.g. "@e3")') },
-  toolHandler(async ({ ref }) => {
-    const sid = await ensureSession()
-    await getClient().hover(sid, ref)
-    return { content: [{ type: 'text', text: `Hovered over ${ref}` }] }
-  }),
-)
-
-server.tool(
-  'evaluate',
-  'Run JavaScript code directly in the browser. The code runs in the page context.',
-  {
-    code: z.string().describe('JavaScript code to execute in the browser. Top-level await is supported.'),
-    timeout: z.number().default(10000).describe('Timeout in milliseconds'),
-  },
-  toolHandler(async ({ code, timeout }) => {
-    const sid = await ensureSession()
-    const result = await getClient().evaluate(sid, code, timeout)
-    const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
-      { type: 'text', text: result.text },
-    ]
-    for (const img of result.images) {
-      content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
+  for (const ch of input) {
+    if (inQuote) {
+      if (ch === inQuote) {
+        inQuote = null
+      } else {
+        current += ch
+      }
+    } else if (ch === '"' || ch === "'") {
+      inQuote = ch
+    } else if (ch === ' ') {
+      if (current) {
+        parts.push(current)
+        current = ''
+      }
+    } else {
+      current += ch
     }
-    return { content, isError: result.isError }
-  }),
-)
+  }
+  if (current) parts.push(current)
+  return parts
+}
 
-server.tool(
-  'get_url',
-  'Get the current page URL.',
-  {},
-  toolHandler(async () => {
-    const sid = await ensureSession()
-    const result = await getClient().getUrl(sid)
-    return { content: [{ type: 'text', text: result.url }] }
-  }),
-)
-
-server.tool(
-  'get_title',
-  'Get the current page title.',
-  {},
-  toolHandler(async () => {
-    const sid = await ensureSession()
-    const result = await getClient().getTitle(sid)
-    return { content: [{ type: 'text', text: result.title }] }
-  }),
-)
-
-server.tool(
-  'back',
-  'Navigate back in browser history.',
-  {},
-  toolHandler(async () => {
-    const sid = await ensureSession()
-    await getClient().back(sid)
-    return { content: [{ type: 'text', text: 'Navigated back' }] }
-  }),
-)
-
-server.tool(
-  'forward',
-  'Navigate forward in browser history.',
-  {},
-  toolHandler(async () => {
-    const sid = await ensureSession()
-    await getClient().forward(sid)
-    return { content: [{ type: 'text', text: 'Navigated forward' }] }
-  }),
-)
-
-server.tool(
-  'reload',
-  'Reload the current page.',
-  {},
-  toolHandler(async () => {
-    const sid = await ensureSession()
-    await getClient().reload(sid)
-    return { content: [{ type: 'text', text: 'Page reloaded' }] }
-  }),
-)
-
-server.tool(
-  'reset',
-  'Reset the browser connection. Use when you get connection errors or the browser seems stuck.',
-  {},
-  toolHandler(async () => {
-    const sid = await ensureSession()
-    const result = await getClient().reset(sid)
-    return {
-      content: [{ type: 'text', text: `Connection reset. Current URL: ${result.pageUrl}` }],
+/** Parse --flag value pairs into a record */
+function parseFlags(parts: string[]): Record<string, any> {
+  const flags: Record<string, any> = {}
+  let i = 0
+  while (i < parts.length) {
+    if (parts[i].startsWith('--')) {
+      const key = parts[i].slice(2)
+      const next = parts[i + 1]
+      if (next && !next.startsWith('--')) {
+        const n = Number(next)
+        flags[key] = isNaN(n) ? next : n
+        i += 2
+      } else {
+        flags[key] = true
+        i++
+      }
+    } else {
+      i++
     }
-  }),
-)
-
-// Keep execute tool for backwards compatibility with existing MCP clients
-server.tool(
-  'execute',
-  'Run JavaScript in the browser context. Prefer using the specific tools (navigate, click, fill, snapshot) instead. Use this for complex operations not covered by other tools.',
-  {
-    code: z.string().describe('JavaScript code to execute in the browser. Top-level await is supported.'),
-    timeout: z.number().default(10000).describe('Timeout in milliseconds'),
-  },
-  toolHandler(async ({ code, timeout }) => {
-    const sid = await ensureSession()
-    const result = await getClient().evaluate(sid, code, timeout)
-    const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
-      { type: 'text', text: result.text },
-    ]
-    for (const img of result.images) {
-      content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
-    }
-    return { content, isError: result.isError }
-  }),
-)
+  }
+  return flags
+}
 
 // ============================================================================
 export { server }
@@ -345,7 +378,6 @@ export async function startMcp(options: { host?: string; token?: string } = {}) 
     process.env.RUNBROWSER_TOKEN = options.token
   }
 
-  // Initialize client and ensure server
   const c = getClient()
   if (c.isRemote) {
     mcpLog(`Using remote CDP relay server: ${options.host}`)

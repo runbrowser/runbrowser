@@ -36,7 +36,7 @@ Click the extension icon on a tab. It turns **green** when connected.
 
 ```bash
 # install the CLI globally
-npm i -g @agmod/runbrowser
+npm i -g @jiweiyuan/runbrowser
 
 # create a session
 runbrowser session-new
@@ -161,7 +161,7 @@ The CLI is the recommended way to use RunBrowser. If you need MCP server setup, 
   "mcpServers": {
     "runbrowser": {
       "command": "npx",
-      "args": ["-y", "@agmod/runbrowser-mcp@latest"]
+      "args": ["-y", "@jiweiyuan/runbrowser-mcp@latest"]
     }
   }
 }
@@ -199,7 +199,7 @@ The relay server also exposes a standard CDP WebSocket endpoint, so you can opti
 
 ```typescript
 import { chromium } from 'playwright-core'
-import { startRunBrowserCDPRelayServer, getCdpUrl } from '@agmod/runbrowser-server'
+import { startRunBrowserCDPRelayServer, getCdpUrl } from '@jiweiyuan/runbrowser-server'
 
 const server = await startRunBrowserCDPRelayServer()
 const browser = await chromium.connectOverCDP(getCdpUrl())
@@ -270,7 +270,7 @@ runbrowser logfile  # prints the log file paths
 
 ## Need Help?
 
-For issues, feature requests, or contributions, visit the [GitHub repository](https://github.com/yuanjiwei/runbrowser).
+For issues, feature requests, or contributions, visit the [GitHub repository](https://github.com/runbrowser/runbrowser).
 
 ## Credits
 

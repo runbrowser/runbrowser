@@ -1,5 +1,5 @@
 {
-  "name": "@agmod/runbrowser-mcp",
+  "name": "@jiweiyuan/runbrowser-mcp",
   "version": "0.0.2",
   "description": "MCP server for RunBrowser — control your running Chrome browser via Playwright",
   "type": "module",
@@ -27,10 +27,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yuanjiwei/runbrowser.git",
+    "url": "git+https://github.com/runbrowser/runbrowser.git",
     "directory": "packages/mcp"
   },
-  "homepage": "https://github.com/yuanjiwei/runbrowser",
+  "homepage": "https://github.com/runbrowser/runbrowser",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -39,8 +39,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@agmod/runbrowser-core": "workspace:*",
-    "@agmod/runbrowser-server": "workspace:*",
+    "@jiweiyuan/runbrowser-core": "workspace:*",
+    "@jiweiyuan/runbrowser-server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "cac": "^6.7.14",
     "string-dedent": "^3.0.2",

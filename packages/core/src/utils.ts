@@ -13,4 +13,4 @@ export {
   LOG_CDP_FILE_PATH,
   VERSION,
   sleep,
-} from '@agmod/runbrowser-server/utils'
+} from '@jiweiyuan/runbrowser-server/utils'

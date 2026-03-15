@@ -5,8 +5,8 @@ declare const __RUNBROWSER_VERSION__: string
 
 import { createStore } from 'zustand/vanilla'
 import type { ExtensionState, ConnectionState, TabState, TabInfo } from './types'
-import type { CDPEvent, Protocol } from '@agmod/runbrowser-server/types'
-import type { ExtensionCommandMessage, ExtensionResponseMessage, RelayToExtensionMessage } from '@agmod/runbrowser-server/protocol'
+import type { CDPEvent, Protocol } from '@jiweiyuan/runbrowser-server/types'
+import type { ExtensionCommandMessage, ExtensionResponseMessage, RelayToExtensionMessage } from '@jiweiyuan/runbrowser-server/protocol'
 
 import {
   getActiveRecordings,
@@ -592,7 +592,6 @@ class ConnectionManager {
           .map(([tabId]) => tabId)
 
         for (const tabId of tabsToReattach) {
-          // Re-check state before attaching - might have been attached by user click
           const currentTab = store.getState().tabs.get(tabId)
           if (!currentTab || currentTab.state !== 'connecting') {
             logger.debug('Skipping reattach, tab state changed:', tabId, currentTab?.state)
@@ -612,6 +611,7 @@ class ConnectionManager {
             })
           }
         }
+
         this.preserveTabsOnDetach = false
       } catch (error: any) {
         logger.debug('Connection attempt failed:', error.message)
@@ -1526,6 +1526,8 @@ async function onActionClicked(tab: chrome.tabs.Tab): Promise<void> {
 
 resetDebugger()
 connectionManager.maintainLoop()
+
+
 
 chrome.contextMenus
   .remove('runbrowser-pin-element')

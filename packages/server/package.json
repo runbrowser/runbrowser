@@ -1,5 +1,5 @@
 {
-  "name": "@agmod/runbrowser-server",
+  "name": "@jiweiyuan/runbrowser-server",
   "version": "0.0.4",
   "description": "RunBrowser server — bridges Chrome extension WebSocket to CDP clients",
   "type": "module",
@@ -65,10 +65,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yuanjiwei/runbrowser.git",
+    "url": "git+https://github.com/runbrowser/runbrowser.git",
     "directory": "packages/server"
   },
-  "homepage": "https://github.com/yuanjiwei/runbrowser",
+  "homepage": "https://github.com/runbrowser/runbrowser",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

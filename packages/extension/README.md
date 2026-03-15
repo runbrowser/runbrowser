@@ -2,7 +2,7 @@
 
 Control your Chrome browser via Model Context Protocol (MCP) using Chrome DevTools Protocol (CDP) events.
 
-[**Install from Chrome Web Store**](https://chromewebstore.google.com/detail/@agmod/runbrowser-mcp/jfeammnjpkecdekppnclgkkffahnhfhe)
+[**Install from Chrome Web Store**](https://chromewebstore.google.com/detail/@jiweiyuan/runbrowser-mcp/jfeammnjpkecdekppnclgkkffahnhfhe)
 
 ## What is RunBrowser?
 
@@ -44,7 +44,7 @@ This extension requires the following permissions:
 
 ## Getting Started
 
-1. [Install the extension from the Chrome Web Store](https://chromewebstore.google.com/detail/@agmod/runbrowser-mcp/jfeammnjpkecdekppnclgkkffahnhfhe)
+1. [Install the extension from the Chrome Web Store](https://chromewebstore.google.com/detail/@jiweiyuan/runbrowser-mcp/jfeammnjpkecdekppnclgkkffahnhfhe)
 2. Navigate to any webpage
 3. Click the RunBrowser extension icon
 4. The debugger will attach and the icon will turn green when connected
@@ -56,7 +56,7 @@ RunBrowser runs locally in your browser and does not send any data to external s
 
 ## Support
 
-For issues, feature requests, or contributions, visit the [GitHub repository](https://github.com/yuanjiwei/runbrowser).
+For issues, feature requests, or contributions, visit the [GitHub repository](https://github.com/runbrowser/runbrowser).
 
 ## License
 

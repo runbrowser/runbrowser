@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { formatHtmlForPrompt } from '@agmod/runbrowser-core'
+import { formatHtmlForPrompt } from '@jiweiyuan/runbrowser-core'
 
 test('formatHtmlForPrompt', async () => {
   const assetUrl = new URL('./assets/framer.html', import.meta.url)

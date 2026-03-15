@@ -82,12 +82,13 @@ export class CDPExecutor implements ExecutorLike {
 
   /** Send a CDP command to the browser via the Extension WebSocket. Public for use in server endpoints. */
   async sendCDP(method: string, params?: unknown, timeout?: number): Promise<unknown> {
-    const { extensionId, cdpSessionId } = this.getActiveCdpSession()
+    let { extensionId, cdpSessionId } = this.getActiveCdpSession()
     if (!extensionId) {
       throw new Error('Extension not connected')
     }
     if (!cdpSessionId) {
-      throw new Error('No connected browser tab found. Make sure a tab is open in Chrome.')
+      // Auto-create a tab instead of failing
+      cdpSessionId = await this.autoCreateTab(extensionId)
     }
     return this.sendToExtension({
       extensionId,
@@ -95,6 +96,34 @@ export class CDPExecutor implements ExecutorLike {
       params: { method, params, sessionId: cdpSessionId },
       timeout,
     })
+  }
+
+  /** Auto-create a browser tab when none are attached */
+  private async autoCreateTab(extensionId: string): Promise<string> {
+    const result = (await this.sendToExtension({
+      extensionId,
+      method: 'createInitialTab',
+      timeout: 10000,
+    })) as { success: boolean; sessionId: string; targetInfo: any }
+
+    if (!result?.success || !result.sessionId) {
+      throw new Error('No connected browser tab found and failed to auto-create one. Click the RunBrowser extension icon on a tab.')
+    }
+
+    // Register the new target in relay state
+    if (this.getExtensionEntry) {
+      const entry = this.getExtensionEntry(this.extensionStableKey)
+      if (entry && result.targetInfo) {
+        entry.connectedTargets.set(result.sessionId, {
+          sessionId: result.sessionId,
+          targetId: result.targetInfo.targetId,
+          targetInfo: result.targetInfo,
+          frameIds: new Set(),
+        })
+      }
+    }
+
+    return result.sessionId
   }
 
   // --------------------------------------------------------------------------
@@ -106,8 +135,13 @@ export class CDPExecutor implements ExecutorLike {
     timeout: number,
   ): Promise<{ text: string; images: Array<{ data: string; mimeType: string }>; isError: boolean }> {
     try {
-      // Wrap in async IIFE so top-level `await` works
-      const expression = `(async () => { ${code} })()`
+      // Try direct expression evaluation first (handles `document.title`, `1+1`, etc.)
+      // Fall back to async IIFE wrapper only for multi-statement code (has semicolons or explicit return)
+      const trimmed = code.trim()
+      const isMultiStatement = trimmed.includes(';') || trimmed.startsWith('return ')
+      const expression = isMultiStatement
+        ? `(async () => { ${trimmed} })()`
+        : trimmed
 
       const result = (await this.sendCDP(
         'Runtime.evaluate',

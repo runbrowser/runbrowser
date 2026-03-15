@@ -265,9 +265,9 @@ Remove exports for deleted files. Keep exports for refactored files.
 ### 4.4 Remove playwright-core dependency
 ```bash
 cd /Users/yuanjiwei/Documents/GitHub/runbrowser
-pnpm remove playwright-core --filter @agmod/runbrowser-core
-pnpm remove playwright-core --filter @agmod/runbrowser-relay
-pnpm remove playwright-core --filter @runbrowser/e2e
+pnpm remove playwright-core --filter @jiweiyuan/runbrowser-core
+pnpm remove playwright-core --filter @jiweiyuan/runbrowser-relay
+pnpm remove playwright-core --filter @jiweiyuan/e2e
 ```
 
 ### 4.5 Remove executorManagerFactory from relay server

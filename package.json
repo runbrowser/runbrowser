@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @agmod/runbrowser-server build && pnpm --filter @agmod/runbrowser-core build && pnpm --filter @agmod/runbrowser-mcp --filter @agmod/runbrowser build",
+    "build": "pnpm --filter @jiweiyuan/runbrowser-server build && pnpm --filter @jiweiyuan/runbrowser-core build && pnpm --filter @jiweiyuan/runbrowser-mcp --filter @jiweiyuan/runbrowser build",
     "build:extension": "pnpm --filter mcp-extension build",
     "dev:extension": "pnpm --filter mcp-extension dev",
     "build:all": "pnpm run build && pnpm run build:extension",
-    "typecheck": "pnpm --filter @agmod/runbrowser-core typecheck && pnpm --filter @agmod/runbrowser-mcp typecheck && pnpm --filter @agmod/runbrowser typecheck",
-    "test": "pnpm --filter @agmod/runbrowser test",
-    "publish:all": "pnpm run build && pnpm --filter @agmod/runbrowser-server publish --no-git-checks && pnpm --filter @agmod/runbrowser-core publish --no-git-checks && pnpm --filter @agmod/runbrowser-mcp publish --no-git-checks && pnpm --filter @agmod/runbrowser publish --no-git-checks"
+    "typecheck": "pnpm --filter @jiweiyuan/runbrowser-core typecheck && pnpm --filter @jiweiyuan/runbrowser-mcp typecheck && pnpm --filter @jiweiyuan/runbrowser typecheck",
+    "test": "pnpm --filter @jiweiyuan/runbrowser test",
+    "publish:all": "pnpm run build && pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks && pnpm --filter @jiweiyuan/runbrowser-core publish --no-git-checks && pnpm --filter @jiweiyuan/runbrowser-mcp publish --no-git-checks && pnpm --filter @jiweiyuan/runbrowser publish --no-git-checks"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

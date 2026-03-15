@@ -1,5 +1,5 @@
 {
-  "name": "@agmod/runbrowser",
+  "name": "@jiweiyuan/runbrowser",
   "version": "0.0.4",
   "description": "Control your running Chrome browser via Playwright — your logins, extensions, cookies already there",
   "type": "module",
@@ -29,10 +29,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yuanjiwei/runbrowser.git",
+    "url": "git+https://github.com/runbrowser/runbrowser.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/yuanjiwei/runbrowser",
+  "homepage": "https://github.com/runbrowser/runbrowser",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -41,13 +41,11 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@agmod/runbrowser-server": "workspace:*",
-    "picocolors": "^1.1.1",
-    "yargs": "^18.0.0"
+    "@jiweiyuan/runbrowser-server": "workspace:*",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "@types/yargs": "^17.0.35",
     "typescript": "^5.9.3"
   }
 }

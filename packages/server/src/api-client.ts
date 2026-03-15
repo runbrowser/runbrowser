@@ -537,6 +537,29 @@ export class RelayApiClient {
   }
 
   // --------------------------------------------------------------------------
+  // Site commands
+  // --------------------------------------------------------------------------
+
+  async listCommands(): Promise<Array<{ site: string; name: string; description: string; args?: Record<string, any>; columns?: string[] }>> {
+    try {
+      const baseUrl = this.getBaseUrl()
+      const response = await fetch(`${baseUrl}/api/commands`, {
+        signal: AbortSignal.timeout(2000),
+        headers: this.getAuthHeaders(),
+      })
+      if (!response.ok) return []
+      const data = await response.json() as { commands: any[] }
+      return data.commands || []
+    } catch {
+      return []
+    }
+  }
+
+  async runCommand(sessionId: string, site: string, name: string, args: Record<string, any> = {}): Promise<{ data: any[]; columns: string[] }> {
+    return this.post('/api/command/run', { sessionId, site, name, args })
+  }
+
+  // --------------------------------------------------------------------------
   // Diff
   // --------------------------------------------------------------------------
 
@@ -548,4 +571,80 @@ export class RelayApiClient {
     return this.post('/api/diff/screenshot', { sessionId, baseline, output })
   }
 
+  // --------------------------------------------------------------------------
+  // Recording
+  // --------------------------------------------------------------------------
+
+  async startRecording(sessionId: string, options: {
+    outputPath: string
+    frameRate?: number
+    audio?: boolean
+    videoBitsPerSecond?: number
+    audioBitsPerSecond?: number
+  }): Promise<StartRecordingApiResult> {
+    const baseUrl = this.getBaseUrl()
+    const response = await fetch(`${baseUrl}/recording/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+      body: JSON.stringify({ sessionId, ...options }),
+      signal: AbortSignal.timeout(15000),
+    })
+    return (await response.json()) as StartRecordingApiResult
+  }
+
+  async stopRecording(sessionId: string): Promise<StopRecordingApiResult> {
+    const baseUrl = this.getBaseUrl()
+    const response = await fetch(`${baseUrl}/recording/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+      body: JSON.stringify({ sessionId }),
+      signal: AbortSignal.timeout(35000),
+    })
+    return (await response.json()) as StopRecordingApiResult
+  }
+
+  async recordingStatus(sessionId: string): Promise<RecordingStatusApiResult> {
+    const baseUrl = this.getBaseUrl()
+    const url = `${baseUrl}/recording/status?sessionId=${encodeURIComponent(sessionId)}`
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(5000),
+      headers: this.getAuthHeaders(),
+    })
+    return (await response.json()) as RecordingStatusApiResult
+  }
+
+  async cancelRecording(sessionId: string): Promise<CancelRecordingApiResult> {
+    const baseUrl = this.getBaseUrl()
+    const response = await fetch(`${baseUrl}/recording/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+      body: JSON.stringify({ sessionId }),
+      signal: AbortSignal.timeout(10000),
+    })
+    return (await response.json()) as CancelRecordingApiResult
+  }
+
+}
+
+// ============================================================================
+// Recording result types
+// ============================================================================
+
+export type StartRecordingApiResult =
+  | { success: true; tabId: number; startedAt: number }
+  | { success: false; error: string }
+
+export type StopRecordingApiResult =
+  | { success: true; tabId: number; duration: number; path: string; size: number }
+  | { success: false; error: string }
+
+export type RecordingStatusApiResult = {
+  isRecording: boolean
+  tabId?: number
+  startedAt?: number
+}
+
+export type CancelRecordingApiResult = {
+  success: boolean
+  error?: string
 }

@@ -75,6 +75,72 @@ export function resolveRef(refString: string, refMap: Map<string, SnapshotRef>):
   return refMap.get(key) ?? null
 }
 
+async function scrollIntoView(sendCDP: SendCDP, backendNodeId: number): Promise<void> {
+  try {
+    await sendCDP('DOM.scrollIntoViewIfNeeded', { backendNodeId })
+  } catch {
+    try {
+      const { object } = (await sendCDP('DOM.resolveNode', { backendNodeId })) as any
+      if (object?.objectId) {
+        await sendCDP('Runtime.callFunctionOn', {
+          objectId: object.objectId,
+          functionDeclaration: 'function() { this.scrollIntoView({ block: "center", behavior: "instant" }); }',
+        })
+      }
+    } catch {}
+  }
+}
+
+/**
+ * Visual feedback: flash a border glow on the page when a command runs,
+ * and highlight the target element with a pulse effect.
+ */
+async function flashPageBorder(sendCDP: SendCDP): Promise<void> {
+  await sendCDP('Runtime.evaluate', {
+    expression: `(function() {
+      if (document.__runbrowser_border) return;
+      const el = document.createElement('div');
+      el.id = '__runbrowser_border';
+      document.__runbrowser_border = el;
+      Object.assign(el.style, {
+        position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
+        pointerEvents: 'none', zIndex: '2147483647',
+        border: '2px solid #22c55e',
+        boxShadow: 'inset 0 0 12px rgba(34,197,94,0.3)',
+        opacity: '1',
+        transition: 'opacity 0.4s ease-out',
+      });
+      document.documentElement.appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; }, 600);
+      setTimeout(() => { el.remove(); document.__runbrowser_border = null; }, 1000);
+    })()`,
+    returnByValue: true,
+  }).catch(() => {})
+}
+
+async function highlightElement(sendCDP: SendCDP, backendNodeId: number): Promise<void> {
+  try {
+    const { object } = (await sendCDP('DOM.resolveNode', { backendNodeId })) as any
+    if (!object?.objectId) return
+    await sendCDP('Runtime.callFunctionOn', {
+      objectId: object.objectId,
+      functionDeclaration: `function() {
+        const el = this;
+        const orig = el.style.outline;
+        const origTransition = el.style.transition;
+        el.style.transition = 'outline 0.15s ease-out, outline-offset 0.15s ease-out';
+        el.style.outline = '2px solid #22c55e';
+        el.style.outlineOffset = '2px';
+        setTimeout(() => {
+          el.style.outline = orig;
+          el.style.outlineOffset = '';
+          el.style.transition = origTransition;
+        }, 1000);
+      }`,
+    })
+  } catch {}
+}
+
 export async function click(
   sendCDP: SendCDP,
   ref: string,
@@ -85,6 +151,8 @@ export async function click(
     throw new Error(`Ref "${ref}" not found in last snapshot. Call snapshot() first.`)
   }
 
+  await scrollIntoView(sendCDP, resolved.backendNodeId)
+
   const box = await getElementBox(sendCDP, resolved.backendNodeId)
   if (!box) {
     throw new Error(`Could not get bounding box for ref "${ref}" (backendNodeId: ${resolved.backendNodeId})`)
@@ -93,16 +161,9 @@ export async function click(
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
 
-  // First scroll element into view
-  await sendCDP('Runtime.evaluate', {
-    expression: `document.querySelector('[data-testid]') || (function() {
-      try {
-        const node = __runbrowser_resolveNode && __runbrowser_resolveNode(${resolved.backendNodeId});
-        if (node) node.scrollIntoView({ block: 'center', behavior: 'instant' });
-      } catch(e) {}
-    })()`,
-    returnByValue: true,
-  }).catch(() => {})
+  // Visual feedback
+  await flashPageBorder(sendCDP)
+  await highlightElement(sendCDP, resolved.backendNodeId)
 
   await sendCDP('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
   await sendCDP('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
@@ -119,6 +180,8 @@ export async function fill(
     throw new Error(`Ref "${ref}" not found in last snapshot. Call snapshot() first.`)
   }
 
+  await scrollIntoView(sendCDP, resolved.backendNodeId)
+
   const box = await getElementBox(sendCDP, resolved.backendNodeId)
   if (!box) {
     throw new Error(`Could not get bounding box for ref "${ref}"`)
@@ -126,6 +189,10 @@ export async function fill(
 
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
+
+  // Visual feedback
+  await flashPageBorder(sendCDP)
+  await highlightElement(sendCDP, resolved.backendNodeId)
 
   // Click to focus
   await sendCDP('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
@@ -172,14 +239,12 @@ export async function scroll(
   direction: 'up' | 'down' | 'left' | 'right',
   amount: number = 300,
 ): Promise<void> {
-  const deltaX = direction === 'left' ? -amount : direction === 'right' ? amount : 0
-  const deltaY = direction === 'up' ? -amount : direction === 'down' ? amount : 0
-  await sendCDP('Input.dispatchMouseEvent', {
-    type: 'mouseWheel',
-    x: 400,
-    y: 300,
-    deltaX,
-    deltaY,
+  const scrollX = direction === 'left' ? -amount : direction === 'right' ? amount : 0
+  const scrollY = direction === 'up' ? -amount : direction === 'down' ? amount : 0
+  await flashPageBorder(sendCDP)
+  await sendCDP('Runtime.evaluate', {
+    expression: `window.scrollBy(${scrollX}, ${scrollY})`,
+    returnByValue: true,
   })
 }
 
@@ -193,6 +258,9 @@ export async function hover(
     throw new Error(`Ref "${ref}" not found in last snapshot. Call snapshot() first.`)
   }
 
+  // Scroll element into view first so it has a valid bounding box
+  await scrollIntoView(sendCDP, resolved.backendNodeId)
+
   const box = await getElementBox(sendCDP, resolved.backendNodeId)
   if (!box) {
     throw new Error(`Could not get bounding box for ref "${ref}"`)
@@ -201,6 +269,8 @@ export async function hover(
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
 
+  await flashPageBorder(sendCDP)
+  await highlightElement(sendCDP, resolved.backendNodeId)
   await sendCDP('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
 }
 

@@ -13,7 +13,7 @@ import type {
   ExtensionStopRecordingResult,
   IsRecordingResult,
   CancelRecordingResult,
-} from '@agmod/runbrowser-server/protocol'
+} from '@jiweiyuan/runbrowser-server/protocol'
 import type {
   OffscreenStartRecordingResult,
   OffscreenStopRecordingResult,

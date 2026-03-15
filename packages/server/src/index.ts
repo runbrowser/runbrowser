@@ -71,6 +71,10 @@ export type {
   ResetResult,
   SessionInfo,
   SessionListEntry,
+  StartRecordingApiResult,
+  StopRecordingApiResult,
+  RecordingStatusApiResult,
+  CancelRecordingApiResult,
 } from './api-client.js'
 
 // Shared utilities

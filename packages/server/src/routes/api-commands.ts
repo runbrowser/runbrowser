@@ -192,4 +192,19 @@ export function registerApiCommandRoutes(app: Hono, ctx: ServerContext) {
     required: ['method'],
     handler: async (exec, { method, params }) => ({ result: await exec.rawCDP(method, params) }),
   })
+
+  // --------------------------------------------------------------------------
+  // Tab management — use CDP to query browser tabs
+  // --------------------------------------------------------------------------
+
+  commandRoute(app, ctx, '/api/tab/list', {
+    handler: async (exec) => {
+      // Get current tab info via CDP (chrome.debugger only sees the attached tab)
+      const url = await exec.getUrl()
+      const title = await exec.getTitle()
+      return {
+        tabs: [{ index: 0, url, title, active: true }],
+      }
+    },
+  })
 }

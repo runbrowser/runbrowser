@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createSmartDiff } from '@agmod/runbrowser-core'
+import { createSmartDiff } from '@jiweiyuan/runbrowser-core'
 
 describe('createSmartDiff', () => {
   it('returns no-change with full content when content is identical', () => {
