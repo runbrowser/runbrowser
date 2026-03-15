@@ -1,6 +1,6 @@
 {
   "name": "@jiweiyuan/runbrowser",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Control your running Chrome browser via Playwright — your logins, extensions, cookies already there",
   "type": "module",
   "exports": {

@@ -40,17 +40,21 @@ jobs:
         run: pnpm run test
 
       - name: Publish @jiweiyuan/runbrowser-server
-        run: npm publish --access public
-        working-directory: packages/server
+        run: pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
 
       - name: Publish @jiweiyuan/runbrowser-core
-        run: npm publish --access public
-        working-directory: packages/core
+        run: pnpm --filter @jiweiyuan/runbrowser-core publish --no-git-checks --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
 
       - name: Publish @jiweiyuan/runbrowser-mcp
-        run: npm publish --access public
-        working-directory: packages/mcp
+        run: pnpm --filter @jiweiyuan/runbrowser-mcp publish --no-git-checks --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
 
       - name: Publish @jiweiyuan/runbrowser
-        run: npm publish --access public
-        working-directory: packages/cli
+        run: pnpm --filter @jiweiyuan/runbrowser publish --no-git-checks --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
