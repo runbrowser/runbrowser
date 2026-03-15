@@ -3,9 +3,44 @@
  * Each function takes a sendCDP function and performs a browser action.
  */
 
+import type { Protocol } from 'devtools-protocol'
 import type { SnapshotRef } from './snapshot.js'
 
 export type SendCDP = (method: string, params?: unknown) => Promise<unknown>
+
+// ============================================================================
+// Type-safe CDP helpers
+//
+// SendCDP returns `unknown` because it crosses a WebSocket boundary.
+// These thin wrappers narrow the return type using devtools-protocol types,
+// replacing ~20 `as any` casts with a single assertion at the boundary.
+// (Matt Pocock: "push type assertions to the edges")
+// ============================================================================
+
+async function cdpEvaluate(sendCDP: SendCDP, expression: string): Promise<Protocol.Runtime.EvaluateResponse> {
+  return (await sendCDP('Runtime.evaluate', { expression, returnByValue: true })) as Protocol.Runtime.EvaluateResponse
+}
+
+async function cdpGetBoxModel(sendCDP: SendCDP, backendNodeId: number): Promise<Protocol.DOM.GetBoxModelResponse> {
+  return (await sendCDP('DOM.getBoxModel', { backendNodeId })) as Protocol.DOM.GetBoxModelResponse
+}
+
+async function cdpResolveNode(sendCDP: SendCDP, backendNodeId: number): Promise<Protocol.DOM.ResolveNodeResponse> {
+  return (await sendCDP('DOM.resolveNode', { backendNodeId })) as Protocol.DOM.ResolveNodeResponse
+}
+
+async function cdpCallFunctionOn(
+  sendCDP: SendCDP,
+  objectId: string,
+  functionDeclaration: string,
+  returnByValue = true,
+): Promise<Protocol.Runtime.CallFunctionOnResponse> {
+  return (await sendCDP('Runtime.callFunctionOn', { objectId, functionDeclaration, returnByValue })) as Protocol.Runtime.CallFunctionOnResponse
+}
+
+async function cdpGetOuterHTML(sendCDP: SendCDP, backendNodeId: number): Promise<Protocol.DOM.GetOuterHTMLResponse> {
+  return (await sendCDP('DOM.getOuterHTML', { backendNodeId })) as Protocol.DOM.GetOuterHTMLResponse
+}
 
 // ============================================================================
 // Navigation
@@ -16,17 +51,11 @@ export async function navigate(sendCDP: SendCDP, url: string): Promise<{ url: st
   await sendCDP('Page.navigate', { url })
   // Wait a moment for the page to load
   await new Promise((resolve) => setTimeout(resolve, 500))
-  const titleResult = (await sendCDP('Runtime.evaluate', {
-    expression: 'document.title',
-    returnByValue: true,
-  })) as any
-  const urlResult = (await sendCDP('Runtime.evaluate', {
-    expression: 'window.location.href',
-    returnByValue: true,
-  })) as any
+  const titleResult = await cdpEvaluate(sendCDP, 'document.title')
+  const urlResult = await cdpEvaluate(sendCDP, 'window.location.href')
   return {
-    url: urlResult?.result?.value || url,
-    title: titleResult?.result?.value || '',
+    url: String(urlResult.result.value ?? url),
+    title: String(titleResult.result.value ?? ''),
   }
 }
 
@@ -54,8 +83,8 @@ export async function getElementBox(
   backendNodeId: number,
 ): Promise<{ x: number; y: number; width: number; height: number } | null> {
   try {
-    const result = (await sendCDP('DOM.getBoxModel', { backendNodeId })) as any
-    const quad = result?.model?.border
+    const { model } = await cdpGetBoxModel(sendCDP, backendNodeId)
+    const quad = model.border
     if (!quad || quad.length < 8) return null
     const xs = [quad[0], quad[2], quad[4], quad[6]]
     const ys = [quad[1], quad[3], quad[5], quad[7]]
@@ -75,17 +104,42 @@ export function resolveRef(refString: string, refMap: Map<string, SnapshotRef>):
   return refMap.get(key) ?? null
 }
 
+/**
+ * Resolve a ref string and require it to have a backendNodeId.
+ * Throws a descriptive error if not found — defines the error out of existence
+ * for all callers (Ousterhout: "define errors out of existence").
+ */
+function requireRef(ref: string, refMap: Map<string, SnapshotRef>): SnapshotRef & { backendNodeId: number } {
+  const resolved = resolveRef(ref, refMap)
+  if (!resolved?.backendNodeId) {
+    throw new Error(`Ref "${ref}" not found in last snapshot. Call snapshot() first.`)
+  }
+  return resolved as SnapshotRef & { backendNodeId: number }
+}
+
+/**
+ * Resolve a DOM node to a JS object ID for Runtime.callFunctionOn.
+ * Consolidates the repeated DOM.resolveNode + objectId check pattern.
+ */
+async function resolveToObjectId(sendCDP: SendCDP, backendNodeId: number, ref: string): Promise<string> {
+  const { object } = await cdpResolveNode(sendCDP, backendNodeId)
+  if (!object.objectId) throw new Error(`Cannot resolve ref "${ref}" to a JS object`)
+  return object.objectId
+}
+
 async function scrollIntoView(sendCDP: SendCDP, backendNodeId: number): Promise<void> {
   try {
     await sendCDP('DOM.scrollIntoViewIfNeeded', { backendNodeId })
   } catch {
     try {
-      const { object } = (await sendCDP('DOM.resolveNode', { backendNodeId })) as any
-      if (object?.objectId) {
-        await sendCDP('Runtime.callFunctionOn', {
-          objectId: object.objectId,
-          functionDeclaration: 'function() { this.scrollIntoView({ block: "center", behavior: "instant" }); }',
-        })
+      const { object } = await cdpResolveNode(sendCDP, backendNodeId)
+      if (object.objectId) {
+        await cdpCallFunctionOn(
+          sendCDP,
+          object.objectId,
+          'function() { this.scrollIntoView({ block: "center", behavior: "instant" }); }',
+          false,
+        )
       }
     } catch {}
   }
@@ -120,11 +174,12 @@ async function flashPageBorder(sendCDP: SendCDP): Promise<void> {
 
 async function highlightElement(sendCDP: SendCDP, backendNodeId: number): Promise<void> {
   try {
-    const { object } = (await sendCDP('DOM.resolveNode', { backendNodeId })) as any
-    if (!object?.objectId) return
-    await sendCDP('Runtime.callFunctionOn', {
-      objectId: object.objectId,
-      functionDeclaration: `function() {
+    const { object } = await cdpResolveNode(sendCDP, backendNodeId)
+    if (!object.objectId) return
+    await cdpCallFunctionOn(
+      sendCDP,
+      object.objectId,
+      `function() {
         const el = this;
         const orig = el.style.outline;
         const origTransition = el.style.transition;
@@ -137,8 +192,32 @@ async function highlightElement(sendCDP: SendCDP, backendNodeId: number): Promis
           el.style.transition = origTransition;
         }, 1000);
       }`,
-    })
+      false,
+    )
   } catch {}
+}
+
+/**
+ * Scroll, get box center, flash visual feedback, and return coordinates.
+ * Shared preparation step for click, fill, hover — eliminates repeated
+ * scrollIntoView → getElementBox → flashPageBorder → highlightElement chains.
+ */
+async function prepareElementInteraction(
+  sendCDP: SendCDP,
+  backendNodeId: number,
+  ref: string,
+): Promise<{ x: number; y: number }> {
+  await scrollIntoView(sendCDP, backendNodeId)
+
+  const box = await getElementBox(sendCDP, backendNodeId)
+  if (!box) {
+    throw new Error(`Could not get bounding box for ref "${ref}" (backendNodeId: ${backendNodeId})`)
+  }
+
+  await flashPageBorder(sendCDP)
+  await highlightElement(sendCDP, backendNodeId)
+
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
 export async function click(
@@ -146,24 +225,8 @@ export async function click(
   ref: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<void> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot. Call snapshot() first.`)
-  }
-
-  await scrollIntoView(sendCDP, resolved.backendNodeId)
-
-  const box = await getElementBox(sendCDP, resolved.backendNodeId)
-  if (!box) {
-    throw new Error(`Could not get bounding box for ref "${ref}" (backendNodeId: ${resolved.backendNodeId})`)
-  }
-
-  const x = box.x + box.width / 2
-  const y = box.y + box.height / 2
-
-  // Visual feedback
-  await flashPageBorder(sendCDP)
-  await highlightElement(sendCDP, resolved.backendNodeId)
+  const resolved = requireRef(ref, refMap)
+  const { x, y } = await prepareElementInteraction(sendCDP, resolved.backendNodeId, ref)
 
   await sendCDP('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
   await sendCDP('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
@@ -175,24 +238,8 @@ export async function fill(
   value: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<void> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot. Call snapshot() first.`)
-  }
-
-  await scrollIntoView(sendCDP, resolved.backendNodeId)
-
-  const box = await getElementBox(sendCDP, resolved.backendNodeId)
-  if (!box) {
-    throw new Error(`Could not get bounding box for ref "${ref}"`)
-  }
-
-  const x = box.x + box.width / 2
-  const y = box.y + box.height / 2
-
-  // Visual feedback
-  await flashPageBorder(sendCDP)
-  await highlightElement(sendCDP, resolved.backendNodeId)
+  const resolved = requireRef(ref, refMap)
+  const { x, y } = await prepareElementInteraction(sendCDP, resolved.backendNodeId, ref)
 
   // Click to focus
   await sendCDP('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
@@ -253,24 +300,8 @@ export async function hover(
   ref: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<void> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot. Call snapshot() first.`)
-  }
-
-  // Scroll element into view first so it has a valid bounding box
-  await scrollIntoView(sendCDP, resolved.backendNodeId)
-
-  const box = await getElementBox(sendCDP, resolved.backendNodeId)
-  if (!box) {
-    throw new Error(`Could not get bounding box for ref "${ref}"`)
-  }
-
-  const x = box.x + box.width / 2
-  const y = box.y + box.height / 2
-
-  await flashPageBorder(sendCDP)
-  await highlightElement(sendCDP, resolved.backendNodeId)
+  const resolved = requireRef(ref, refMap)
+  const { x, y } = await prepareElementInteraction(sendCDP, resolved.backendNodeId, ref)
   await sendCDP('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
 }
 
@@ -279,19 +310,13 @@ export async function hover(
 // ============================================================================
 
 export async function getUrl(sendCDP: SendCDP): Promise<string> {
-  const result = (await sendCDP('Runtime.evaluate', {
-    expression: 'window.location.href',
-    returnByValue: true,
-  })) as any
-  return result?.result?.value || ''
+  const result = await cdpEvaluate(sendCDP, 'window.location.href')
+  return String(result.result.value ?? '')
 }
 
 export async function getTitle(sendCDP: SendCDP): Promise<string> {
-  const result = (await sendCDP('Runtime.evaluate', {
-    expression: 'document.title',
-    returnByValue: true,
-  })) as any
-  return result?.result?.value || ''
+  const result = await cdpEvaluate(sendCDP, 'document.title')
+  return String(result.result.value ?? '')
 }
 
 export async function getText(
@@ -299,24 +324,22 @@ export async function getText(
   ref: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<string> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot`)
-  }
+  const resolved = requireRef(ref, refMap)
   // Resolve to a JS object, get innerText
-  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
-  const objectId = obj?.object?.objectId
-  if (!objectId) {
+  let objectId: string
+  try {
+    objectId = await resolveToObjectId(sendCDP, resolved.backendNodeId, ref)
+  } catch {
     // Fallback to outerHTML
-    const html = (await sendCDP('DOM.getOuterHTML', { backendNodeId: resolved.backendNodeId })) as any
-    return html?.outerHTML || ''
+    const { outerHTML } = await cdpGetOuterHTML(sendCDP, resolved.backendNodeId)
+    return outerHTML || ''
   }
-  const result = (await sendCDP('Runtime.callFunctionOn', {
+  const result = await cdpCallFunctionOn(
+    sendCDP,
     objectId,
-    functionDeclaration: 'function() { return this.innerText || this.textContent || "" }',
-    returnByValue: true,
-  })) as any
-  return result?.result?.value || ''
+    'function() { return this.innerText || this.textContent || "" }',
+  )
+  return String(result.result.value ?? '')
 }
 
 export async function getHtml(
@@ -324,12 +347,9 @@ export async function getHtml(
   ref: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<string> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot`)
-  }
-  const result = (await sendCDP('DOM.getOuterHTML', { backendNodeId: resolved.backendNodeId })) as any
-  return result?.outerHTML || ''
+  const resolved = requireRef(ref, refMap)
+  const { outerHTML } = await cdpGetOuterHTML(sendCDP, resolved.backendNodeId)
+  return outerHTML
 }
 
 export async function getValue(
@@ -337,19 +357,10 @@ export async function getValue(
   ref: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<string> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot`)
-  }
-  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
-  const objectId = obj?.object?.objectId
-  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
-  const result = (await sendCDP('Runtime.callFunctionOn', {
-    objectId,
-    functionDeclaration: 'function() { return this.value ?? "" }',
-    returnByValue: true,
-  })) as any
-  return result?.result?.value ?? ''
+  const resolved = requireRef(ref, refMap)
+  const objectId = await resolveToObjectId(sendCDP, resolved.backendNodeId, ref)
+  const result = await cdpCallFunctionOn(sendCDP, objectId, 'function() { return this.value ?? "" }')
+  return String(result.result.value ?? '')
 }
 
 export async function getAttribute(
@@ -358,19 +369,14 @@ export async function getAttribute(
   attr: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<string | null> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot`)
-  }
-  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
-  const objectId = obj?.object?.objectId
-  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
-  const result = (await sendCDP('Runtime.callFunctionOn', {
+  const resolved = requireRef(ref, refMap)
+  const objectId = await resolveToObjectId(sendCDP, resolved.backendNodeId, ref)
+  const result = await cdpCallFunctionOn(
+    sendCDP,
     objectId,
-    functionDeclaration: `function() { return this.getAttribute(${JSON.stringify(attr)}) }`,
-    returnByValue: true,
-  })) as any
-  return result?.result?.value ?? null
+    `function() { return this.getAttribute(${JSON.stringify(attr)}) }`,
+  )
+  return (result.result.value as string | null) ?? null
 }
 
 export async function isVisible(
@@ -378,10 +384,7 @@ export async function isVisible(
   ref: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<boolean> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot`)
-  }
+  const resolved = requireRef(ref, refMap)
   const box = await getElementBox(sendCDP, resolved.backendNodeId)
   return box != null && box.width > 0 && box.height > 0
 }
@@ -391,19 +394,10 @@ export async function isChecked(
   ref: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<boolean> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot`)
-  }
-  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
-  const objectId = obj?.object?.objectId
-  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
-  const result = (await sendCDP('Runtime.callFunctionOn', {
-    objectId,
-    functionDeclaration: 'function() { return !!this.checked }',
-    returnByValue: true,
-  })) as any
-  return !!result?.result?.value
+  const resolved = requireRef(ref, refMap)
+  const objectId = await resolveToObjectId(sendCDP, resolved.backendNodeId, ref)
+  const result = await cdpCallFunctionOn(sendCDP, objectId, 'function() { return !!this.checked }')
+  return !!result.result.value
 }
 
 export async function selectOption(
@@ -412,22 +406,17 @@ export async function selectOption(
   value: string,
   refMap: Map<string, SnapshotRef>,
 ): Promise<void> {
-  const resolved = resolveRef(ref, refMap)
-  if (!resolved?.backendNodeId) {
-    throw new Error(`Ref "${ref}" not found in last snapshot`)
-  }
-  const obj = (await sendCDP('DOM.resolveNode', { backendNodeId: resolved.backendNodeId })) as any
-  const objectId = obj?.object?.objectId
-  if (!objectId) throw new Error(`Cannot resolve ref "${ref}"`)
-  await sendCDP('Runtime.callFunctionOn', {
+  const resolved = requireRef(ref, refMap)
+  const objectId = await resolveToObjectId(sendCDP, resolved.backendNodeId, ref)
+  await cdpCallFunctionOn(
+    sendCDP,
     objectId,
-    functionDeclaration: `function() {
+    `function() {
       this.value = ${JSON.stringify(value)};
       this.dispatchEvent(new Event('input', { bubbles: true }));
       this.dispatchEvent(new Event('change', { bubbles: true }));
     }`,
-    returnByValue: true,
-  })
+  )
 }
 
 export async function waitFor(
@@ -452,12 +441,9 @@ export async function waitFor(
   }
 
   if (options.ref) {
-    const resolved = resolveRef(options.ref, refMap)
-    if (!resolved?.backendNodeId) {
-      throw new Error(`Ref "${options.ref}" not found in last snapshot`)
-    }
+    const resolved = requireRef(options.ref, refMap)
     await poll(async () => {
-      const box = await getElementBox(sendCDP, resolved.backendNodeId!)
+      const box = await getElementBox(sendCDP, resolved.backendNodeId)
       return box != null && box.width > 0 && box.height > 0
     })
     return
@@ -466,11 +452,8 @@ export async function waitFor(
   if (options.text) {
     const searchText = options.text
     await poll(async () => {
-      const result = (await sendCDP('Runtime.evaluate', {
-        expression: `document.body?.innerText?.includes(${JSON.stringify(searchText)}) ?? false`,
-        returnByValue: true,
-      })) as any
-      return !!result?.result?.value
+      const result = await cdpEvaluate(sendCDP, `document.body?.innerText?.includes(${JSON.stringify(searchText)}) ?? false`)
+      return !!result.result.value
     })
     return
   }
@@ -478,11 +461,8 @@ export async function waitFor(
   if (options.url) {
     const urlPattern = options.url
     await poll(async () => {
-      const result = (await sendCDP('Runtime.evaluate', {
-        expression: 'window.location.href',
-        returnByValue: true,
-      })) as any
-      const currentUrl = result?.result?.value || ''
+      const result = await cdpEvaluate(sendCDP, 'window.location.href')
+      const currentUrl = String(result.result.value ?? '')
       // Support glob patterns: ** = anything
       const regex = new RegExp('^' + urlPattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*') + '$')
       return regex.test(currentUrl)
@@ -493,11 +473,8 @@ export async function waitFor(
   if (options.load) {
     if (options.load === 'domcontentloaded' || options.load === 'load') {
       await poll(async () => {
-        const result = (await sendCDP('Runtime.evaluate', {
-          expression: 'document.readyState',
-          returnByValue: true,
-        })) as any
-        const state = result?.result?.value || ''
+        const result = await cdpEvaluate(sendCDP, 'document.readyState')
+        const state = String(result.result.value ?? '')
         if (options.load === 'domcontentloaded') return state === 'interactive' || state === 'complete'
         return state === 'complete'
       })
@@ -505,11 +482,8 @@ export async function waitFor(
       // Simple heuristic: wait for document complete + short idle period
       await new Promise((resolve) => setTimeout(resolve, 1000))
       await poll(async () => {
-        const result = (await sendCDP('Runtime.evaluate', {
-          expression: 'document.readyState',
-          returnByValue: true,
-        })) as any
-        return result?.result?.value === 'complete'
+        const result = await cdpEvaluate(sendCDP, 'document.readyState')
+        return result.result.value === 'complete'
       })
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
@@ -519,14 +493,11 @@ export async function waitFor(
   if (options.fn) {
     const expression = options.fn
     await poll(async () => {
-      const result = (await sendCDP('Runtime.evaluate', {
-        expression,
-        returnByValue: true,
-      })) as any
-      if (result?.exceptionDetails) {
+      const result = await cdpEvaluate(sendCDP, expression)
+      if (result.exceptionDetails) {
         throw new Error(`wait --fn error: ${result.exceptionDetails.text || result.exceptionDetails.exception?.description || 'evaluation failed'}`)
       }
-      return !!result?.result?.value
+      return !!result.result.value
     })
     return
   }

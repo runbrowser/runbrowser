@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "title": "RunBrowser - Chrome extension & CLI that lets agents use your real browser",
+    "description": "Chrome extension and CLI that let your agents control your actual browser. Your logins, extensions, cookies — already there. No headless instance, no bot detection."
+  },
+  "nav": {
+    "home": "Home"
+  },
+  "locale": {
+    "switchTo": "中文"
+  }
+}

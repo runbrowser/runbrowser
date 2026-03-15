@@ -32,6 +32,13 @@ export type ExtensionInfo = {
   version?: string
 }
 
+/** Session metadata identifying which browser/profile a session is bound to. */
+export type SessionMetadata = {
+  extensionId: string | null
+  browser: string | null
+  profile: { email: string; id: string } | null
+}
+
 export type ExtensionPendingRequest = {
   resolve: (result: unknown) => void
   reject: (error: Error) => void

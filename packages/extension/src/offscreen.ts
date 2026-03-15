@@ -143,11 +143,17 @@ async function handleStartRecording(params: OffscreenStartRecordingMessage): Pro
         // Convert blob to array buffer and send to service worker
         const arrayBuffer = await event.data.arrayBuffer()
         const uint8Array = new Uint8Array(arrayBuffer)
-        chrome.runtime.sendMessage({
-          action: 'recordingChunk',
-          tabId,
-          data: Array.from(uint8Array), // Convert to regular array for message passing
-        })
+        console.log(`[offscreen] Sending chunk for tab ${tabId}: ${uint8Array.length} bytes`)
+        try {
+          await chrome.runtime.sendMessage({
+            action: 'recordingChunk',
+            tabId,
+            data: Array.from(uint8Array), // Convert to regular array for message passing
+          })
+          console.log(`[offscreen] Chunk sent successfully for tab ${tabId}`)
+        } catch (error: any) {
+          console.error(`[offscreen] Failed to send chunk for tab ${tabId}:`, error.message || error)
+        }
       }
     }
 

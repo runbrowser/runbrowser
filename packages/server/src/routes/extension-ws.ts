@@ -26,13 +26,13 @@ import pc from 'picocolors'
 export function registerExtensionWsRoute(
   app: Hono,
   ctx: ServerContext,
-  upgradeWebSocket: Function,
+  upgradeWebSocket: ReturnType<typeof import('@hono/node-ws').createNodeWebSocket>['upgradeWebSocket'],
 ) {
   // Recording relays per extension connection
   const recordingRelays = new Map<string, RecordingRelay>()
 
   // Expose getRecordingRelay via context so other routes can use it
-  ;(ctx as any)._recordingRelays = recordingRelays
+  ctx._recordingRelays = recordingRelays
 
   const getRecordingRelay = (extensionId?: string | null): RecordingRelay | null => {
     const allowDefault = !extensionId && ctx.store.getState().extensions.size === 1
@@ -53,7 +53,7 @@ export function registerExtensionWsRoute(
   }
 
   // Wire getRecordingRelay into the context
-  ;(ctx as any)._getRecordingRelay = getRecordingRelay
+  ctx._getRecordingRelay = getRecordingRelay
 
   const getExtensionInfoFromRequest = (c: {
     req: { query: (name: string) => string | undefined }
@@ -143,8 +143,23 @@ export function registerExtensionWsRoute(
           }
 
           // Handle binary data (recording chunks)
-          if (event.data instanceof ArrayBuffer || Buffer.isBuffer(event.data)) {
-            const buffer = Buffer.isBuffer(event.data) ? event.data : Buffer.from(event.data)
+          const isBinary = event.data instanceof ArrayBuffer
+            || Buffer.isBuffer(event.data)
+            || (typeof Blob !== 'undefined' && event.data instanceof Blob)
+            || (event.data instanceof Uint8Array)
+          if (isBinary) {
+            let buffer: Buffer
+            if (Buffer.isBuffer(event.data)) {
+              buffer = event.data
+            } else if (event.data instanceof ArrayBuffer) {
+              buffer = Buffer.from(event.data)
+            } else if (event.data instanceof Uint8Array) {
+              buffer = Buffer.from(event.data.buffer, event.data.byteOffset, event.data.byteLength)
+            } else {
+              // Blob
+              const arrayBuffer = await (event.data as Blob).arrayBuffer()
+              buffer = Buffer.from(arrayBuffer)
+            }
             const relay = getRecordingRelay(connectionId)
             if (relay) {
               relay.handleBinaryData(buffer)

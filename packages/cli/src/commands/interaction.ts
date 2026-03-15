@@ -6,7 +6,7 @@
 import pc from 'picocolors'
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
-import { output, ok, die } from '../output.js'
+import { output, ok } from '../output.js'
 
 // ============================================================================
 // click
@@ -20,10 +20,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const ref = args.subcommand
-    if (!ref) die('Usage: runbrowser click <ref>')
+    if (!ref) throw new Error('Usage: runbrowser click <ref>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.click(sessionId, ref); ok(`Clicked ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.click(sessionId, ref); ok(`Clicked ${ref}`, args.json)
   },
 })
 
@@ -39,10 +38,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const ref = args.subcommand
-    if (!ref) die('Usage: runbrowser dblclick <ref>')
+    if (!ref) throw new Error('Usage: runbrowser dblclick <ref>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.dblclick(sessionId, ref); ok(`Double-clicked ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.dblclick(sessionId, ref); ok(`Double-clicked ${ref}`, args.json)
   },
 })
 
@@ -62,10 +60,9 @@ registerBuiltinCommand({
   async execute(args, resolveSession) {
     const ref = args.subcommand
     const value = args.positionals[0]
-    if (!ref || !value) die('Usage: runbrowser fill <ref> <value>')
+    if (!ref || !value) throw new Error('Usage: runbrowser fill <ref> <value>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.fill(sessionId, ref, value); ok(`Filled ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.fill(sessionId, ref, value); ok(`Filled ${ref}`, args.json)
   },
 })
 
@@ -81,10 +78,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const text = args.subcommand
-    if (!text) die('Usage: runbrowser type <text>')
+    if (!text) throw new Error('Usage: runbrowser type <text>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.type(sessionId, text); ok(`Typed "${text}"`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.type(sessionId, text); ok(`Typed "${text}"`, args.json)
   },
 })
 
@@ -100,10 +96,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const key = args.subcommand
-    if (!key) die('Usage: runbrowser press <key>')
+    if (!key) throw new Error('Usage: runbrowser press <key>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.press(sessionId, key); ok(`Pressed ${key}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.press(sessionId, key); ok(`Pressed ${key}`, args.json)
   },
 })
 
@@ -123,10 +118,9 @@ registerBuiltinCommand({
   async execute(args, resolveSession) {
     const ref = args.subcommand
     const value = args.positionals[0]
-    if (!ref || !value) die('Usage: runbrowser select <ref> <value>')
+    if (!ref || !value) throw new Error('Usage: runbrowser select <ref> <value>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.selectOption(sessionId, ref, value); ok(`Selected "${value}" on ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.selectOption(sessionId, ref, value); ok(`Selected "${value}" on ${ref}`, args.json)
   },
 })
 
@@ -142,10 +136,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const ref = args.subcommand
-    if (!ref) die('Usage: runbrowser check <ref>')
+    if (!ref) throw new Error('Usage: runbrowser check <ref>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.check(sessionId, ref); ok(`Checked ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.check(sessionId, ref); ok(`Checked ${ref}`, args.json)
   },
 })
 
@@ -157,10 +150,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const ref = args.subcommand
-    if (!ref) die('Usage: runbrowser uncheck <ref>')
+    if (!ref) throw new Error('Usage: runbrowser uncheck <ref>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.uncheck(sessionId, ref); ok(`Unchecked ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.uncheck(sessionId, ref); ok(`Unchecked ${ref}`, args.json)
   },
 })
 
@@ -180,12 +172,10 @@ registerBuiltinCommand({
   async execute(args, resolveSession) {
     const direction = args.subcommand as 'up' | 'down' | 'left' | 'right'
     const amount = args.positionals[0] ? Number(args.positionals[0]) : undefined
-    if (!direction) die('Usage: runbrowser scroll <up|down|left|right> [amount]')
+    if (!direction) throw new Error('Usage: runbrowser scroll <up|down|left|right> [amount]')
     const { sessionId, client } = await resolveSession(args)
-    try {
       await client.scroll(sessionId, direction, amount)
       ok(`Scrolled ${direction}${amount ? ` ${amount}px` : ''}`, args.json)
-    } catch (e: any) { die(e.message) }
   },
 })
 
@@ -201,10 +191,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const ref = args.subcommand
-    if (!ref) die('Usage: runbrowser hover <ref>')
+    if (!ref) throw new Error('Usage: runbrowser hover <ref>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.hover(sessionId, ref); ok(`Hovered ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.hover(sessionId, ref); ok(`Hovered ${ref}`, args.json)
   },
 })
 
@@ -220,10 +209,9 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const ref = args.subcommand
-    if (!ref) die('Usage: runbrowser focus <ref>')
+    if (!ref) throw new Error('Usage: runbrowser focus <ref>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.focus(sessionId, ref); ok(`Focused ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.focus(sessionId, ref); ok(`Focused ${ref}`, args.json)
   },
 })
 
@@ -243,10 +231,9 @@ registerBuiltinCommand({
   async execute(args, resolveSession) {
     const ref = args.subcommand
     const files = args.positionals
-    if (!ref || files.length === 0) die('Usage: runbrowser upload <ref> <files..>')
+    if (!ref || files.length === 0) throw new Error('Usage: runbrowser upload <ref> <files..>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.upload(sessionId, ref, files); ok(`Uploaded ${files.length} file(s) to ${ref}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.upload(sessionId, ref, files); ok(`Uploaded ${files.length} file(s) to ${ref}`, args.json)
   },
 })
 
@@ -266,10 +253,9 @@ registerBuiltinCommand({
   async execute(args, resolveSession) {
     const source = args.subcommand
     const target = args.positionals[0]
-    if (!source || !target) die('Usage: runbrowser drag <source> <target>')
+    if (!source || !target) throw new Error('Usage: runbrowser drag <source> <target>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.drag(sessionId, source, target); ok(`Dragged ${source} → ${target}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.drag(sessionId, source, target); ok(`Dragged ${source} → ${target}`, args.json)
   },
 })
 
@@ -289,10 +275,9 @@ registerBuiltinCommand({
   async execute(args, resolveSession) {
     const width = Number(args.subcommand)
     const height = Number(args.positionals[0])
-    if (isNaN(width) || isNaN(height)) die('Usage: runbrowser viewport <width> <height>')
+    if (isNaN(width) || isNaN(height)) throw new Error('Usage: runbrowser viewport <width> <height>')
     const { sessionId, client } = await resolveSession(args)
-    try { await client.viewport(sessionId, width, height); ok(`Viewport set to ${width}×${height}`, args.json) }
-    catch (e: any) { die(e.message) }
+    await client.viewport(sessionId, width, height); ok(`Viewport set to ${width}×${height}`, args.json)
   },
 })
 
@@ -317,7 +302,6 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const { sessionId, client } = await resolveSession(args)
-    try {
       const timeout = (args.flags.get('timeout') as number) ?? 10000
       const opts: Record<string, unknown> = { timeout }
 
@@ -336,12 +320,11 @@ registerBuiltinCommand({
         if (!isNaN(n) && !target.startsWith('@')) opts.ms = n
         else opts.ref = target
       } else {
-        die('wait requires: @ref, ms, --text, --url, --load, or --fn')
+        throw new Error('wait requires: @ref, ms, --text, --url, --load, or --fn')
       }
 
       await client.waitFor(sessionId, opts as any)
       ok('Wait completed', args.json)
-    } catch (e: any) { die(e.message) }
   },
 })
 
@@ -370,10 +353,9 @@ registerBuiltinCommand({
     const value = args.positionals[0]
     const action = args.positionals[1]
     const actionValue = args.positionals[2]
-    if (!by || !value || !action) die('Usage: runbrowser find <by> <value> <action> [actionValue]')
+    if (!by || !value || !action) throw new Error('Usage: runbrowser find <by> <value> <action> [actionValue]')
 
     const { sessionId, client } = await resolveSession(args)
-    try {
       const result = await client.findAndAct(sessionId, {
         by, value, action, actionValue,
         name: args.flags.get('name') as string,
@@ -382,7 +364,6 @@ registerBuiltinCommand({
       })
       if (action === 'text') output({ text: result as string }, args.json)
       else ok(`${action} on ${by}="${value}"`, args.json)
-    } catch (e: any) { die(e.message) }
   },
 })
 
@@ -403,7 +384,6 @@ registerBuiltinCommand({
     const { sessionId, client } = await resolveSession(args)
     const cmd = args.subcommand || 'list'
 
-    try {
       // Number → switch tab
       const idx = Number(cmd)
       if (!isNaN(idx)) {
@@ -436,9 +416,8 @@ registerBuiltinCommand({
           break
         }
         default:
-          die(`Unknown tab command: ${cmd}. Use: list, new, close, or <index>`)
+          throw new Error(`Unknown tab command: ${cmd}. Use: list, new, close, or <index>`)
       }
-    } catch (e: any) { die(e.message) }
   },
 })
 
@@ -456,9 +435,8 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const selector = args.subcommand
-    if (!selector) die('Usage: runbrowser frame <selector>')
+    if (!selector) throw new Error('Usage: runbrowser frame <selector>')
     const { sessionId, client } = await resolveSession(args)
-    try {
       if (selector === 'main') {
         await client.switchToMainFrame(sessionId)
         ok('Switched to main frame', args.json)
@@ -466,6 +444,5 @@ registerBuiltinCommand({
         await client.switchFrame(sessionId, selector)
         ok(`Switched to frame ${selector}`, args.json)
       }
-    } catch (e: any) { die(e.message) }
   },
 })

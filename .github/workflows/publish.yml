@@ -39,22 +39,25 @@ jobs:
       - name: Run tests
         run: pnpm run test
 
-      - name: Publish @agmod/runbrowser-relay
-        run: pnpm --filter @agmod/runbrowser-relay publish --no-git-checks --access public
+      - name: Publish @jiweiyuan/runbrowser-server
+        run: pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
 
-      - name: Publish @agmod/runbrowser-core
-        run: pnpm --filter @agmod/runbrowser-core publish --no-git-checks --access public
+      - name: Publish @jiweiyuan/runbrowser-core
+        run: pnpm --filter @jiweiyuan/runbrowser-core publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
 
-      - name: Publish @agmod/runbrowser-mcp
-        run: pnpm --filter @agmod/runbrowser-mcp publish --no-git-checks --access public
+      - name: Publish @jiweiyuan/runbrowser-mcp
+        run: pnpm --filter @jiweiyuan/runbrowser-mcp publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
 
-      - name: Publish @agmod/runbrowser
-        run: pnpm --filter @agmod/runbrowser publish --no-git-checks --access public
+      - name: Publish @jiweiyuan/runbrowser
+        run: pnpm --filter @jiweiyuan/runbrowser publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

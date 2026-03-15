@@ -5,7 +5,7 @@
 import fs from 'node:fs'
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
-import { output, die } from '../output.js'
+import { output } from '../output.js'
 
 // ============================================================================
 // snapshot
@@ -24,7 +24,6 @@ registerBuiltinCommand({
   },
   async execute(args: ParsedArgs, resolveSession: SessionResolver) {
     const { sessionId, client } = await resolveSession(args)
-    try {
       const result = await client.snapshot(sessionId, {
         interactiveOnly: args.flags.get('interactive') as boolean,
         ...(args.flags.get('compact') && { compact: true }),
@@ -33,7 +32,6 @@ registerBuiltinCommand({
       })
       if (args.json) console.log(JSON.stringify(result))
       else console.log(result.snapshot)
-    } catch (e: any) { die(e.message) }
   },
 })
 
@@ -56,7 +54,6 @@ registerBuiltinCommand({
   async execute(args: ParsedArgs, resolveSession: SessionResolver) {
     const savePath = args.subcommand
     const { sessionId, client } = await resolveSession(args)
-    try {
       const result = await client.captureScreenshot(sessionId)
       if (savePath) {
         fs.writeFileSync(savePath, Buffer.from(result.data, 'base64'))
@@ -66,7 +63,6 @@ registerBuiltinCommand({
         if (args.json) console.log(JSON.stringify(result))
         else console.log(`Screenshot captured (${result.mimeType}, ${result.data.length} base64 chars)`)
       }
-    } catch (e: any) { die(e.message) }
   },
 })
 
@@ -89,10 +85,9 @@ registerBuiltinCommand({
   async execute(args: ParsedArgs, resolveSession: SessionResolver) {
     const what = args.subcommand
     const ref = args.positionals[0]
-    if (!what) die('Usage: runbrowser get <text|html|value|attr|url|title|count> [ref]')
+    if (!what) throw new Error('Usage: runbrowser get <text|html|value|attr|url|title|count> [ref]')
 
     const { sessionId, client } = await resolveSession(args)
-    try {
       switch (what) {
         case 'url': {
           const r = await client.getUrl(sessionId)
@@ -105,41 +100,40 @@ registerBuiltinCommand({
           break
         }
         case 'text': {
-          if (!ref) die('ref is required for `get text`')
+          if (!ref) throw new Error('ref is required for `get text`')
           const r = await client.getText(sessionId, ref)
           output({ text: r.text }, args.json)
           break
         }
         case 'html': {
-          if (!ref) die('ref is required for `get html`')
+          if (!ref) throw new Error('ref is required for `get html`')
           const r = await client.getHtml(sessionId, ref)
           output({ html: r.html }, args.json)
           break
         }
         case 'value': {
-          if (!ref) die('ref is required for `get value`')
+          if (!ref) throw new Error('ref is required for `get value`')
           const r = await client.getValue(sessionId, ref)
           output({ value: r.value }, args.json)
           break
         }
         case 'attr': {
-          if (!ref) die('ref is required for `get attr`')
+          if (!ref) throw new Error('ref is required for `get attr`')
           const attrName = args.flags.get('attr-name') as string
-          if (!attrName) die('--attr-name is required for `get attr`')
+          if (!attrName) throw new Error('--attr-name is required for `get attr`')
           const r = await client.getAttribute(sessionId, ref, attrName)
           output({ value: r.value }, args.json)
           break
         }
         case 'count': {
-          if (!ref) die('selector is required for `get count`')
+          if (!ref) throw new Error('selector is required for `get count`')
           const r = await client.getCount(sessionId, ref)
           output({ count: r.count }, args.json)
           break
         }
         default:
-          die(`Unknown: ${what}. Use: text, html, value, attr, url, title, count`)
+          throw new Error(`Unknown: ${what}. Use: text, html, value, attr, url, title, count`)
       }
-    } catch (e: any) { die(e.message) }
   },
 })
 
@@ -159,10 +153,9 @@ registerBuiltinCommand({
   async execute(args: ParsedArgs, resolveSession: SessionResolver) {
     const check = args.subcommand
     const ref = args.positionals[0]
-    if (!check || !ref) die('Usage: runbrowser is <visible|checked|enabled> <ref>')
+    if (!check || !ref) throw new Error('Usage: runbrowser is <visible|checked|enabled> <ref>')
 
     const { sessionId, client } = await resolveSession(args)
-    try {
       if (check === 'visible') {
         const r = await client.isVisible(sessionId, ref)
         output({ visible: r.visible }, args.json)
@@ -173,8 +166,7 @@ registerBuiltinCommand({
         const r = await client.isEnabled(sessionId, ref)
         output({ enabled: r.enabled }, args.json)
       } else {
-        die(`Unknown check: ${check}. Use: visible, checked, enabled`)
+        throw new Error(`Unknown check: ${check}. Use: visible, checked, enabled`)
       }
-    } catch (e: any) { die(e.message) }
   },
 })

@@ -451,10 +451,3 @@ export class ScopedFS {
   constants = fs.constants
 }
 
-/**
- * Create a scoped fs instance with allowed directories.
- * Defaults to cwd, /tmp, and os.tmpdir() if no directories specified.
- */
-export function createScopedFS(allowedDirs?: string[]): ScopedFS {
-  return new ScopedFS(allowedDirs)
-}

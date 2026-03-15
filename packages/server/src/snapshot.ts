@@ -5,8 +5,7 @@
  */
 
 import type { Protocol } from './cdp-types.js'
-
-export type SendCDP = (method: string, params?: unknown) => Promise<unknown>
+import type { SendCDP } from './commands.js'
 
 // ============================================================================
 // Types

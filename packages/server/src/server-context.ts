@@ -76,6 +76,12 @@ export type ServerContext = {
 
 
 
+  // Internal wiring (set by extension-ws route, used by recording routes)
+  /** @internal Set by registerExtensionWsRoute */
+  _getRecordingRelay?: (extensionId: string | null) => import('./recording.js').RecordingRelay | null
+  /** @internal Set by registerExtensionWsRoute */
+  _recordingRelays?: Map<string, import('./recording.js').RecordingRelay>
+
   // Utility
   normalizeSessionId: (value: string | number | null | undefined) => string | null
 }

@@ -1,6 +1,6 @@
 {
   "name": "@jiweiyuan/runbrowser-server",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "RunBrowser server — bridges Chrome extension WebSocket to CDP clients",
   "type": "module",
   "main": "dist/index.js",

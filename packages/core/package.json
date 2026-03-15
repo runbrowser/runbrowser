@@ -1,6 +1,6 @@
 {
   "name": "@jiweiyuan/runbrowser-core",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Shared core library for RunBrowser — debugger, editor, ffmpeg, diff, and browser utilities",
   "type": "module",
   "main": "dist/index.js",

@@ -9,7 +9,7 @@ import pc from 'picocolors'
 
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
-import { output, ok, die } from '../output.js'
+import { output, ok } from '../output.js'
 import {
   VERSION,
   RELAY_PORT,
@@ -43,7 +43,7 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const cmd = args.subcommand
-    if (!cmd) die('Usage: runbrowser session <new|list|delete> [id]')
+    if (!cmd) throw new Error('Usage: runbrowser session <new|list|delete> [id]')
 
     const config = readConfig()
     const client = new RelayApiClient({
@@ -61,7 +61,7 @@ registerBuiltinCommand({
           console.error(pc.dim('Waiting for extension...'))
           extensions = await client.waitForExtensions({ timeoutMs: 10000, pollIntervalMs: 250 })
         }
-        if (extensions.length === 0) die('No connected browsers. Click the RunBrowser extension icon.')
+        if (extensions.length === 0) throw new Error('No connected browsers. Click the RunBrowser extension icon.')
 
         let ext = extensions[0]
         const browserKey = args.flags.get('browser') as string | undefined
@@ -78,7 +78,7 @@ registerBuiltinCommand({
             process.exit(1)
           }
           ext = extensions.find((e) => e.stableKey === browserKey)!
-          if (!ext) die(`Browser not found: ${browserKey}`)
+          if (!ext) throw new Error(`Browser not found: ${browserKey}`)
         }
 
         const extensionId = ext.extensionId === 'default' ? null : ext.stableKey || ext.extensionId
@@ -90,7 +90,6 @@ registerBuiltinCommand({
 
       case 'list': {
         await client.ensureServer(cliRelayEnv)
-        try {
           const sessions = await client.listSessions()
           if (args.json) { console.log(JSON.stringify(sessions)); return }
           if (sessions.length === 0) { console.log('No active sessions'); return }
@@ -102,21 +101,19 @@ registerBuiltinCommand({
           for (const s of sessions) {
             console.log(String(s.id).padEnd(idW) + '  ' + (s.browser || 'Chrome').padEnd(brW) + '  ' + (s.profile?.email || '-').padEnd(prW) + '  ' + (s.stateKeys.length > 0 ? s.stateKeys.join(', ') : '-'))
           }
-        } catch (e: any) { die(e.message) }
         break
       }
 
       case 'delete': {
         const id = args.positionals[0]
-        if (!id) die('Session ID required: session delete <id>')
+        if (!id) throw new Error('Session ID required: session delete <id>')
         await client.ensureServer(cliRelayEnv)
-        try { await client.deleteSession(id); console.log(`Session ${id} deleted.`) }
-        catch (e: any) { die(e.message) }
+    await client.deleteSession(id); console.log(`Session ${id} deleted.`)
         break
       }
 
       default:
-        die(`Unknown session command: ${cmd}. Use: new, list, delete`)
+        throw new Error(`Unknown session command: ${cmd}. Use: new, list, delete`)
     }
   },
 })
@@ -142,7 +139,7 @@ registerBuiltinCommand({
 
     switch (cmd) {
       case 'set': {
-        if (!key || !value) die('Usage: config set <key> <value>')
+        if (!key || !value) throw new Error('Usage: config set <key> <value>')
         const config = readConfig()
         setNestedValue(config, key, value)
         writeConfig(config)
@@ -150,7 +147,7 @@ registerBuiltinCommand({
         break
       }
       case 'unset': {
-        if (!key) die('Usage: config unset <key>')
+        if (!key) throw new Error('Usage: config unset <key>')
         const config = readConfig()
         deleteNestedValue(config, key)
         writeConfig(config)
@@ -161,12 +158,13 @@ registerBuiltinCommand({
         const config = readConfig()
         console.log(`Config: ${CONFIG_FILE_PATH}`)
         if (Object.keys(config).length === 0) { console.log('(empty)'); return }
-        if (config.host) console.log(`  host:  ${config.host}`)
-        if (config.token) console.log(`  token: ${'*'.repeat(config.token.length)}`)
+        if (config.host) console.log(`  host:    ${config.host}`)
+        if (config.token) console.log(`  token:   ${'*'.repeat(config.token.length)}`)
+        if (config.profile) console.log(`  profile: ${config.profile}`)
         break
       }
       default:
-        die(`Unknown config command: ${cmd ?? 'none'}. Use: set, unset, show`)
+        throw new Error(`Unknown config command: ${cmd ?? 'none'}. Use: set, unset, show`)
     }
   },
 })
@@ -188,7 +186,7 @@ registerBuiltinCommand({
     const host = (args.flags.get('host') as string) ?? '127.0.0.1'
     const token = args.token || process.env.RUNBROWSER_TOKEN
     if ((host === '0.0.0.0' || host === '::') && !token) {
-      die('Auth token required for public host. Use --token or RUNBROWSER_TOKEN.')
+      throw new Error('Auth token required for public host. Use --token or RUNBROWSER_TOKEN.')
     }
     const portInUse = await isPortInUse(RELAY_PORT)
     if (portInUse) {

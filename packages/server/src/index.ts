@@ -48,6 +48,7 @@ export type {
   ExtensionEntry,
   PlaywrightClient,
   RelayState,
+  SessionMetadata,
 } from './state.js'
 
 // Client utilities (for connecting to / managing relay server)
@@ -146,5 +147,3 @@ export type { ActiveRecording } from './recording.js'
 // Port management
 export { killPortProcess, getListeningPidsForPort, isPortInUse } from './kill-port.js'
 export type { KillPortSignal } from './kill-port.js'
-
-

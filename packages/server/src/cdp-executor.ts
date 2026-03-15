@@ -5,7 +5,7 @@
  */
 
 import type { ExecutorLike } from './server.js'
-import type { ExtensionEntry } from './state.js'
+import type { ExtensionEntry, SessionMetadata } from './state.js'
 import { getSnapshot, type SnapshotResult } from './snapshot.js'
 import { captureScreenshot } from './screenshot.js'
 import * as commands from './commands.js'
@@ -26,11 +26,7 @@ export type GetExtensionEntry = (stableKeyOrId: string | null) => ExtensionEntry
 export interface CDPExecutorOptions {
   /** The stableKey of the extension to send commands to (stored in session metadata) */
   extensionStableKey: string | null
-  sessionMetadata: {
-    extensionId: string | null
-    browser: string | null
-    profile: { email: string; id: string } | null
-  }
+  sessionMetadata: SessionMetadata
   sendToExtension: SendToExtension
   getExtensionEntry: GetExtensionEntry
   logger?: { log(...args: any[]): void; error(...args: any[]): void }
@@ -42,11 +38,7 @@ export interface CDPExecutorOptions {
 
 export class CDPExecutor implements ExecutorLike {
   private extensionStableKey: string | null
-  private metadata: {
-    extensionId: string | null
-    browser: string | null
-    profile: { email: string; id: string } | null
-  }
+  private metadata: SessionMetadata
   private sendToExtension: SendToExtension
   private getExtensionEntry: GetExtensionEntry
   private logger?: { log(...args: any[]): void; error(...args: any[]): void }
@@ -64,7 +56,7 @@ export class CDPExecutor implements ExecutorLike {
   }
 
   /** Get the Chrome CDP session ID of the active tab for this executor's extension. */
-  private getActiveCdpSession(): { extensionId: string | null; cdpSessionId: string | null } {
+  getActiveCdpSession(): { extensionId: string | null; cdpSessionId: string | null } {
     const entry = this.getExtensionEntry(this.extensionStableKey)
     if (!entry) {
       return { extensionId: null, cdpSessionId: null }
@@ -110,18 +102,9 @@ export class CDPExecutor implements ExecutorLike {
       throw new Error('No connected browser tab found and failed to auto-create one. Click the RunBrowser extension icon on a tab.')
     }
 
-    // Register the new target in relay state
-    if (this.getExtensionEntry) {
-      const entry = this.getExtensionEntry(this.extensionStableKey)
-      if (entry && result.targetInfo) {
-        entry.connectedTargets.set(result.sessionId, {
-          sessionId: result.sessionId,
-          targetId: result.targetInfo.targetId,
-          targetInfo: result.targetInfo,
-          frameIds: new Set(),
-        })
-      }
-    }
+    // Note: target registration in relay state is handled by the extension-ws
+    // route when it receives the Target.attachedToTarget event from the extension.
+    // We don't mutate connectedTargets directly here (that would be Feature Envy).
 
     return result.sessionId
   }

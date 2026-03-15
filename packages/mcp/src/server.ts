@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { LOG_FILE_PATH, VERSION } from '@jiweiyuan/runbrowser-server'
+import { VERSION } from '@jiweiyuan/runbrowser-server'
 import { RelayApiClient } from '@jiweiyuan/runbrowser-server/api'
 
 // ============================================================================
@@ -68,8 +68,8 @@ function toolHandler<T extends Record<string, unknown>>(
   return async (args) => {
     try {
       return await fn(args)
-    } catch (error: any) {
-      const msg = error.message || String(error)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
       if (msg.includes('404')) sessionId = null
       return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true }
     }

@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "title": "RunBrowser - 让 Agent 控制你的真实浏览器的 Chrome 扩展和 CLI",
+    "description": "Chrome 扩展和 CLI，让你的 Agent 控制你的实际浏览器。登录状态、扩展、Cookie 都在。无需无头实例，不会被反爬虫检测。"
+  },
+  "nav": {
+    "home": "首页"
+  },
+  "locale": {
+    "switchTo": "English"
+  }
+}

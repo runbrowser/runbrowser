@@ -5,6 +5,7 @@
  */
 
 import type { ExecutorManagerLike } from './server.js'
+import type { SessionMetadata } from './state.js'
 import { CDPExecutor, type SendToExtension, type GetExtensionEntry } from './cdp-executor.js'
 
 export interface CDPExecutorManagerOptions {
@@ -32,11 +33,7 @@ export class CDPExecutorManager implements ExecutorManagerLike {
   getExecutor(options: {
     sessionId: string
     cwd?: string
-    sessionMetadata?: {
-      extensionId: string | null
-      browser: string | null
-      profile: { email: string; id: string } | null
-    }
+    sessionMetadata?: SessionMetadata
   }): CDPExecutor {
     const existing = this.executors.get(options.sessionId)
     if (existing) return existing
@@ -58,13 +55,7 @@ export class CDPExecutorManager implements ExecutorManagerLike {
     return executor
   }
 
-  listSessions(): Array<{
-    id: string
-    stateKeys: string[]
-    browser: string | null
-    profile: { email: string; id: string } | null
-    extensionId: string | null
-  }> {
+  listSessions(): Array<SessionMetadata & { id: string; stateKeys: string[] }> {
     return Array.from(this.executors.entries()).map(([id, executor]) => {
       const meta = executor.getSessionMetadata()
       return {

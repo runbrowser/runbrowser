@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "title": "RunBrowser - エージェントが実際のブラウザを操作できる Chrome 拡張機能と CLI",
+    "description": "Chrome 拡張機能と CLI で、エージェントがあなたの実際のブラウザを操作。ログイン状態、拡張機能、Cookie はすべてそのまま。ヘッドレスインスタンス不要、ボット検出なし。"
+  },
+  "nav": {
+    "home": "ホーム"
+  },
+  "locale": {
+    "switchTo": "English"
+  }
+}

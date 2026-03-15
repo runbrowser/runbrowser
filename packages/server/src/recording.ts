@@ -5,6 +5,7 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawn } from 'node:child_process'
 import pc from 'picocolors'
 import type {
   StartRecordingParams,
@@ -83,13 +84,49 @@ export class RecordingRelay {
     }
 
     if (recording && final) {
-      try {
-        const totalSize = recording.chunks.reduce((sum, chunk) => sum + chunk.length, 0)
-        const combined = Buffer.concat(recording.chunks)
-        fs.writeFileSync(recording.outputPath, combined)
+      this.activeRecordings.delete(tabId)
+      this.finalizeRecording(recording, tabId)
+    }
+  }
 
-        const duration = Date.now() - recording.startedAt
-        this.logger?.log(pc.green(`Recording saved: ${recording.outputPath} (${totalSize} bytes, ${duration}ms)`))
+  /**
+   * Write chunks to disk and transcode VP9 → H.264.
+   * Runs async so handleRecordingData stays synchronous.
+   */
+  private async finalizeRecording(recording: ActiveRecording, tabId: number): Promise<void> {
+    try {
+      const totalSize = recording.chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+      const combined = Buffer.concat(recording.chunks)
+
+      // Write raw VP9 chunks to a temporary file first
+      const rawPath = recording.outputPath + '.raw.mp4'
+      fs.writeFileSync(rawPath, combined)
+
+      const duration = Date.now() - recording.startedAt
+      this.logger?.log(pc.blue(`Recording raw saved: ${rawPath} (${totalSize} bytes, ${duration}ms). Transcoding to H.264...`))
+
+      // Transcode VP9 → H.264 for universal compatibility (QuickTime, browsers, etc.)
+      try {
+        await transcodeToH264(rawPath, recording.outputPath, this.logger)
+        // Remove raw file after successful transcode
+        fs.unlinkSync(rawPath)
+        const finalSize = fs.statSync(recording.outputPath).size
+        this.logger?.log(pc.green(`Recording saved: ${recording.outputPath} (${finalSize} bytes, ${duration}ms)`))
+
+        if (recording.resolveStop) {
+          recording.resolveStop({
+            success: true,
+            tabId,
+            duration,
+            path: recording.outputPath,
+            size: finalSize,
+          })
+        }
+      } catch (transcodeError: unknown) {
+        // Transcoding failed — fall back to raw VP9 file
+        const msg = transcodeError instanceof Error ? transcodeError.message : String(transcodeError)
+        this.logger?.log(pc.yellow(`Transcode failed (${msg}), keeping raw VP9 file`))
+        fs.renameSync(rawPath, recording.outputPath)
 
         if (recording.resolveStop) {
           recording.resolveStop({
@@ -100,15 +137,13 @@ export class RecordingRelay {
             size: totalSize,
           })
         }
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        this.logger?.error('Failed to write recording:', error)
-        if (recording.resolveStop) {
-          recording.resolveStop({ success: false, error: errorMessage })
-        }
       }
-
-      this.activeRecordings.delete(tabId)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      this.logger?.error('Failed to write recording:', error)
+      if (recording.resolveStop) {
+        recording.resolveStop({ success: false, error: errorMessage })
+      }
     }
   }
 
@@ -272,4 +307,89 @@ export class RecordingRelay {
       return { success: false, error: errorMessage }
     }
   }
+}
+
+// ============================================================================
+// VP9 → H.264 transcoding
+// ============================================================================
+
+/**
+ * Transcode a VP9 video to H.264 for universal compatibility.
+ * Uses hardware acceleration (VideoToolbox on macOS) when available.
+ * Falls back to libx264 software encoding.
+ */
+async function transcodeToH264(
+  inputPath: string,
+  outputPath: string,
+  logger?: { log(...args: unknown[]): void; error(...args: unknown[]): void },
+): Promise<void> {
+  // Try hardware encoder first (h264_videotoolbox on macOS), fall back to libx264
+  const encoders = process.platform === 'darwin'
+    ? ['h264_videotoolbox', 'libx264']
+    : ['libx264']
+
+  for (const encoder of encoders) {
+    try {
+      await runFfmpeg(inputPath, outputPath, encoder, logger)
+      return
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error)
+      if (encoders.indexOf(encoder) < encoders.length - 1) {
+        logger?.log(pc.yellow(`Encoder ${encoder} failed (${msg}), trying next...`))
+      } else {
+        throw error
+      }
+    }
+  }
+}
+
+function runFfmpeg(
+  inputPath: string,
+  outputPath: string,
+  encoder: string,
+  logger?: { log(...args: unknown[]): void; error(...args: unknown[]): void },
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const qualityArgs = encoder === 'h264_videotoolbox'
+      ? ['-q:v', '80']
+      : ['-crf', '18', '-preset', 'fast']
+
+    const args = [
+      '-y',
+      '-i', inputPath,
+      '-c:v', encoder,
+      ...qualityArgs,
+      '-pix_fmt', 'yuv420p',
+      '-movflags', '+faststart',
+      outputPath,
+    ]
+
+    logger?.log(pc.blue(`Transcoding with ${encoder}: ffmpeg ${args.join(' ')}`))
+
+    const child = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderr = ''
+
+    child.stderr.on('data', (data: Buffer) => {
+      stderr += data.toString()
+    })
+
+    const timeout = setTimeout(() => {
+      child.kill()
+      reject(new Error('Transcode timeout (60s)'))
+    }, 60000)
+
+    child.on('close', (code) => {
+      clearTimeout(timeout)
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`ffmpeg exited with code ${code}: ${stderr.slice(-500)}`))
+      }
+    })
+
+    child.on('error', (err) => {
+      clearTimeout(timeout)
+      reject(new Error(`Failed to start ffmpeg: ${err.message}`))
+    })
+  })
 }

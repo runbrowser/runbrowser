@@ -6,3 +6,4 @@ packages:
   - packages/mcp
   - packages/server
   - packages/vite-plugin-extension-reload
+  - packages/website

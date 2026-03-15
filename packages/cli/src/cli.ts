@@ -28,7 +28,7 @@ import {
 
 import { parseArgs, resolveUnknownFlags, type ParsedArgs, type FlagDef } from './args.js'
 import { printMainHelp, printCommandHelp } from './help.js'
-import { die } from './output.js'
+
 
 // Import command registrations (side-effect: registers commands)
 import './commands/navigation.js'
@@ -36,6 +36,7 @@ import './commands/observation.js'
 import './commands/interaction.js'
 import './commands/execution.js'
 import './commands/management.js'
+import './commands/recording.js'
 
 import { getBuiltinCommand, getAllBuiltinCommands, type SessionResolver } from './commands/index.js'
 
@@ -132,7 +133,7 @@ async function main() {
     // TODO: Phase 2 — resolve extension flags here
     // const extFlags = await loadExtensionFlags()
     // const unknown = resolveUnknownFlags(finalArgs, extFlags)
-    // if (unknown.length > 0) die(`Unknown flags: ${unknown.join(', ')}`)
+    // if (unknown.length > 0) throw new Error(`Unknown flags: ${unknown.join(', ')}`)
 
     await builtin.execute(finalArgs, resolveSession)
     return
@@ -147,11 +148,11 @@ async function main() {
     // Check if --help
     if (args.help) {
       // TODO: Look up site command def and show help
-      die(`Unknown command: ${args.command} ${args.subcommand}`)
+      throw new Error(`Unknown command: ${args.command} ${args.subcommand}`)
     }
 
     // TODO: Execute site command
-    die(`Unknown command: ${args.command} ${args.subcommand}\nSite commands not yet implemented. Run 'runbrowser --help' for available commands.`)
+    throw new Error(`Unknown command: ${args.command} ${args.subcommand}\nSite commands not yet implemented. Run 'runbrowser --help' for available commands.`)
   }
 
   // ── Unknown command ──
@@ -161,6 +162,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err)
+  console.error(err.message ?? err)
   process.exit(1)
 })

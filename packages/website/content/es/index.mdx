@@ -1,0 +1,398 @@
+---
+title: "RunBrowser - Extensión de Chrome y CLI para que tus agentes usen tu navegador real"
+description: "Extensión de Chrome y CLI que permiten a tus agentes controlar tu navegador real. Tus sesiones, extensiones, cookies — ya están ahí. Sin instancia headless, sin detección de bots."
+toc:
+  - label: "Inicio rápido"
+    href: "#getting-started"
+  - label: "Cómo funciona"
+    href: "#how-it-works"
+  - label: "Colaboración"
+    href: "#collaboration"
+  - label: "Snapshots"
+    href: "#snapshots"
+  - label: "Etiquetas visuales"
+    href: "#visual-labels"
+  - label: "Sesiones"
+    href: "#sessions"
+  - label: "Comandos CLI"
+    href: "#cli-commands"
+  - label: "Comandos de sitio"
+    href: "#site-commands"
+  - label: "Depurador y editor"
+    href: "#debugger-and-editor"
+  - label: "Interceptación de red"
+    href: "#network-interception"
+  - label: "Grabación de pantalla"
+    href: "#screen-recording"
+  - label: "Comparación"
+    href: "#comparison"
+  - label: "Acceso remoto"
+    href: "#remote-access"
+  - label: "Seguridad"
+    href: "#security"
+---
+
+Una extensión de Chrome y CLI que permiten a tus agentes controlar **tu navegador real** — con sesiones, extensiones y cookies ya configuradas. Sin instancia headless, sin detección de bots, sin memoria adicional. [Star en GitHub](https://github.com/yuanjiwei/runbrowser).
+
+Otros MCP de navegador **lanzan un Chrome nuevo** o dan a los agentes un conjunto fijo de herramientas. Chrome nuevo significa sin sesiones, sin extensiones, detección de bots instantánea y el doble de memoria. Herramientas fijas significan que el agente no puede perfilar rendimiento, establecer puntos de interrupción ni interceptar solicitudes de red — solo puede hacer lo que alguien decidió exponer.
+
+RunBrowser da a los agentes **acceso completo a CDP** a través de comandos CLI de alto nivel y una herramienta Playwright `execute`. Bajo uso de contexto, sin inflación de esquemas por docenas de definiciones de herramientas. Y funciona en tu navegador existente, así que **no se lanza nada adicional**.
+
+<Section id="getting-started" title="Inicio rápido">
+
+**Cuatro pasos** y tu agente está navegando.
+
+1. Carga la extensión en Chrome: abre `chrome://extensions/`, activa el modo desarrollador, haz clic en **Cargar descomprimida**, selecciona la carpeta `packages/extension/dist`
+2. Haz clic en el icono de la extensión en una pestaña — se vuelve verde
+3. Instala el CLI:
+
+```bash
+npm i -g @jiweiyuan/runbrowser
+```
+
+Luego instala el **skill** — enseña a tu agente cómo usar RunBrowser: qué selectores usar, cómo evitar timeouts, cómo leer snapshots y todas las utilidades disponibles.
+
+```bash
+npx -y skills add yuanjiwei/runbrowser
+```
+
+La extensión conecta tu navegador a un **servidor relay WebSocket local** en `localhost:19988`. El CLI envía comandos CDP a través del relay. Sin servidores remotos, sin cuentas, nada sale de tu máquina.
+
+```bash
+runbrowser session-new              # new sandbox, outputs id (e.g. 1)
+runbrowser navigate https://example.com -s 1
+runbrowser snapshot -s 1
+runbrowser click @e5 -s 1
+```
+
+<Caption>Icono de extensión verde = conectado. Gris = no conectado a esta pestaña.</Caption>
+
+</Section>
+
+<Section id="how-it-works" title="Cómo funciona">
+
+Haz clic en el icono de la extensión en una pestaña — se adjunta via `chrome.debugger` y abre un WebSocket al relay local. Tu agente (CLI o MCP) se conecta al mismo relay. **Los comandos CDP fluyen**; la extensión los reenvía a Chrome y devuelve las respuestas. Sin reiniciar Chrome, sin configuración especial.
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│   BROWSER           │     │   LOCALHOST          │     │   CLIENT        │
+│                     │     │                      │     │                 │
+│  ┌───────────────┐  │     │ WebSocket Server     │     │  ┌───────────┐  │
+│  │   Extension   │<───────┬───>  :19988          │     │  │ CLI / MCP │  │
+│  └───────┬───────┘  │ WS  │                      │     │  └───────────┘  │
+│          │          │     │  /extension          │     │        │        │
+│    chrome.debugger  │     │       │              │     │        v        │
+│          v          │     │       v              │     │  ┌────────────┐ │
+│  ┌───────────────┐  │     │  /cdp/:id <───────────────>│  │  CDP API   │ │
+│  │ Tab 1 (green) │  │     └──────────────────────┘  WS │  └────────────┘ │
+│  │ Tab 2 (green) │  │                                  │        │        │
+│  │ Tab 3 (gray)  │  │     Tab 3 not controlled         │  Playwright API │
+└─────────────────────┘     (extension not clicked)      └─────────────────┘`}
+</CodeBlock>
+
+El relay **multiplexa sesiones**, así que múltiples agentes o instancias CLI pueden trabajar con el mismo navegador simultáneamente.
+
+</Section>
+
+<Section id="collaboration" title="Colaboración">
+
+Como el agente trabaja en **tu navegador**, puedes colaborar. Ves todo lo que hace en tiempo real. Cuando encuentra un captcha, **tú lo resuelves**. Cuando aparece un muro de consentimiento de cookies, haces clic para pasar. Cuando el agente se atasca, desactivas la extensión en esa pestaña, corriges manualmente, reactivas, y el agente retoma donde se quedó.
+
+No estás viendo una pantalla remota ni leyendo logs después del hecho. Estás **compartiendo un navegador** — el agente hace el trabajo repetitivo, tú intervienes cuando necesita un humano.
+
+</Section>
+
+<Section id="snapshots" title="Snapshots de accesibilidad">
+
+Tu agente necesita **ver la página** antes de actuar. Los snapshots de accesibilidad devuelven cada elemento interactivo como texto, con etiquetas `@ref`. **5–20 KB en lugar de 100 KB+** de una captura de pantalla — más barato, más rápido, y el agente puede analizarlos sin visión.
+
+```bash
+runbrowser snapshot -s 1
+
+# Output:
+# - banner:
+#     - link "Home" @e1
+#     - navigation:
+#         - link "Docs" @e2
+#         - link "Blog" @e3
+```
+
+Cada línea termina con un **@ref** que puedes pasar directamente a `runbrowser click`. Usa snapshots como **método principal para leer páginas**. Solo usa capturas de pantalla cuando la disposición espacial importa — cuadrículas, dashboards, mapas.
+
+```bash
+# Click using refs from snapshot
+runbrowser click @e3 -s 1
+
+# Or via exec with Playwright
+runbrowser exec -s 1 -e 'await snapshot({ page: state.page, search: /button|submit/i })'
+```
+
+</Section>
+
+<Section id="visual-labels" title="Etiquetas visuales">
+
+Cuando el agente necesita entender **dónde están los elementos en pantalla**, `screenshotWithAccessibilityLabels` superpone **etiquetas estilo Vimium** en cada elemento interactivo.
+
+```bash
+runbrowser screenshot -s 1 --output shot.png
+# Or with Playwright exec:
+runbrowser exec -s 1 -e 'await screenshotWithAccessibilityLabels({ page: state.page })'
+```
+
+Las etiquetas están **codificadas por color según el tipo de elemento**: amarillo para enlaces, naranja para botones, coral para campos de entrada, rosa para casillas de verificación, durazno para deslizadores, salmón para menús, ámbar para pestañas.
+
+<Caption>Etiquetas estilo Vimium. Captura de pantalla + snapshot en una sola llamada.</Caption>
+
+</Section>
+
+<Section id="sessions" title="Sesiones">
+
+Ejecuta **múltiples agentes a la vez** sin que interfieran entre sí. Cada sesión es un sandbox aislado con su propio objeto `state`. Variables, páginas y listeners persisten entre llamadas. Las pestañas del navegador se comparten, pero el estado no.
+
+```bash
+runbrowser session-new    # => 1
+runbrowser session-new    # => 2
+runbrowser session-list   # shows sessions + state keys
+
+# Session 1 stores data
+runbrowser exec -s 1 -e 'state.users = await state.page.$$eval(".user", els => els.map(e => e.textContent))'
+
+# Session 2 can't see it
+runbrowser exec -s 2 -e 'console.log(state.users)'  # undefined
+```
+
+Crea tu propia página para **evitar interferencias** de otros agentes. Reutiliza una pestaña `about:blank` existente o crea una nueva, y guárdala en `state`.
+
+```bash
+runbrowser exec -s 1 -e 'state.page = context.pages().find(p => p.url() === "about:blank") ?? await context.newPage(); await state.page.goto("https://example.com")'
+```
+
+</Section>
+
+<Section id="cli-commands" title="Comandos CLI">
+
+RunBrowser proporciona **comandos de alto nivel** que funcionan sin conocimiento de Playwright, más un comando `exec` de bajo nivel para acceso completo a la API de Playwright.
+
+```bash
+# Navigation
+runbrowser navigate https://example.com -s 1
+runbrowser back -s 1
+runbrowser forward -s 1
+runbrowser reload -s 1
+
+# Observation
+runbrowser snapshot -s 1
+runbrowser screenshot -s 1 --output shot.png
+runbrowser get-url -s 1
+runbrowser get-title -s 1
+
+# Interaction
+runbrowser click @e5 -s 1
+runbrowser fill @e3 "hello world" -s 1
+runbrowser type "search query" -s 1
+runbrowser press Enter -s 1
+runbrowser scroll down -s 1
+runbrowser hover @e2 -s 1
+
+# Wait for conditions
+runbrowser wait @e5 -s 1
+runbrowser wait 2000 -s 1
+runbrowser wait --text "Welcome" -s 1
+runbrowser wait --url "**/dashboard" -s 1
+
+# Browser JS evaluation
+runbrowser evaluate 'document.title' -s 1
+
+# Full Playwright access
+runbrowser exec -s 1 -e 'await state.page.goto("https://example.com")'
+```
+
+<Caption>Comandos de alto nivel para acciones comunes. exec para todo lo demás.</Caption>
+
+</Section>
+
+<Section id="site-commands" title="Comandos de sitio">
+
+Convierte cualquier sitio web en un **comando CLI**. Los comandos de sitio son plugins TypeScript que encapsulan navegación, scraping y extracción de datos en comandos reutilizables. En lugar de decirle a tu agente que navegue → snapshot → analice, ejecuta un comando y obtén **JSON estructurado**.
+
+```bash
+# Get GitHub trending repos as structured data
+runbrowser github trending --limit 5
+
+# RANK  NAME                 STARS   LANGUAGE
+# ---   ----                 -----   --------
+# 1     denoland/deno        5.2k    Rust
+# 2     tauri-apps/tauri     3.8k    Rust
+# 3     nickel-org/nickel    2.1k    Rust
+
+# JSON output for agents
+runbrowser github trending --limit 3 --json
+```
+
+**Escribe los tuyos** colocando un archivo `.ts` en `~/.runbrowser/commands/`. TypeScript completo, soporte IDE completo, sin wrappers YAML.
+
+```typescript
+// ~/.runbrowser/commands/github/trending.ts
+import { command } from '@jiweiyuan/commands'
+
+export default command({
+  site: 'github',
+  name: 'trending',
+  description: 'GitHub trending repositories',
+  args: {
+    limit: { type: 'number', default: 20, description: 'Number of items' },
+    language: { type: 'string', description: 'Filter by language' },
+  },
+  columns: ['rank', 'name', 'stars', 'language'],
+
+  async run(browser, args) {
+    await browser.navigate('https://github.com/trending')
+    const data = await browser.evaluate(`
+      [...document.querySelectorAll('article.Box-row')].map(el => ({
+        name: el.querySelector('h2 a')?.textContent?.trim(),
+        stars: el.querySelector('.octicon-star')?.parentElement?.textContent?.trim(),
+        language: el.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim(),
+      }))
+    `)
+    return data.slice(0, args.limit).map((item, i) => ({ rank: i + 1, ...item }))
+  },
+})
+```
+
+Los comandos son **cargados por el servidor relay** via jiti — el CLI es solo un cliente HTTP. Los agentes descubren comandos mediante MCP `skill` y los ejecutan via `run`. La salida soporta `--json`, `--csv`, tabla y markdown.
+
+<Caption>Plugins TypeScript. Datos estructurados. Un comando en lugar de navegar → snapshot → analizar.</Caption>
+
+</Section>
+
+<Section id="debugger-and-editor" title="Depurador y editor">
+
+Cosas que ningún otro MCP de navegador puede hacer. **Establecer puntos de interrupción**, ejecutar paso a paso, inspeccionar variables en tiempo de ejecución. **Editar en vivo scripts y CSS de la página** sin recargar. Acceso completo al Chrome DevTools Protocol.
+
+```bash
+# Set breakpoints and debug
+runbrowser exec -s 1 -e 'state.cdp = await getCDPSession({ page: state.page }); state.dbg = createDebugger({ cdp: state.cdp }); await state.dbg.enable()'
+runbrowser exec -s 1 -e 'state.scripts = await state.dbg.listScripts({ search: "app" }); console.log(state.scripts.map(s => s.url))'
+runbrowser exec -s 1 -e 'await state.dbg.setBreakpoint({ file: state.scripts[0].url, line: 42 })'
+
+# Live edit page code
+runbrowser exec -s 1 -e 'state.editor = createEditor({ cdp: state.cdp }); await state.editor.enable()'
+runbrowser exec -s 1 -e 'await state.editor.edit({ url: "https://example.com/app.js", oldString: "const DEBUG = false", newString: "const DEBUG = true" })'
+```
+
+Las ediciones son **en memoria** y persisten hasta que se recarga la página. Útil para alternar flags de depuración, parchear código roto o probar correcciones rápidas sin tocar los archivos fuente.
+
+<Caption>Puntos de interrupción, ejecución paso a paso, inspección de variables — desde el CLI.</Caption>
+
+</Section>
+
+<Section id="network-interception" title="Interceptación de red">
+
+Deja que el agente **vigile el tráfico de red** para hacer ingeniería inversa de APIs, extraer datos detrás del renderizado JavaScript o depurar solicitudes fallidas. Los datos capturados viven en `state` y persisten entre llamadas.
+
+```bash
+# Start intercepting
+runbrowser exec -s 1 -e 'state.responses = []; state.page.on("response", async res => { if (res.url().includes("/api/")) { try { state.responses.push({ url: res.url(), status: res.status(), body: await res.json() }); } catch {} } })'
+
+# Trigger actions, then analyze
+runbrowser exec -s 1 -e 'await state.page.click("button.load-more")'
+runbrowser exec -s 1 -e 'console.log("Captured", state.responses.length, "API calls"); state.responses.forEach(r => console.log(r.status, r.url.slice(0, 80)))'
+```
+
+**Más rápido que extraer del DOM.** El agente captura las llamadas API reales, inspecciona sus esquemas y las reproduce con diferentes parámetros.
+
+</Section>
+
+<Section id="screen-recording" title="Grabación de pantalla">
+
+Haz que el agente **grabe lo que está haciendo** como video MP4. La grabación usa `chrome.tabCapture` y se ejecuta en el contexto de la extensión, así que **sobrevive la navegación entre páginas**.
+
+```bash
+# Start recording
+runbrowser exec -s 1 -e 'await recording.start({ page: state.page, outputPath: "./recording.mp4", frameRate: 30 })'
+
+# Navigate, interact — recording continues
+runbrowser exec -s 1 -e 'await state.page.click("a"); await state.page.waitForLoadState("domcontentloaded")'
+
+# Stop and save
+runbrowser exec -s 1 -e 'const result = await recording.stop({ page: state.page }); console.log(result.path, result.duration + "ms")'
+```
+
+A diferencia de `getDisplayMedia`, este enfoque **persiste entre navegaciones** porque la extensión mantiene el `MediaRecorder`, no la página.
+
+<Caption>Captura de pestaña nativa. 30–60 fps. Persiste entre navegaciones.</Caption>
+
+</Section>
+
+<Section id="comparison" title="Comparación">
+
+Por qué usar esto en lugar de las alternativas.
+
+<ComparisonTable
+  title="vs Playwright MCP"
+  headers={['', 'Playwright MCP', 'RunBrowser']}
+  rows={[
+    ['Navegador', 'Lanza nuevo Chrome', 'Usa tu Chrome'],
+    ['Extensiones', 'Ninguna', 'Tus extensiones existentes'],
+    ['Estado de sesión', 'Nuevo', 'Ya conectado'],
+    ['Detección de bots', 'Siempre detectado', 'Puede evadir'],
+    ['Colaboración', 'Ventana separada', 'Mismo navegador que el usuario'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs BrowserMCP"
+  headers={['', 'BrowserMCP', 'RunBrowser']}
+  rows={[
+    ['Herramientas', '12+ herramientas dedicadas', 'CLI alto nivel + exec'],
+    ['API', 'Acciones limitadas', 'CDP completo + Playwright'],
+    ['Uso de contexto', 'Alto (esquemas de herramientas)', 'Bajo'],
+    ['Conocimiento LLM', 'Debe aprender herramientas', 'Ya conoce Playwright'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs Claude Browser Extension"
+  headers={['', 'Claude Extension', 'RunBrowser']}
+  rows={[
+    ['Soporte de agentes', 'Solo Claude', 'Cualquier cliente MCP'],
+    ['Windows WSL', 'No', 'Sí'],
+    ['Método de contexto', 'Capturas de pantalla (100 KB+)', 'Snapshots a11y (5–20 KB)'],
+    ['API Playwright', 'No', 'Completa'],
+    ['Depurador', 'No', 'Sí'],
+    ['Edición de código en vivo', 'No', 'Sí'],
+    ['Interceptación de red', 'Limitada', 'Completa'],
+    ['Acceso CDP directo', 'No', 'Sí'],
+  ]}
+/>
+
+</Section>
+
+<Section id="remote-access" title="Acceso remoto">
+
+Controla Chrome en una **máquina remota** — Mac mini headless, VM en la nube, contenedor de desarrollo. Establece las variables de entorno `RUNBROWSER_HOST` y `RUNBROWSER_TOKEN`. **Sin VPN, sin reglas de firewall, sin reenvío de puertos.**
+
+```bash
+# On the host machine — start relay server
+runbrowser serve --host 0.0.0.0 --token <secret>
+
+# From anywhere — set env vars and use normally
+export RUNBROWSER_HOST=192.168.1.10
+export RUNBROWSER_TOKEN=<secret>
+runbrowser navigate https://example.com -s 1
+```
+
+También funciona para **contenedores de desarrollo y Docker** — usa `RUNBROWSER_HOST=host.docker.internal`. Funciona para MCP también — establece `RUNBROWSER_HOST` y `RUNBROWSER_TOKEN` en la configuración de entorno de tu cliente MCP.
+
+</Section>
+
+<Section id="security" title="Seguridad">
+
+Todo se ejecuta **en tu máquina**. El relay se vincula a `localhost:19988` y solo acepta conexiones de la extensión. Sin servidor remoto, sin cuenta, sin telemetría.
+
+- **Solo local** — El servidor WebSocket se vincula a localhost. Nada sale de tu máquina.
+- **Validación de origen** — Solo se acepta el origen de la extensión RunBrowser. Los navegadores no pueden falsificar el encabezado Origin, así que los sitios maliciosos no pueden conectarse.
+- **Consentimiento explícito** — Solo las pestañas donde hiciste clic en el icono de la extensión son controladas. Sin acceso en segundo plano.
+- **Automatización visible** — Chrome muestra un banner de automatización en las pestañas controladas.
+
+</Section>

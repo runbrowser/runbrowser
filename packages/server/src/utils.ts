@@ -69,6 +69,8 @@ export const CONFIG_FILE_PATH = path.join(RUNBROWSER_DIR, 'config.json')
 export interface RunBrowserConfig {
   token?: string
   host?: string
+  /** Chrome profile directory name (e.g. "Default", "Profile 11") */
+  profile?: string
 }
 
 export function readConfig(): RunBrowserConfig {
@@ -91,3 +93,4 @@ export const VERSION = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).ver
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
+

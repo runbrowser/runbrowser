@@ -4,7 +4,7 @@
 
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
-import { output, die } from '../output.js'
+import { output } from '../output.js'
 
 // ============================================================================
 // eval
@@ -23,17 +23,15 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const code = args.subcommand
-    if (!code) die('Usage: runbrowser eval <code>')
+    if (!code) throw new Error('Usage: runbrowser eval <code>')
     const timeout = (args.flags.get('timeout') as number) ?? 10000
     const { sessionId, client } = await resolveSession(args)
-    try {
-      const result = await client.evaluate(sessionId, code, timeout)
-      if (result.text) {
-        if (result.isError) { console.error(result.text); process.exit(1) }
-        else if (args.json) output({ value: result.text }, true)
-        else console.log(result.text)
-      }
-    } catch (e: any) { die(e.message) }
+    const result = await client.evaluate(sessionId, code, timeout)
+    if (result.text) {
+      if (result.isError) { console.error(result.text); process.exit(1) }
+      else if (args.json) output({ value: result.text }, true)
+      else console.log(result.text)
+    }
   },
 })
 
@@ -52,16 +50,16 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const method = args.subcommand
-    if (!method) die('Usage: runbrowser cdp <method> [params]')
+    if (!method) throw new Error('Usage: runbrowser cdp <method> [params]')
     const { sessionId, client } = await resolveSession(args)
-    try {
-      const params = args.positionals[0] ? JSON.parse(args.positionals[0]) : undefined
-      const result = await client.cdp(sessionId, method, params)
-      console.log(JSON.stringify(result.result, null, 2))
-    } catch (e: any) {
-      if (e instanceof SyntaxError) die(`Invalid JSON params: ${e.message}`)
-      die(e.message)
+    // Parse params separately — SyntaxError needs a specific message
+    let params: unknown
+    if (args.positionals[0]) {
+      try { params = JSON.parse(args.positionals[0]) }
+      catch { throw new Error(`Invalid JSON params: ${args.positionals[0]}`) }
     }
+    const result = await client.cdp(sessionId, method, params)
+    console.log(JSON.stringify(result.result, null, 2))
   },
 })
 
@@ -83,24 +81,22 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const type = args.subcommand
-    if (!type) die('Usage: runbrowser diff <snapshot|screenshot>')
+    if (!type) throw new Error('Usage: runbrowser diff <snapshot|screenshot>')
     const { sessionId, client } = await resolveSession(args)
-    try {
-      if (type === 'snapshot') {
-        const baseline = args.flags.get('baseline') as string | undefined
-        const r = await client.diffSnapshot(sessionId, baseline)
-        if (args.json) console.log(JSON.stringify(r))
-        else console.log(r.diff)
-      } else if (type === 'screenshot') {
-        const baseline = args.flags.get('baseline') as string
-        if (!baseline) die('--baseline is required for screenshot diff')
-        const out = args.flags.get('output') as string | undefined
-        const r = await client.diffScreenshot(sessionId, baseline, out)
-        if (args.json) console.log(JSON.stringify(r))
-        else console.log(`Diff saved to ${r.path}`)
-      } else {
-        die(`Unknown diff type: ${type}. Use: snapshot, screenshot`)
-      }
-    } catch (e: any) { die(e.message) }
+    if (type === 'snapshot') {
+      const baseline = args.flags.get('baseline') as string | undefined
+      const r = await client.diffSnapshot(sessionId, baseline)
+      if (args.json) console.log(JSON.stringify(r))
+      else console.log(r.diff)
+    } else if (type === 'screenshot') {
+      const baseline = args.flags.get('baseline') as string
+      if (!baseline) throw new Error('--baseline is required for screenshot diff')
+      const out = args.flags.get('output') as string | undefined
+      const r = await client.diffScreenshot(sessionId, baseline, out)
+      if (args.json) console.log(JSON.stringify(r))
+      else console.log(`Diff saved to ${r.path}`)
+    } else {
+      throw new Error(`Unknown diff type: ${type}. Use: snapshot, screenshot`)
+    }
   },
 })

@@ -2,7 +2,7 @@
  * CDP-based screenshot capture.
  */
 
-export type SendCDP = (method: string, params?: unknown) => Promise<unknown>
+import type { SendCDP } from './commands.js'
 
 /**
  * Capture a screenshot of the current page via CDP.

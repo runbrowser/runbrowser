@@ -1,0 +1,398 @@
+---
+title: "RunBrowser - エージェントが実際のブラウザを操作できる Chrome 拡張機能と CLI"
+description: "Chrome 拡張機能と CLI で、エージェントがあなたの実際のブラウザを操作。ログイン状態、拡張機能、Cookie はすべてそのまま。ヘッドレスインスタンス不要、ボット検出なし。"
+toc:
+  - label: "はじめに"
+    href: "#getting-started"
+  - label: "仕組み"
+    href: "#how-it-works"
+  - label: "コラボレーション"
+    href: "#collaboration"
+  - label: "スナップショット"
+    href: "#snapshots"
+  - label: "ビジュアルラベル"
+    href: "#visual-labels"
+  - label: "セッション"
+    href: "#sessions"
+  - label: "CLI コマンド"
+    href: "#cli-commands"
+  - label: "サイトコマンド"
+    href: "#site-commands"
+  - label: "デバッガとエディタ"
+    href: "#debugger-and-editor"
+  - label: "ネットワーク傍受"
+    href: "#network-interception"
+  - label: "画面録画"
+    href: "#screen-recording"
+  - label: "比較"
+    href: "#comparison"
+  - label: "リモートアクセス"
+    href: "#remote-access"
+  - label: "セキュリティ"
+    href: "#security"
+---
+
+Chrome 拡張機能と CLI で、エージェントが**あなたの実際のブラウザ**を操作できます — ログイン状態、拡張機能、Cookie はすべてそのまま。ヘッドレスインスタンス不要、ボット検出なし、余分なメモリ消費なし。[GitHub で Star](https://github.com/yuanjiwei/runbrowser)。
+
+他のブラウザ MCP は**新しい Chrome を起動**するか、エージェントに固定のツールセットを提供します。新しい Chrome はログイン状態なし、拡張機能なし、即座にボット検出、メモリ2倍。固定ツールではパフォーマンス分析、ブレークポイント設定、ネットワークリクエスト傍受ができません — 誰かが公開すると決めた機能しか使えません。
+
+RunBrowser は高レベル CLI コマンドと Playwright `execute` ツールで**完全な CDP アクセス**を提供します。コンテキスト使用量が少なく、大量のツール定義によるスキーマ膨張なし。既存のブラウザで動作するため、**追加のプロセスは起動されません**。
+
+<Section id="getting-started" title="はじめに">
+
+**4ステップ**でエージェントがブラウジングを開始できます。
+
+1. Chrome に拡張機能をロード：`chrome://extensions/` を開き、デベロッパーモードを有効化、**パッケージ化されていない拡張機能を読み込む**をクリックし、`packages/extension/dist` フォルダを選択
+2. タブで拡張機能アイコンをクリック — 緑色に変わります
+3. CLI をインストール：
+
+```bash
+npm i -g @jiweiyuan/runbrowser
+```
+
+次に **skill** をインストール — エージェントに RunBrowser の使い方を教えます：どのセレクタを使うか、タイムアウトの回避方法、スナップショットの読み方、利用可能なすべてのユーティリティ。
+
+```bash
+npx -y skills add yuanjiwei/runbrowser
+```
+
+拡張機能はブラウザを `localhost:19988` の**ローカル WebSocket リレーサーバー**に接続します。CLI はリレー経由で CDP コマンドを送信します。リモートサーバーなし、アカウント不要、すべてがあなたのマシン上で完結します。
+
+```bash
+runbrowser session-new              # new sandbox, outputs id (e.g. 1)
+runbrowser navigate https://example.com -s 1
+runbrowser snapshot -s 1
+runbrowser click @e5 -s 1
+```
+
+<Caption>拡張機能アイコン緑 = 接続済み。グレー = このタブに未接続。</Caption>
+
+</Section>
+
+<Section id="how-it-works" title="仕組み">
+
+タブで拡張機能アイコンをクリック — `chrome.debugger` でアタッチし、ローカルリレーへの WebSocket を開きます。エージェント（CLI または MCP）は同じリレーに接続します。**CDP コマンドが流れます**；拡張機能がコマンドを Chrome に転送し、レスポンスを返します。Chrome の再起動不要、特別な設定不要。
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│   BROWSER           │     │   LOCALHOST          │     │   CLIENT        │
+│                     │     │                      │     │                 │
+│  ┌───────────────┐  │     │ WebSocket Server     │     │  ┌───────────┐  │
+│  │   Extension   │<───────┬───>  :19988          │     │  │ CLI / MCP │  │
+│  └───────┬───────┘  │ WS  │                      │     │  └───────────┘  │
+│          │          │     │  /extension          │     │        │        │
+│    chrome.debugger  │     │       │              │     │        v        │
+│          v          │     │       v              │     │  ┌────────────┐ │
+│  ┌───────────────┐  │     │  /cdp/:id <───────────────>│  │  CDP API   │ │
+│  │ Tab 1 (green) │  │     └──────────────────────┘  WS │  └────────────┘ │
+│  │ Tab 2 (green) │  │                                  │        │        │
+│  │ Tab 3 (gray)  │  │     Tab 3 not controlled         │  Playwright API │
+└─────────────────────┘     (extension not clicked)      └─────────────────┘`}
+</CodeBlock>
+
+リレーは**セッションを多重化**するため、複数のエージェントや CLI インスタンスが同時に同じブラウザで作業できます。
+
+</Section>
+
+<Section id="collaboration" title="コラボレーション">
+
+エージェントは**あなたのブラウザ**で動作するため、コラボレーションできます。エージェントの操作をリアルタイムで確認できます。CAPTCHA に遭遇したら**あなたが解決**します。Cookie 同意ウォールが表示されたらクリックして通過します。エージェントが詰まったら、そのタブで拡張機能を無効化し、手動で修正し、再有効化すれば、エージェントは中断したところから再開します。
+
+リモート画面を見たり事後のログを読んだりするのではありません。**ブラウザを共有**しています — エージェントが反復作業を行い、人間の介入が必要な時にあなたが対応します。
+
+</Section>
+
+<Section id="snapshots" title="アクセシビリティスナップショット">
+
+エージェントは操作する前にページを**見る**必要があります。アクセシビリティスナップショットは、すべてのインタラクティブ要素を `@ref` ラベル付きのテキストで返します。スクリーンショットの **100KB+ ではなく 5–20KB** — より安く、より速く、ビジョンなしで解析できます。
+
+```bash
+runbrowser snapshot -s 1
+
+# Output:
+# - banner:
+#     - link "Home" @e1
+#     - navigation:
+#         - link "Docs" @e2
+#         - link "Blog" @e3
+```
+
+各行末の **@ref** は `runbrowser click` に直接渡せます。スナップショットを**ページを読む主な方法**として使用してください。空間レイアウトが重要な場合のみスクリーンショットを使用 — グリッド、ダッシュボード、マップ。
+
+```bash
+# Click using refs from snapshot
+runbrowser click @e3 -s 1
+
+# Or via exec with Playwright
+runbrowser exec -s 1 -e 'await snapshot({ page: state.page, search: /button|submit/i })'
+```
+
+</Section>
+
+<Section id="visual-labels" title="ビジュアルラベル">
+
+エージェントが**画面上の要素の位置**を理解する必要がある場合、`screenshotWithAccessibilityLabels` がすべてのインタラクティブ要素に **Vimium スタイルのラベル**をオーバーレイします。
+
+```bash
+runbrowser screenshot -s 1 --output shot.png
+# Or with Playwright exec:
+runbrowser exec -s 1 -e 'await screenshotWithAccessibilityLabels({ page: state.page })'
+```
+
+ラベルは**要素タイプ別に色分け**：リンクは黄色、ボタンはオレンジ、入力はコーラル、チェックボックスはピンク、スライダーはピーチ、メニューはサーモン、タブはアンバー。
+
+<Caption>Vimium スタイルラベル。1回の呼び出しでスクリーンショット + スナップショット。</Caption>
+
+</Section>
+
+<Section id="sessions" title="セッション">
+
+**複数のエージェントを同時実行**して互いに干渉しません。各セッションは独自の `state` オブジェクトを持つ分離されたサンドボックスです。変数、ページ、リスナーは呼び出し間で永続化します。ブラウザタブは共有されますが、状態は共有されません。
+
+```bash
+runbrowser session-new    # => 1
+runbrowser session-new    # => 2
+runbrowser session-list   # shows sessions + state keys
+
+# Session 1 stores data
+runbrowser exec -s 1 -e 'state.users = await state.page.$$eval(".user", els => els.map(e => e.textContent))'
+
+# Session 2 can't see it
+runbrowser exec -s 2 -e 'console.log(state.users)'  # undefined
+```
+
+他のエージェントからの**干渉を避ける**ために独自のページを作成してください。既存の `about:blank` タブを再利用するか新しいタブを作成し、`state` に保存します。
+
+```bash
+runbrowser exec -s 1 -e 'state.page = context.pages().find(p => p.url() === "about:blank") ?? await context.newPage(); await state.page.goto("https://example.com")'
+```
+
+</Section>
+
+<Section id="cli-commands" title="CLI コマンド">
+
+RunBrowser は Playwright の知識不要の**高レベルコマンド**と、完全な Playwright API アクセスのための低レベル `exec` コマンドを提供します。
+
+```bash
+# Navigation
+runbrowser navigate https://example.com -s 1
+runbrowser back -s 1
+runbrowser forward -s 1
+runbrowser reload -s 1
+
+# Observation
+runbrowser snapshot -s 1
+runbrowser screenshot -s 1 --output shot.png
+runbrowser get-url -s 1
+runbrowser get-title -s 1
+
+# Interaction
+runbrowser click @e5 -s 1
+runbrowser fill @e3 "hello world" -s 1
+runbrowser type "search query" -s 1
+runbrowser press Enter -s 1
+runbrowser scroll down -s 1
+runbrowser hover @e2 -s 1
+
+# Wait for conditions
+runbrowser wait @e5 -s 1
+runbrowser wait 2000 -s 1
+runbrowser wait --text "Welcome" -s 1
+runbrowser wait --url "**/dashboard" -s 1
+
+# Browser JS evaluation
+runbrowser evaluate 'document.title' -s 1
+
+# Full Playwright access
+runbrowser exec -s 1 -e 'await state.page.goto("https://example.com")'
+```
+
+<Caption>一般的な操作用の高レベルコマンド。その他すべてに exec。</Caption>
+
+</Section>
+
+<Section id="site-commands" title="サイトコマンド">
+
+任意のウェブサイトを **CLI コマンド**に変換できます。サイトコマンドは TypeScript プラグインで、ナビゲーション、スクレイピング、データ抽出を再利用可能なコマンドにカプセル化します。エージェントにナビゲート → スナップショット → パースさせる代わりに、1つのコマンドで**構造化 JSON** を取得できます。
+
+```bash
+# Get GitHub trending repos as structured data
+runbrowser github trending --limit 5
+
+# RANK  NAME                 STARS   LANGUAGE
+# ---   ----                 -----   --------
+# 1     denoland/deno        5.2k    Rust
+# 2     tauri-apps/tauri     3.8k    Rust
+# 3     nickel-org/nickel    2.1k    Rust
+
+# JSON output for agents
+runbrowser github trending --limit 3 --json
+```
+
+`~/.runbrowser/commands/` に `.ts` ファイルを置くだけで**独自コマンドを作成**できます。完全な TypeScript、完全な IDE サポート、YAML ラッパー不要。
+
+```typescript
+// ~/.runbrowser/commands/github/trending.ts
+import { command } from '@jiweiyuan/commands'
+
+export default command({
+  site: 'github',
+  name: 'trending',
+  description: 'GitHub trending repositories',
+  args: {
+    limit: { type: 'number', default: 20, description: 'Number of items' },
+    language: { type: 'string', description: 'Filter by language' },
+  },
+  columns: ['rank', 'name', 'stars', 'language'],
+
+  async run(browser, args) {
+    await browser.navigate('https://github.com/trending')
+    const data = await browser.evaluate(`
+      [...document.querySelectorAll('article.Box-row')].map(el => ({
+        name: el.querySelector('h2 a')?.textContent?.trim(),
+        stars: el.querySelector('.octicon-star')?.parentElement?.textContent?.trim(),
+        language: el.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim(),
+      }))
+    `)
+    return data.slice(0, args.limit).map((item, i) => ({ rank: i + 1, ...item }))
+  },
+})
+```
+
+コマンドはリレーサーバーが jiti 経由で**ロード**します — CLI は HTTP クライアントに過ぎません。エージェントは MCP `skill` でコマンドを発見し、`run` で実行します。出力は `--json`、`--csv`、テーブル、markdown 形式に対応。
+
+<Caption>TypeScript プラグイン。構造化データ。ナビゲート → スナップショット → パースの代わりに1コマンド。</Caption>
+
+</Section>
+
+<Section id="debugger-and-editor" title="デバッガとエディタ">
+
+他のブラウザ MCP にはできないこと。**ブレークポイント設定**、コードのステップ実行、実行時の変数検査。リロードなしで**ページスクリプトと CSS をライブ編集**。完全な Chrome DevTools Protocol アクセス。
+
+```bash
+# Set breakpoints and debug
+runbrowser exec -s 1 -e 'state.cdp = await getCDPSession({ page: state.page }); state.dbg = createDebugger({ cdp: state.cdp }); await state.dbg.enable()'
+runbrowser exec -s 1 -e 'state.scripts = await state.dbg.listScripts({ search: "app" }); console.log(state.scripts.map(s => s.url))'
+runbrowser exec -s 1 -e 'await state.dbg.setBreakpoint({ file: state.scripts[0].url, line: 42 })'
+
+# Live edit page code
+runbrowser exec -s 1 -e 'state.editor = createEditor({ cdp: state.cdp }); await state.editor.enable()'
+runbrowser exec -s 1 -e 'await state.editor.edit({ url: "https://example.com/app.js", oldString: "const DEBUG = false", newString: "const DEBUG = true" })'
+```
+
+編集は**メモリ内**で、ページリロードまで永続化します。デバッグフラグの切り替え、壊れたコードの修正、ソースファイルに触れずにクイックフィックスのテストに便利です。
+
+<Caption>ブレークポイント、ステップ実行、変数検査 — すべて CLI から。</Caption>
+
+</Section>
+
+<Section id="network-interception" title="ネットワーク傍受">
+
+エージェントに**ネットワークトラフィックを監視**させ、API のリバースエンジニアリング、JavaScript レンダリング背後のデータスクレイピング、失敗リクエストのデバッグができます。キャプチャしたデータは `state` に保存され、呼び出し間で永続化します。
+
+```bash
+# Start intercepting
+runbrowser exec -s 1 -e 'state.responses = []; state.page.on("response", async res => { if (res.url().includes("/api/")) { try { state.responses.push({ url: res.url(), status: res.status(), body: await res.json() }); } catch {} } })'
+
+# Trigger actions, then analyze
+runbrowser exec -s 1 -e 'await state.page.click("button.load-more")'
+runbrowser exec -s 1 -e 'console.log("Captured", state.responses.length, "API calls"); state.responses.forEach(r => console.log(r.status, r.url.slice(0, 80)))'
+```
+
+**DOM スクレイピングより高速。** エージェントは実際の API コールをキャプチャし、スキーマを検査し、異なるパラメータで再生します。
+
+</Section>
+
+<Section id="screen-recording" title="画面録画">
+
+エージェントの**操作を MP4 動画として録画**できます。録画は `chrome.tabCapture` を使用し拡張機能コンテキストで実行されるため、**ページナビゲーション後も継続**します。
+
+```bash
+# Start recording
+runbrowser exec -s 1 -e 'await recording.start({ page: state.page, outputPath: "./recording.mp4", frameRate: 30 })'
+
+# Navigate, interact — recording continues
+runbrowser exec -s 1 -e 'await state.page.click("a"); await state.page.waitForLoadState("domcontentloaded")'
+
+# Stop and save
+runbrowser exec -s 1 -e 'const result = await recording.stop({ page: state.page }); console.log(result.path, result.duration + "ms")'
+```
+
+`getDisplayMedia` と異なり、このアプローチは**ナビゲーション間で永続化**します。拡張機能が `MediaRecorder` を保持するため、ページではありません。
+
+<Caption>ネイティブタブキャプチャ。30–60fps。ナビゲーション間で永続化。</Caption>
+
+</Section>
+
+<Section id="comparison" title="比較">
+
+なぜ代替手段よりこれを使うのか。
+
+<ComparisonTable
+  title="vs Playwright MCP"
+  headers={['', 'Playwright MCP', 'RunBrowser']}
+  rows={[
+    ['ブラウザ', '新しい Chrome を起動', 'あなたの Chrome を使用'],
+    ['拡張機能', 'なし', '既存の拡張機能'],
+    ['ログイン状態', '新規', 'ログイン済み'],
+    ['ボット検出', '常に検出される', 'バイパス可能'],
+    ['コラボレーション', '別ウィンドウ', 'ユーザーと同じブラウザ'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs BrowserMCP"
+  headers={['', 'BrowserMCP', 'RunBrowser']}
+  rows={[
+    ['ツール', '12+ 専用ツール', '高レベル CLI + exec'],
+    ['API', '限定的な操作', '完全な CDP + Playwright'],
+    ['コンテキスト使用量', '高（ツールスキーマ）', '低'],
+    ['LLM 知識', 'ツールの学習が必要', 'Playwright を既に理解'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs Claude Browser Extension"
+  headers={['', 'Claude Extension', 'RunBrowser']}
+  rows={[
+    ['エージェント対応', 'Claude のみ', '任意の MCP クライアント'],
+    ['Windows WSL', 'いいえ', 'はい'],
+    ['コンテキスト方法', 'スクリーンショット (100KB+)', 'A11y スナップショット (5–20KB)'],
+    ['Playwright API', 'いいえ', '完全'],
+    ['デバッガ', 'いいえ', 'はい'],
+    ['ライブコード編集', 'いいえ', 'はい'],
+    ['ネットワーク傍受', '限定的', '完全'],
+    ['生 CDP アクセス', 'いいえ', 'はい'],
+  ]}
+/>
+
+</Section>
+
+<Section id="remote-access" title="リモートアクセス">
+
+**リモートマシン**上の Chrome を制御 — ヘッドレス Mac mini、クラウド VM、開発コンテナ。`RUNBROWSER_HOST` と `RUNBROWSER_TOKEN` 環境変数を設定。**VPN 不要、ファイアウォールルール不要、ポートフォワーディング不要。**
+
+```bash
+# On the host machine — start relay server
+runbrowser serve --host 0.0.0.0 --token <secret>
+
+# From anywhere — set env vars and use normally
+export RUNBROWSER_HOST=192.168.1.10
+export RUNBROWSER_TOKEN=<secret>
+runbrowser navigate https://example.com -s 1
+```
+
+**開発コンテナや Docker** にも対応 — `RUNBROWSER_HOST=host.docker.internal` を使用。MCP でも動作 — MCP クライアントの環境設定で `RUNBROWSER_HOST` と `RUNBROWSER_TOKEN` を設定。
+
+</Section>
+
+<Section id="security" title="セキュリティ">
+
+すべてが**あなたのマシン上**で実行されます。リレーは `localhost:19988` にバインドし、拡張機能からの接続のみを受け付けます。リモートサーバーなし、アカウント不要、テレメトリなし。
+
+- **ローカルのみ** — WebSocket サーバーは localhost にバインド。データはマシンから出ません。
+- **オリジン検証** — RunBrowser 拡張機能のオリジンのみ受け付けます。ブラウザは Origin ヘッダーを偽装できないため、悪意のあるウェブサイトは接続できません。
+- **明示的な同意** — 拡張機能アイコンをクリックしたタブのみが制御されます。バックグラウンドアクセスなし。
+- **可視化された自動化** — Chrome は制御されたタブに自動化バナーを表示します。
+
+</Section>

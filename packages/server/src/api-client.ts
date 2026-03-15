@@ -6,7 +6,7 @@
  */
 
 import { parseRelayHost } from './utils.js'
-import { RELAY_PORT, type ExtensionStatus, ensureRelayServer, waitForConnectedExtensions, getExtensionStatus, getExtensionOutdatedWarning } from './client.js'
+import { RELAY_PORT, type ExtensionStatus, ensureRelayServer, waitForConnectedExtensions } from './client.js'
 
 // ============================================================================
 // Types

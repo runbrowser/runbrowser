@@ -1,0 +1,398 @@
+---
+title: "RunBrowser - 让 Agent 控制你的真实浏览器的 Chrome 扩展和 CLI"
+description: "Chrome 扩展和 CLI，让你的 Agent 控制你的实际浏览器。登录状态、扩展、Cookie 都在。无需无头实例，不会被反爬虫检测。"
+toc:
+  - label: "快速开始"
+    href: "#getting-started"
+  - label: "工作原理"
+    href: "#how-it-works"
+  - label: "人机协作"
+    href: "#collaboration"
+  - label: "快照"
+    href: "#snapshots"
+  - label: "可视化标签"
+    href: "#visual-labels"
+  - label: "会话"
+    href: "#sessions"
+  - label: "CLI 命令"
+    href: "#cli-commands"
+  - label: "站点命令"
+    href: "#site-commands"
+  - label: "调试器和编辑器"
+    href: "#debugger-and-editor"
+  - label: "网络拦截"
+    href: "#network-interception"
+  - label: "屏幕录制"
+    href: "#screen-recording"
+  - label: "对比"
+    href: "#comparison"
+  - label: "远程访问"
+    href: "#remote-access"
+  - label: "安全性"
+    href: "#security"
+---
+
+一个 Chrome 扩展和 CLI，让你的 Agent 控制**你的真实浏览器** —— 登录状态、扩展、Cookie 都已就绪。无需启动无头实例，不会被反爬虫检测，不占用额外内存。[在 GitHub 上 Star](https://github.com/yuanjiwei/runbrowser)。
+
+其他浏览器 MCP 要么**启动一个全新的 Chrome**，要么给 Agent 一组固定的工具。新 Chrome 意味着没有登录状态、没有扩展、立即被反爬虫检测、双倍内存占用。固定工具意味着 Agent 无法分析性能、无法设置断点、无法拦截网络请求 —— 它只能做别人决定暴露出来的功能。
+
+RunBrowser 通过高级 CLI 命令和 Playwright `execute` 工具为 Agent 提供**完整的 CDP 访问**。低上下文占用，没有大量工具定义带来的 schema 膨胀。而且它运行在你现有的浏览器中，**不会额外启动任何进程**。
+
+<Section id="getting-started" title="快速开始">
+
+**四步**即可让你的 Agent 开始浏览。
+
+1. 在 Chrome 中加载扩展：打开 `chrome://extensions/`，启用开发者模式，点击**加载已解压的扩展程序**，选择 `packages/extension/dist` 文件夹
+2. 在标签页上点击扩展图标 —— 它会变成绿色
+3. 安装 CLI：
+
+```bash
+npm i -g @jiweiyuan/runbrowser
+```
+
+然后安装 **skill** —— 它会教你的 Agent 如何使用 RunBrowser：使用哪些选择器、如何避免超时、如何读取快照，以及所有可用的工具函数。
+
+```bash
+npx -y skills add yuanjiwei/runbrowser
+```
+
+扩展将你的浏览器连接到 `localhost:19988` 上的**本地 WebSocket 中继服务器**。CLI 通过中继发送 CDP 命令。没有远程服务器、没有账户，一切都在你的机器上。
+
+```bash
+runbrowser session-new              # new sandbox, outputs id (e.g. 1)
+runbrowser navigate https://example.com -s 1
+runbrowser snapshot -s 1
+runbrowser click @e5 -s 1
+```
+
+<Caption>扩展图标绿色 = 已连接。灰色 = 未连接到此标签页。</Caption>
+
+</Section>
+
+<Section id="how-it-works" title="工作原理">
+
+在标签页上点击扩展图标 —— 它通过 `chrome.debugger` 连接并打开一个 WebSocket 到本地中继。你的 Agent（CLI 或 MCP）连接到同一个中继。**CDP 命令在其中流转**；扩展将命令转发给 Chrome 并将响应返回。无需重启 Chrome，无需特殊配置。
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│   BROWSER           │     │   LOCALHOST          │     │   CLIENT        │
+│                     │     │                      │     │                 │
+│  ┌───────────────┐  │     │ WebSocket Server     │     │  ┌───────────┐  │
+│  │   Extension   │<───────┬───>  :19988          │     │  │ CLI / MCP │  │
+│  └───────┬───────┘  │ WS  │                      │     │  └───────────┘  │
+│          │          │     │  /extension          │     │        │        │
+│    chrome.debugger  │     │       │              │     │        v        │
+│          v          │     │       v              │     │  ┌────────────┐ │
+│  ┌───────────────┐  │     │  /cdp/:id <───────────────>│  │  CDP API   │ │
+│  │ Tab 1 (green) │  │     └──────────────────────┘  WS │  └────────────┘ │
+│  │ Tab 2 (green) │  │                                  │        │        │
+│  │ Tab 3 (gray)  │  │     Tab 3 not controlled         │  Playwright API │
+└─────────────────────┘     (extension not clicked)      └─────────────────┘`}
+</CodeBlock>
+
+中继**多路复用会话**，因此多个 Agent 或 CLI 实例可以同时操作同一个浏览器。
+
+</Section>
+
+<Section id="collaboration" title="人机协作">
+
+因为 Agent 在**你的浏览器**中工作，所以你可以协作。你能实时看到它做的一切。当它遇到验证码时，**你来解决**。当出现 Cookie 同意弹窗时，你点击通过。当 Agent 卡住时，你在该标签页上禁用扩展，手动修复问题，重新启用扩展，Agent 就能从中断处继续。
+
+你不是在看远程屏幕或事后查看日志。你在**共享浏览器** —— Agent 做重复性工作，你在需要人工干预时介入。
+
+</Section>
+
+<Section id="snapshots" title="无障碍快照">
+
+你的 Agent 在操作之前需要**看到页面**。无障碍快照以文本形式返回每个可交互元素，并附带 `@ref` 标签。**5–20KB 而非 100KB+** 的截图 —— 更便宜、更快，Agent 无需视觉能力即可解析。
+
+```bash
+runbrowser snapshot -s 1
+
+# Output:
+# - banner:
+#     - link "Home" @e1
+#     - navigation:
+#         - link "Docs" @e2
+#         - link "Blog" @e3
+```
+
+每行末尾的 **@ref** 可以直接传给 `runbrowser click`。将快照作为**读取页面的主要方式**。只在需要空间布局信息时才使用截图 —— 网格、仪表盘、地图。
+
+```bash
+# Click using refs from snapshot
+runbrowser click @e3 -s 1
+
+# Or via exec with Playwright
+runbrowser exec -s 1 -e 'await snapshot({ page: state.page, search: /button|submit/i })'
+```
+
+</Section>
+
+<Section id="visual-labels" title="可视化标签">
+
+当 Agent 需要了解**元素在屏幕上的位置**时，`screenshotWithAccessibilityLabels` 会在每个可交互元素上叠加 **Vimium 风格的标签**。Agent 查看截图，读取标签，然后通过引用点击。
+
+```bash
+runbrowser screenshot -s 1 --output shot.png
+# Or with Playwright exec:
+runbrowser exec -s 1 -e 'await screenshotWithAccessibilityLabels({ page: state.page })'
+```
+
+标签按**元素类型着色**：黄色表示链接，橙色表示按钮，珊瑚色表示输入框，粉色表示复选框，桃色表示滑块，鲑鱼色表示菜单，琥珀色表示标签页。
+
+<Caption>Vimium 风格标签。一次调用获取截图 + 快照。</Caption>
+
+</Section>
+
+<Section id="sessions" title="会话">
+
+**同时运行多个 Agent** 而互不干扰。每个会话是一个隔离的沙箱，拥有自己的 `state` 对象。变量、页面和监听器在调用之间持久化。浏览器标签页是共享的，但状态不是。
+
+```bash
+runbrowser session-new    # => 1
+runbrowser session-new    # => 2
+runbrowser session-list   # shows sessions + state keys
+
+# Session 1 stores data
+runbrowser exec -s 1 -e 'state.users = await state.page.$$eval(".user", els => els.map(e => e.textContent))'
+
+# Session 2 can't see it
+runbrowser exec -s 2 -e 'console.log(state.users)'  # undefined
+```
+
+创建你自己的页面以**避免被其他 Agent 干扰**。复用现有的 `about:blank` 标签页或创建新的，然后存入 `state`。
+
+```bash
+runbrowser exec -s 1 -e 'state.page = context.pages().find(p => p.url() === "about:blank") ?? await context.newPage(); await state.page.goto("https://example.com")'
+```
+
+</Section>
+
+<Section id="cli-commands" title="CLI 命令">
+
+RunBrowser 提供无需 Playwright 知识的**高级命令**，以及用于完整 Playwright API 访问的低级 `exec` 命令。
+
+```bash
+# Navigation
+runbrowser navigate https://example.com -s 1
+runbrowser back -s 1
+runbrowser forward -s 1
+runbrowser reload -s 1
+
+# Observation
+runbrowser snapshot -s 1
+runbrowser screenshot -s 1 --output shot.png
+runbrowser get-url -s 1
+runbrowser get-title -s 1
+
+# Interaction
+runbrowser click @e5 -s 1
+runbrowser fill @e3 "hello world" -s 1
+runbrowser type "search query" -s 1
+runbrowser press Enter -s 1
+runbrowser scroll down -s 1
+runbrowser hover @e2 -s 1
+
+# Wait for conditions
+runbrowser wait @e5 -s 1
+runbrowser wait 2000 -s 1
+runbrowser wait --text "Welcome" -s 1
+runbrowser wait --url "**/dashboard" -s 1
+
+# Browser JS evaluation
+runbrowser evaluate 'document.title' -s 1
+
+# Full Playwright access
+runbrowser exec -s 1 -e 'await state.page.goto("https://example.com")'
+```
+
+<Caption>高级命令用于常见操作。exec 用于其他一切。</Caption>
+
+</Section>
+
+<Section id="site-commands" title="站点命令">
+
+将任何网站变成一个 **CLI 命令**。站点命令是 TypeScript 插件，将导航、抓取和数据提取封装成可复用的命令。无需让 Agent 逐步导航、快照、解析 —— 运行一个命令，直接获得**结构化 JSON**。
+
+```bash
+# Get GitHub trending repos as structured data
+runbrowser github trending --limit 5
+
+# RANK  NAME                 STARS   LANGUAGE
+# ---   ----                 -----   --------
+# 1     denoland/deno        5.2k    Rust
+# 2     tauri-apps/tauri     3.8k    Rust
+# 3     nickel-org/nickel    2.1k    Rust
+
+# JSON output for agents
+runbrowser github trending --limit 3 --json
+```
+
+将 `.ts` 文件放入 `~/.runbrowser/commands/` 即可**编写自定义命令**。完整 TypeScript，完整 IDE 支持，无需 YAML 封装。
+
+```typescript
+// ~/.runbrowser/commands/github/trending.ts
+import { command } from '@jiweiyuan/commands'
+
+export default command({
+  site: 'github',
+  name: 'trending',
+  description: 'GitHub trending repositories',
+  args: {
+    limit: { type: 'number', default: 20, description: 'Number of items' },
+    language: { type: 'string', description: 'Filter by language' },
+  },
+  columns: ['rank', 'name', 'stars', 'language'],
+
+  async run(browser, args) {
+    await browser.navigate('https://github.com/trending')
+    const data = await browser.evaluate(`
+      [...document.querySelectorAll('article.Box-row')].map(el => ({
+        name: el.querySelector('h2 a')?.textContent?.trim(),
+        stars: el.querySelector('.octicon-star')?.parentElement?.textContent?.trim(),
+        language: el.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim(),
+      }))
+    `)
+    return data.slice(0, args.limit).map((item, i) => ({ rank: i + 1, ...item }))
+  },
+})
+```
+
+命令由**中继服务器**通过 jiti 加载 —— CLI 只是一个 HTTP 客户端。Agent 通过 MCP `skill` 发现命令，通过 `run` 执行。输出支持 `--json`、`--csv`、表格和 markdown 格式。
+
+<Caption>TypeScript 插件。结构化数据。一个命令替代 导航 → 快照 → 解析。</Caption>
+
+</Section>
+
+<Section id="debugger-and-editor" title="调试器和编辑器">
+
+其他浏览器 MCP 做不到的事。**设置断点**，单步调试代码，运行时检查变量。**实时编辑页面脚本和 CSS** 而无需重新加载。完整的 Chrome DevTools 协议访问，不是阉割版。
+
+```bash
+# Set breakpoints and debug
+runbrowser exec -s 1 -e 'state.cdp = await getCDPSession({ page: state.page }); state.dbg = createDebugger({ cdp: state.cdp }); await state.dbg.enable()'
+runbrowser exec -s 1 -e 'state.scripts = await state.dbg.listScripts({ search: "app" }); console.log(state.scripts.map(s => s.url))'
+runbrowser exec -s 1 -e 'await state.dbg.setBreakpoint({ file: state.scripts[0].url, line: 42 })'
+
+# Live edit page code
+runbrowser exec -s 1 -e 'state.editor = createEditor({ cdp: state.cdp }); await state.editor.enable()'
+runbrowser exec -s 1 -e 'await state.editor.edit({ url: "https://example.com/app.js", oldString: "const DEBUG = false", newString: "const DEBUG = true" })'
+```
+
+编辑是**内存中的**，在页面重新加载前持久化。适用于切换调试标志、修补损坏的代码或测试快速修复，无需触碰源文件。
+
+<Caption>断点、单步调试、变量检查 —— 全部通过 CLI 完成。</Caption>
+
+</Section>
+
+<Section id="network-interception" title="网络拦截">
+
+让 Agent **监控网络流量**，逆向工程 API、抓取 JavaScript 渲染背后的数据或调试失败的请求。捕获的数据存在 `state` 中，跨调用持久化。
+
+```bash
+# Start intercepting
+runbrowser exec -s 1 -e 'state.responses = []; state.page.on("response", async res => { if (res.url().includes("/api/")) { try { state.responses.push({ url: res.url(), status: res.status(), body: await res.json() }); } catch {} } })'
+
+# Trigger actions, then analyze
+runbrowser exec -s 1 -e 'await state.page.click("button.load-more")'
+runbrowser exec -s 1 -e 'console.log("Captured", state.responses.length, "API calls"); state.responses.forEach(r => console.log(r.status, r.url.slice(0, 80)))'
+```
+
+**比抓取 DOM 更快。** Agent 捕获真实的 API 调用，检查它们的 schema，然后用不同参数重放。
+
+</Section>
+
+<Section id="screen-recording" title="屏幕录制">
+
+让 Agent **录制它正在做的事情**为 MP4 视频。录制使用 `chrome.tabCapture` 并在扩展上下文中运行，因此它**在页面导航时不会中断**。
+
+```bash
+# Start recording
+runbrowser exec -s 1 -e 'await recording.start({ page: state.page, outputPath: "./recording.mp4", frameRate: 30 })'
+
+# Navigate, interact — recording continues
+runbrowser exec -s 1 -e 'await state.page.click("a"); await state.page.waitForLoadState("domcontentloaded")'
+
+# Stop and save
+runbrowser exec -s 1 -e 'const result = await recording.stop({ page: state.page }); console.log(result.path, result.duration + "ms")'
+```
+
+与 `getDisplayMedia` 不同，这种方式**跨页面导航持久化**，因为扩展持有 `MediaRecorder`，而不是页面。
+
+<Caption>原生标签页捕获。30–60fps。跨导航持久化。</Caption>
+
+</Section>
+
+<Section id="comparison" title="对比">
+
+为什么选择 RunBrowser 而不是其他方案。
+
+<ComparisonTable
+  title="vs Playwright MCP"
+  headers={['', 'Playwright MCP', 'RunBrowser']}
+  rows={[
+    ['浏览器', '启动新 Chrome', '使用你的 Chrome'],
+    ['扩展', '无', '你现有的扩展'],
+    ['登录状态', '全新', '已登录'],
+    ['反爬虫检测', '总是被检测', '可以绕过'],
+    ['协作', '独立窗口', '与用户共享浏览器'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs BrowserMCP"
+  headers={['', 'BrowserMCP', 'RunBrowser']}
+  rows={[
+    ['工具', '12+ 专用工具', '高级 CLI + exec'],
+    ['API', '有限操作', '完整 CDP + Playwright'],
+    ['上下文占用', '高（工具 schema）', '低'],
+    ['LLM 知识', '需要学习工具', '已熟悉 Playwright'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs Claude 浏览器扩展"
+  headers={['', 'Claude 扩展', 'RunBrowser']}
+  rows={[
+    ['Agent 支持', '仅 Claude', '任何 MCP 客户端'],
+    ['Windows WSL', '否', '是'],
+    ['上下文方法', '截图 (100KB+)', '无障碍快照 (5–20KB)'],
+    ['Playwright API', '否', '完整'],
+    ['调试器', '否', '是'],
+    ['实时代码编辑', '否', '是'],
+    ['网络拦截', '有限', '完整'],
+    ['原始 CDP 访问', '否', '是'],
+  ]}
+/>
+
+</Section>
+
+<Section id="remote-access" title="远程访问">
+
+在**远程机器**上控制 Chrome —— 无头 Mac mini、云 VM、开发容器。设置 `RUNBROWSER_HOST` 和 `RUNBROWSER_TOKEN` 环境变量。**无需 VPN、无需防火墙规则、无需端口转发。**
+
+```bash
+# On the host machine — start relay server
+runbrowser serve --host 0.0.0.0 --token <secret>
+
+# From anywhere — set env vars and use normally
+export RUNBROWSER_HOST=192.168.1.10
+export RUNBROWSER_TOKEN=<secret>
+runbrowser navigate https://example.com -s 1
+```
+
+也适用于**开发容器和 Docker** —— 使用 `RUNBROWSER_HOST=host.docker.internal`。MCP 同样适用 —— 在 MCP 客户端环境配置中设置 `RUNBROWSER_HOST` 和 `RUNBROWSER_TOKEN`。
+
+</Section>
+
+<Section id="security" title="安全性">
+
+一切都运行在**你的机器上**。中继绑定到 `localhost:19988`，只接受来自扩展的连接。没有远程服务器、没有账户、没有遥测。
+
+- **仅限本地** —— WebSocket 服务器绑定到 localhost。没有任何数据离开你的机器。
+- **来源验证** —— 只接受 RunBrowser 扩展的来源。浏览器无法伪造 Origin 头，因此恶意网站无法连接。
+- **显式授权** —— 只有你点击了扩展图标的标签页才会被控制。没有后台访问。
+- **可见的自动化** —— Chrome 在被控制的标签页上显示自动化横幅。
+
+</Section>

@@ -18,7 +18,7 @@ import pc from 'picocolors'
 export function registerPlaywrightWsRoute(
   app: Hono,
   ctx: ServerContext,
-  upgradeWebSocket: Function,
+  upgradeWebSocket: ReturnType<typeof import('@hono/node-ws').createNodeWebSocket>['upgradeWebSocket'],
 ) {
   app.get(
     '/cdp/:clientId?',

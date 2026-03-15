@@ -8,7 +8,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
-import { getConnInfo } from '@hono/node-server/conninfo'
+
 import { createNodeWebSocket } from '@hono/node-ws'
 import { EventEmitter } from 'node:events'
 import util from 'node:util'
@@ -21,6 +21,7 @@ import { logCdpMessage } from './server-context.js'
 import { isRestrictedTarget } from './target-filter.js'
 import { createCdpLogger, type CdpLogEntry, type CdpLogger } from './cdp-log.js'
 import { CDPExecutorManager } from './cdp-executor-manager.js'
+import { CDPExecutor } from './cdp-executor.js'
 import { RecordingRelay } from './recording.js'
 import * as relayState from './state.js'
 import { VERSION, EXTENSION_IDS } from './utils.js'
@@ -34,7 +35,7 @@ import { registerExtensionWsRoute } from './routes/extension-ws.js'
 import { registerPlaywrightWsRoute } from './routes/playwright-ws.js'
 import { createPrivilegedMiddleware } from './middleware/privileged.js'
 
-import { readConfig } from './utils.js'
+
 
 // Prevent Buffers from dumping hex bytes in util.inspect output.
 Buffer.prototype[util.inspect.custom] = function () {
@@ -62,19 +63,9 @@ export interface ExecutorManagerLike {
   getExecutor(options: {
     sessionId: string
     cwd?: string
-    sessionMetadata?: {
-      extensionId: string | null
-      browser: string | null
-      profile: { email: string; id: string } | null
-    }
+    sessionMetadata?: relayState.SessionMetadata
   }): ExecutorLike
-  listSessions(): Array<{
-    id: string
-    stateKeys: string[]
-    browser: string | null
-    profile: { email: string; id: string } | null
-    extensionId: string | null
-  }>
+  listSessions(): Array<relayState.SessionMetadata & { id: string; stateKeys: string[] }>
   deleteExecutor(sessionId: string): boolean
 }
 
@@ -84,11 +75,7 @@ export interface ExecutorLike {
     timeout: number,
   ): Promise<{ text: string; images: Array<{ data: string; mimeType: string }>; isError: boolean }>
   reset(): Promise<{ page: { url(): string }; context: { pages(): any[] } }>
-  getSessionMetadata(): {
-    extensionId: string | null
-    browser: string | null
-    profile: { email: string; id: string } | null
-  }
+  getSessionMetadata(): relayState.SessionMetadata
 }
 
 // ============================================================================
@@ -471,15 +458,13 @@ export async function startRunBrowserCDPRelayServer({
       })
     },
 
-    // Executor manager (initialized below)
-    executorManager: null as any,
-    getCDPExecutor: null as any,
+    // Executor manager (initialized immediately after ctx creation)
+    executorManager: undefined!,
+    getCDPExecutor: undefined!,
 
-    // Recording (wired up by extension-ws route registration)
-    getRecordingRelay: null as any,
-    resolveRecordingRoute: null as any,
-
-
+    // Recording (wired up after ctx creation)
+    getRecordingRelay: undefined!,
+    resolveRecordingRoute: undefined!,
   }
 
   // ========================================================================
@@ -509,14 +494,23 @@ export async function startRunBrowserCDPRelayServer({
 
   ctx.resolveRecordingRoute = async ({ sessionId }) => {
     if (!sessionId) return { extensionId: null, sessionId: null }
+
+    // First, try resolving via executor manager (CLI session number → extension/CDP session).
+    // CLI sessions use numeric IDs like "1", "2" while CDP sessions look like "pw-tab-xxx".
+    const executor = ctx.executorManager.getSession(sessionId)
+    if (executor && 'getActiveCdpSession' in executor) {
+      const { extensionId: extId, cdpSessionId } = (executor as CDPExecutor).getActiveCdpSession()
+      if (extId) return { extensionId: extId, sessionId: cdpSessionId }
+    }
+
+    // Fallback: treat sessionId as a CDP session ID directly
     const extensionId = findExtensionIdByCdpSession(sessionId)
     return { extensionId, sessionId }
   }
 
   // getRecordingRelay is set by extension-ws route; provide a fallback
   ctx.getRecordingRelay = (extensionId) => {
-    const fn = (ctx as any)._getRecordingRelay
-    return fn ? fn(extensionId) : null
+    return ctx._getRecordingRelay ? ctx._getRecordingRelay(extensionId ?? null) : null
   }
 
   // ========================================================================

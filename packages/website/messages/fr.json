@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "title": "RunBrowser - Extension Chrome et CLI pour que vos agents utilisent votre vrai navigateur",
+    "description": "Extension Chrome et CLI qui permettent à vos agents de contrôler votre navigateur réel. Vos sessions, extensions, cookies — déjà là. Pas d'instance headless, pas de détection de bot."
+  },
+  "nav": {
+    "home": "Accueil"
+  },
+  "locale": {
+    "switchTo": "English"
+  }
+}

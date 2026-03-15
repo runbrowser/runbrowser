@@ -21,10 +21,7 @@ export function ok(msg: string, json?: boolean) {
   else console.log(msg)
 }
 
-export function die(msg: string): never {
-  console.error(`Error: ${msg}`)
-  process.exit(1)
-}
+
 
 /**
  * Format tabular data for output.
