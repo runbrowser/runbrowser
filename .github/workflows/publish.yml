@@ -1,11 +1,9 @@
 name: Publish to npm
 
 on:
-  # Trigger on version tags like v0.0.5, v1.2.3
   push:
     tags:
       - 'v*'
-  # Allow manual trigger from GitHub UI
   workflow_dispatch:
 
 jobs:
@@ -14,7 +12,7 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write  # Required for npm provenance
+      id-token: write  # Required for OIDC Trusted Publishing
 
     steps:
       - name: Checkout code
@@ -28,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -42,24 +40,17 @@ jobs:
         run: pnpm run test
 
       - name: Publish @jiweiyuan/runbrowser-server
-        run: pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
+        run: npm publish --access public
+        working-directory: packages/server
 
       - name: Publish @jiweiyuan/runbrowser-core
-        run: pnpm --filter @jiweiyuan/runbrowser-core publish --no-git-checks --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
+        run: npm publish --access public
+        working-directory: packages/core
 
       - name: Publish @jiweiyuan/runbrowser-mcp
-        run: pnpm --filter @jiweiyuan/runbrowser-mcp publish --no-git-checks --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
+        run: npm publish --access public
+        working-directory: packages/mcp
 
       - name: Publish @jiweiyuan/runbrowser
-        run: pnpm --filter @jiweiyuan/runbrowser publish --no-git-checks --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+        working-directory: packages/cli
