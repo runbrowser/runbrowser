@@ -47,7 +47,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@agmod/runbrowser-relay": "workspace:*",
+    "@agmod/runbrowser-server": "workspace:*",
     "diff": "^8.0.2",
     "posthtml": "^0.16.7",
     "posthtml-beautify": "^0.7.0"

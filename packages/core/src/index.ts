@@ -6,7 +6,7 @@
  */
 
 // Re-export relay (so consumers can get everything from core)
-export * from '@agmod/runbrowser-relay'
+export * from '@agmod/runbrowser-server'
 
 // CDP types (ICDPSession interface, no playwright dependency)
 export type { ICDPSession } from './cdp-types.js'

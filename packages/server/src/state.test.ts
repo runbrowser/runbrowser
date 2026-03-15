@@ -4,8 +4,8 @@
  */
 import { describe, test, expect } from 'vitest'
 import type { WSContext } from 'hono/ws'
-import type { Protocol } from '@agmod/runbrowser-relay/types'
-import * as relayState from '@agmod/runbrowser-relay'
+import type { Protocol } from '@agmod/runbrowser-server/types'
+import * as relayState from '@agmod/runbrowser-server'
 
 // ---------------------------------------------------------------------------
 // Helpers

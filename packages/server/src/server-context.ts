@@ -21,7 +21,8 @@ import type {
 import type { CDPExecutor } from './cdp-executor.js'
 import type { CDPExecutorManager } from './cdp-executor-manager.js'
 import type { RecordingRelay } from './recording.js'
-import type { CredentialBroker } from './credentials/broker.js'
+// Credentials — disabled, reserved for future use
+// import type { CredentialBroker } from './credentials/broker.js'
 import * as relayState from './state.js'
 import pc from 'picocolors'
 
@@ -74,8 +75,8 @@ export type ServerContext = {
     frameId: string
   }) => relayState.ConnectedTarget | undefined
 
-  // Credentials
-  credentialBroker: CredentialBroker | null
+  // Credentials — disabled, reserved for future use
+  credentialBroker: any | null
 
   // Utility
   normalizeSessionId: (value: string | number | null | undefined) => string | null

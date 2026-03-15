@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@agmod/runbrowser-core": "workspace:*",
-    "@agmod/runbrowser-relay": "workspace:*",
+    "@agmod/runbrowser-server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "cac": "^6.7.14",
     "string-dedent": "^3.0.2",

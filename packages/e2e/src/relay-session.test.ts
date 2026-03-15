@@ -1,7 +1,7 @@
 import { createMCPClient } from './mcp-client.js'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { chromium } from 'playwright-core'
-import { getCdpUrl } from '@agmod/runbrowser-relay/utils'
+import { getCdpUrl } from '@agmod/runbrowser-server/utils'
 import {
   setupTestContext,
   cleanupTestContext,

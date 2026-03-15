@@ -30,15 +30,10 @@ import { registerCdpDiscoveryRoutes } from './routes/cdp-discovery.js'
 import { registerApiCommandRoutes } from './routes/api-commands.js'
 import { registerApiSessionRoutes } from './routes/api-sessions.js'
 import { registerApiRecordingRoutes } from './routes/api-recording.js'
-import { registerApiCredentialRoutes } from './routes/api-credentials.js'
 import { registerExtensionWsRoute } from './routes/extension-ws.js'
 import { registerPlaywrightWsRoute } from './routes/playwright-ws.js'
 import { createPrivilegedMiddleware } from './middleware/privileged.js'
 
-// Credentials
-import { CredentialBroker } from './credentials/broker.js'
-import { PolicyEngine } from './credentials/policy.js'
-import { AuditLogger } from './credentials/audit.js'
 import { readConfig } from './utils.js'
 
 // Prevent Buffers from dumping hex bytes in util.inspect output.
@@ -484,7 +479,7 @@ export async function startRunBrowserCDPRelayServer({
     getRecordingRelay: null as any,
     resolveRecordingRoute: null as any,
 
-    // Credentials (initialized below)
+    // Credentials (disabled — reserved for future use)
     credentialBroker: null,
   }
 
@@ -503,35 +498,6 @@ export async function startRunBrowserCDPRelayServer({
     const executor = ctx.executorManager.getSession(sessionId)
     if (!executor) return null
     return executor as import('./cdp-executor.js').CDPExecutor
-  }
-
-  // ========================================================================
-  // Credential Broker
-  // ========================================================================
-
-  {
-    const config = readConfig()
-    const credentialConfig = config.credentials
-    if (credentialConfig && credentialConfig.vault && credentialConfig.vault !== 'none') {
-      try {
-        const { createVaultAdapter } = await import('./credentials/vault-adapters/adapter.js')
-        const vault = await createVaultAdapter({
-          vault: credentialConfig.vault,
-          vaultPath: credentialConfig.vaultPath,
-        })
-        if (vault) {
-          const policy = new PolicyEngine(credentialConfig.policy)
-          const audit = new AuditLogger({
-            filePath: credentialConfig.auditLogPath,
-            enabled: credentialConfig.auditLog !== false,
-          })
-          ctx.credentialBroker = new CredentialBroker({ vault, policy, audit, logger })
-          logger?.log(`Credential broker initialized (vault: ${vault.name})`)
-        }
-      } catch (e) {
-        logger?.error('Failed to initialize credential broker:', e)
-      }
-    }
   }
 
   // ========================================================================
@@ -590,7 +556,6 @@ export async function startRunBrowserCDPRelayServer({
   registerExtensionWsRoute(app, ctx, upgradeWebSocket)
   registerApiSessionRoutes(app, ctx)
   registerApiCommandRoutes(app, ctx)
-  registerApiCredentialRoutes(app, ctx)
   registerApiRecordingRoutes(app, ctx)
 
   // ========================================================================

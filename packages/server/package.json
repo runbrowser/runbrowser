@@ -1,7 +1,7 @@
 {
-  "name": "@agmod/runbrowser-relay",
+  "name": "@agmod/runbrowser-server",
   "version": "0.0.4",
-  "description": "CDP relay for RunBrowser — bridges Chrome extension WebSocket to Playwright CDP clients",
+  "description": "RunBrowser server — bridges Chrome extension WebSocket to CDP clients",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -41,7 +41,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "runbrowser-relay": "./bin.js"
+    "runbrowser-server": "./bin.js"
   },
   "scripts": {
     "build": "tsc",
@@ -66,7 +66,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yuanjiwei/runbrowser.git",
-    "directory": "packages/relay"
+    "directory": "packages/server"
   },
   "homepage": "https://github.com/yuanjiwei/runbrowser",
   "license": "MIT",

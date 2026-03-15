@@ -4,5 +4,5 @@ packages:
   - packages/e2e
   - packages/extension
   - packages/mcp
-  - packages/relay
+  - packages/server
   - packages/vite-plugin-extension-reload

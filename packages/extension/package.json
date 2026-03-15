@@ -31,7 +31,7 @@
     "vite-plugin-static-copy": "^3.1.1"
   },
   "dependencies": {
-    "@agmod/runbrowser-relay": "workspace:*",
+    "@agmod/runbrowser-server": "workspace:*",
     "zustand": "^5.0.8"
   }
 }

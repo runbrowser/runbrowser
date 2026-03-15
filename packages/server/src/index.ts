@@ -1,5 +1,5 @@
 /**
- * runbrowser-relay — CDP relay server for RunBrowser.
+ * runbrowser-server — CDP server for RunBrowser.
  *
  * Bridges Chrome extension WebSocket connections to Playwright CDP clients.
  * This package provides the core relay server functionality, shared types,
@@ -143,19 +143,5 @@ export type { ActiveRecording } from './recording.js'
 export { killPortProcess, getListeningPidsForPort, isPortInUse } from './kill-port.js'
 export type { KillPortSignal } from './kill-port.js'
 
-// Credentials
-export { CredentialBroker } from './credentials/broker.js'
-export type { CredentialBrokerOptions } from './credentials/broker.js'
-export { PolicyEngine } from './credentials/policy.js'
-export { AuditLogger } from './credentials/audit.js'
-export type {
-  LoginRequest,
-  LoginResult,
-  LoginStatus,
-  CredentialMetadata,
-  CredentialPolicy,
-  CredentialConfig,
-  FormDetectionResult,
-  DetectedForm,
-  DetectedField,
-} from './credentials/types.js'
+// Credentials — disabled, reserved for future use
+// export { CredentialBroker } from './credentials/broker.js'

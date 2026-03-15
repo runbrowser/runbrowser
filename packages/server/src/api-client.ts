@@ -453,45 +453,99 @@ export class RelayApiClient {
   }
 
   // --------------------------------------------------------------------------
-  // Credential commands
+  // New interaction commands
   // --------------------------------------------------------------------------
 
-  async login(sessionId: string, domain: string, options?: { credentialHint?: string; timeout?: number }): Promise<{
-    status: string
-    username?: string
-    domain?: string
-    error?: string
-  }> {
-    return this.post('/api/login', { sessionId, domain, ...options })
+  async dblclick(sessionId: string, ref: string): Promise<void> {
+    await this.post('/api/dblclick', { sessionId, ref })
   }
 
-  async listCredentials(sessionId: string, domain: string): Promise<{
-    credentials: Array<{ id: string; domain: string; username: string; label?: string }>
-  }> {
-    return this.post('/api/credentials', { sessionId, domain })
+  async check(sessionId: string, ref: string): Promise<void> {
+    await this.post('/api/check', { sessionId, ref })
   }
 
-  async detectForms(sessionId: string): Promise<{
-    detected: boolean
-    forms: unknown[]
-    loginForm: unknown | null
-    pageUrl: string
-  }> {
-    return this.post('/api/detect-forms', { sessionId })
+  async uncheck(sessionId: string, ref: string): Promise<void> {
+    await this.post('/api/uncheck', { sessionId, ref })
   }
 
-  async credentialStatus(): Promise<{
-    configured: boolean
-    vault: string | null
-    vaultAvailable: boolean
-    policy: unknown | null
-  }> {
-    const baseUrl = this.getBaseUrl()
-    const response = await fetch(`${baseUrl}/api/credential-status`, {
-      signal: AbortSignal.timeout(5000),
-      headers: this.getAuthHeaders(),
-    })
-    if (!response.ok) throw new Error(`credential-status failed: ${response.status}`)
-    return (await response.json()) as any
+  async focus(sessionId: string, ref: string): Promise<void> {
+    await this.post('/api/focus', { sessionId, ref })
   }
+
+  async upload(sessionId: string, ref: string, files: string[]): Promise<void> {
+    await this.post('/api/upload', { sessionId, ref, files })
+  }
+
+  async drag(sessionId: string, source: string, target: string): Promise<void> {
+    await this.post('/api/drag', { sessionId, source, target })
+  }
+
+  async isEnabled(sessionId: string, ref: string): Promise<{ enabled: boolean }> {
+    return this.post('/api/is-enabled', { sessionId, ref })
+  }
+
+  async getCount(sessionId: string, selector: string): Promise<{ count: number }> {
+    return this.post('/api/get-count', { sessionId, selector })
+  }
+
+  // --------------------------------------------------------------------------
+  // Tab management
+  // --------------------------------------------------------------------------
+
+  async listTabs(sessionId: string): Promise<{ tabs: Array<{ index: number; url: string; title: string; active: boolean }> }> {
+    return this.post('/api/tab/list', { sessionId })
+  }
+
+  async newTab(sessionId: string, url?: string): Promise<{ index: number }> {
+    return this.post('/api/tab/new', { sessionId, url })
+  }
+
+  async switchTab(sessionId: string, index: number): Promise<void> {
+    await this.post('/api/tab/switch', { sessionId, index })
+  }
+
+  async closeTab(sessionId: string, index?: number): Promise<void> {
+    await this.post('/api/tab/close', { sessionId, index })
+  }
+
+  // --------------------------------------------------------------------------
+  // Frame management
+  // --------------------------------------------------------------------------
+
+  async switchFrame(sessionId: string, selector: string): Promise<void> {
+    await this.post('/api/frame/switch', { sessionId, selector })
+  }
+
+  async switchToMainFrame(sessionId: string): Promise<void> {
+    await this.post('/api/frame/main', { sessionId })
+  }
+
+  // --------------------------------------------------------------------------
+  // Find + act (semantic locators)
+  // --------------------------------------------------------------------------
+
+  async findAndAct(sessionId: string, options: {
+    by: string
+    value: string
+    action: string
+    actionValue?: string
+    name?: string
+    exact?: boolean
+    index?: number
+  }): Promise<unknown> {
+    return this.post('/api/find', { sessionId, ...options })
+  }
+
+  // --------------------------------------------------------------------------
+  // Diff
+  // --------------------------------------------------------------------------
+
+  async diffSnapshot(sessionId: string, baseline?: string): Promise<{ diff: string; changed: boolean }> {
+    return this.post('/api/diff/snapshot', { sessionId, baseline })
+  }
+
+  async diffScreenshot(sessionId: string, baseline: string, output?: string): Promise<{ path: string; diffPixels: number }> {
+    return this.post('/api/diff/screenshot', { sessionId, baseline, output })
+  }
+
 }

@@ -13,7 +13,7 @@ import type {
   ExtensionStopRecordingResult,
   IsRecordingResult,
   CancelRecordingResult,
-} from '@agmod/runbrowser-relay/protocol'
+} from '@agmod/runbrowser-server/protocol'
 import type {
   OffscreenStartRecordingResult,
   OffscreenStopRecordingResult,

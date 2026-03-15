@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { chromium, type Page } from 'playwright-core'
-import { getCdpUrl } from '@agmod/runbrowser-relay/utils'
+import { getCdpUrl } from '@agmod/runbrowser-server/utils'
 import {
   setupTestContext,
   cleanupTestContext,

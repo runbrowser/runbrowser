@@ -199,7 +199,7 @@ The relay server also exposes a standard CDP WebSocket endpoint, so you can opti
 
 ```typescript
 import { chromium } from 'playwright-core'
-import { startRunBrowserCDPRelayServer, getCdpUrl } from '@agmod/runbrowser-relay'
+import { startRunBrowserCDPRelayServer, getCdpUrl } from '@agmod/runbrowser-server'
 
 const server = await startRunBrowserCDPRelayServer()
 const browser = await chromium.connectOverCDP(getCdpUrl())

@@ -21,7 +21,7 @@ pnpm run build:all
 ```
 
 This runs in order:
-1. `@agmod/runbrowser-relay` (tsc) — WebSocket relay server
+1. `@agmod/runbrowser-server` (tsc) — WebSocket relay server
 2. `@agmod/runbrowser-core` (tsc) — shared executor, snapshots, recording
 3. `@agmod/runbrowser-mcp` + `runbrowser` cli (tsc, parallel) — MCP server + CLI
 4. `mcp-extension` (vite + download-prism) — Chrome extension → `packages/extension/dist/`
