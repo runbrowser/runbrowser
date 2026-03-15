@@ -69,6 +69,25 @@ export const CONFIG_FILE_PATH = path.join(RUNBROWSER_DIR, 'config.json')
 export interface RunBrowserConfig {
   token?: string
   host?: string
+  /** Credential broker configuration */
+  credentials?: {
+    /** Which vault adapter to use: "bitwarden", "json-file", or "none" */
+    vault: 'bitwarden' | 'json-file' | 'none'
+    /** Path for json-file vault adapter (default: ~/.runbrowser/credentials.json) */
+    vaultPath?: string
+    /** Policy overrides */
+    policy?: {
+      allowedDomains?: string[]
+      approvalRequired?: string[]
+      autoApproveDomains?: string[]
+      maxLoginsPerDomain?: number
+      sessionTimeout?: number
+    }
+    /** Enable audit logging (default: true) */
+    auditLog?: boolean
+    /** Custom audit log path (default: ~/.runbrowser/credential-audit.jsonl) */
+    auditLogPath?: string
+  }
 }
 
 export function readConfig(): RunBrowserConfig {

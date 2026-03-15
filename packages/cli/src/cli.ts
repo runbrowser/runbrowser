@@ -101,6 +101,35 @@ function die(msg: string): never {
   process.exit(1)
 }
 
+/** Set a nested config value using dot notation (e.g. "credentials.vault") */
+function setNestedValue(obj: any, key: string, value: string) {
+  const parts = key.split('.')
+  let current = obj
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (current[parts[i]] === undefined || typeof current[parts[i]] !== 'object') {
+      current[parts[i]] = {}
+    }
+    current = current[parts[i]]
+  }
+  // Parse value: try boolean/number, else string
+  const last = parts[parts.length - 1]
+  if (value === 'true') current[last] = true
+  else if (value === 'false') current[last] = false
+  else if (/^\d+$/.test(value)) current[last] = parseInt(value, 10)
+  else current[last] = value
+}
+
+/** Delete a nested config value using dot notation */
+function deleteNestedValue(obj: any, key: string) {
+  const parts = key.split('.')
+  let current = obj
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (!current[parts[i]]) return
+    current = current[parts[i]]
+  }
+  delete current[parts[parts.length - 1]]
+}
+
 // ---------------------------------------------------------------------------
 // Shared option builders
 // ---------------------------------------------------------------------------
@@ -559,20 +588,24 @@ await yargs(hideBin(process.argv))
 
   .command(
     'config-set <key> <value>',
-    'Set config (token, host)',
-    (y) => y.positional('key', { type: 'string', choices: ['token', 'host'] as const, demandOption: true }).positional('value', { type: 'string', demandOption: true }),
+    'Set config (token, host, credentials.vault, credentials.vaultPath, etc.)',
+    (y) => y.positional('key', { type: 'string', demandOption: true }).positional('value', { type: 'string', demandOption: true }),
     (argv) => {
-      const config = readConfig(); (config as any)[argv.key] = argv.value; writeConfig(config)
-      console.log(`${argv.key} = ${argv.key === 'token' ? '***' : argv.value}`)
+      const config = readConfig()
+      setNestedValue(config, argv.key, argv.value)
+      writeConfig(config)
+      console.log(`${argv.key} = ${argv.key.includes('token') ? '***' : argv.value}`)
     },
   )
 
   .command(
     'config-unset <key>',
     'Remove config value',
-    (y) => y.positional('key', { type: 'string', choices: ['token', 'host'] as const, demandOption: true }),
+    (y) => y.positional('key', { type: 'string', demandOption: true }),
     (argv) => {
-      const config = readConfig(); delete (config as any)[argv.key]; writeConfig(config)
+      const config = readConfig()
+      deleteNestedValue(config, argv.key)
+      writeConfig(config)
       console.log(`Removed ${argv.key}`)
     },
   )
@@ -583,8 +616,139 @@ await yargs(hideBin(process.argv))
     if (Object.keys(config).length === 0) { console.log('(empty)'); return }
     if (config.host) console.log(`  host:  ${config.host}`)
     if (config.token) console.log(`  token: ${'*'.repeat(config.token.length)}`)
+    if (config.credentials) {
+      console.log('  credentials:')
+      console.log(`    vault:     ${config.credentials.vault || 'none'}`)
+      if (config.credentials.vaultPath) console.log(`    vaultPath: ${config.credentials.vaultPath}`)
+      if (config.credentials.policy) {
+        const p = config.credentials.policy
+        if (p.allowedDomains) console.log(`    allowedDomains: ${p.allowedDomains.join(', ')}`)
+        if (p.approvalRequired?.length) console.log(`    approvalRequired: ${p.approvalRequired.join(', ')}`)
+      }
+      console.log(`    auditLog:  ${config.credentials.auditLog !== false}`)
+    }
   })
 
+  // =========================================================================
+  // Credentials
+  // =========================================================================
+  .command(
+    'login <domain>',
+    'Securely log into a website (agent never sees password)',
+    (y) =>
+      y.options(globalOpts)
+        .positional('domain', { type: 'string', demandOption: true, describe: 'Website domain (e.g. github.com)' })
+        .option('hint', { type: 'string', describe: 'Credential hint (e.g. "work")' })
+        .option('timeout', { type: 'number', describe: 'Timeout in ms', default: 30000 }),
+    async (argv) => {
+      const { sessionId, client } = await resolveSession(argv)
+      try {
+        const result = await client.login(sessionId, argv.domain, {
+          credentialHint: argv.hint,
+          timeout: argv.timeout,
+        })
+        if (argv.json) {
+          console.log(JSON.stringify(result))
+        } else {
+          if (result.status === 'success') {
+            console.log(pc.green(`✓ Logged in as ${result.username} on ${result.domain}`))
+          } else if (result.status === 'not_configured') {
+            console.error(pc.yellow('Credential broker not configured.'))
+            console.error(pc.dim('Run: runbrowser config-set credentials.vault bitwarden'))
+            console.error(pc.dim('Or:  runbrowser config-set credentials.vault json-file'))
+          } else {
+            console.error(pc.red(`✗ Login failed: ${result.error || result.status}`))
+          }
+        }
+      } catch (e: any) { die(e.message) }
+    },
+  )
+
+  .command(
+    'credentials <domain>',
+    'List available credentials for a domain (metadata only)',
+    (y) => y.options(globalOpts).positional('domain', { type: 'string', demandOption: true }),
+    async (argv) => {
+      const { sessionId, client } = await resolveSession(argv)
+      try {
+        const result = await client.listCredentials(sessionId, argv.domain)
+        if (argv.json) {
+          console.log(JSON.stringify(result))
+        } else if (result.credentials.length === 0) {
+          console.log(`No credentials found for ${argv.domain}`)
+        } else {
+          console.log(`Credentials for ${argv.domain}:`)
+          for (const c of result.credentials) {
+            console.log(`  ${c.username}${c.label ? ` (${c.label})` : ''}`)
+          }
+        }
+      } catch (e: any) { die(e.message) }
+    },
+  )
+
+  .command(
+    'detect-forms',
+    'Detect forms on the current page',
+    (y) => y.options(globalOpts),
+    async (argv) => {
+      const { sessionId, client } = await resolveSession(argv)
+      try {
+        const result = await client.detectForms(sessionId)
+        if (argv.json) {
+          console.log(JSON.stringify(result))
+        } else if (!result.detected) {
+          console.log('No login forms detected on current page')
+        } else {
+          console.log(`Page: ${result.pageUrl}`)
+          for (const form of result.forms as any[]) {
+            console.log(`\n  Form type: ${form.type} (confidence: ${(form.confidence * 100).toFixed(0)}%)`)
+            for (const field of form.fields) {
+              const vis = field.isVisible ? '' : ' (hidden)'
+              console.log(`    ${field.role}: ${field.selector}${vis}`)
+            }
+            if (form.submitSelector) {
+              console.log(`    submit: ${form.submitSelector}`)
+            }
+          }
+        }
+      } catch (e: any) { die(e.message) }
+    },
+  )
+
+  .command(
+    'credential-status',
+    'Show credential broker status',
+    (y) => y.options(globalOpts),
+    async (argv) => {
+      const client = createClient(argv)
+      await client.ensureServer(cliRelayEnv)
+      try {
+        const status = await client.credentialStatus()
+        if (argv.json) {
+          console.log(JSON.stringify(status))
+        } else if (!status.configured) {
+          console.log('Credential broker: not configured')
+          console.log(pc.dim('\nTo enable, add to ~/.runbrowser/config.json:'))
+          console.log(pc.dim('  { "credentials": { "vault": "bitwarden" } }'))
+          console.log(pc.dim('\nOr use: runbrowser config-set credentials.vault bitwarden'))
+        } else {
+          console.log(`Vault: ${status.vault}`)
+          console.log(`Available: ${status.vaultAvailable ? pc.green('yes') : pc.red('no')}`)
+          if (status.policy) {
+            const p = status.policy as any
+            console.log(`Allowed domains: ${p.allowedDomains?.join(', ') || '*'}`)
+            if (p.approvalRequired?.length) {
+              console.log(`Approval required: ${p.approvalRequired.join(', ')}`)
+            }
+          }
+        }
+      } catch (e: any) { die(e.message) }
+    },
+  )
+
+  // =========================================================================
+  // Server & config (continued)
+  // =========================================================================
   .command('skill', 'Print full usage instructions', {}, () => {
     const p = path.join(__dirname, '..', 'src', 'skill.md')
     console.log(fs.readFileSync(p, 'utf-8'))

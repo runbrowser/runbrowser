@@ -451,4 +451,47 @@ export class RelayApiClient {
   async cdp(sessionId: string, method: string, params?: unknown): Promise<{ result: unknown }> {
     return this.post('/api/cdp', { sessionId, method, params })
   }
+
+  // --------------------------------------------------------------------------
+  // Credential commands
+  // --------------------------------------------------------------------------
+
+  async login(sessionId: string, domain: string, options?: { credentialHint?: string; timeout?: number }): Promise<{
+    status: string
+    username?: string
+    domain?: string
+    error?: string
+  }> {
+    return this.post('/api/login', { sessionId, domain, ...options })
+  }
+
+  async listCredentials(sessionId: string, domain: string): Promise<{
+    credentials: Array<{ id: string; domain: string; username: string; label?: string }>
+  }> {
+    return this.post('/api/credentials', { sessionId, domain })
+  }
+
+  async detectForms(sessionId: string): Promise<{
+    detected: boolean
+    forms: unknown[]
+    loginForm: unknown | null
+    pageUrl: string
+  }> {
+    return this.post('/api/detect-forms', { sessionId })
+  }
+
+  async credentialStatus(): Promise<{
+    configured: boolean
+    vault: string | null
+    vaultAvailable: boolean
+    policy: unknown | null
+  }> {
+    const baseUrl = this.getBaseUrl()
+    const response = await fetch(`${baseUrl}/api/credential-status`, {
+      signal: AbortSignal.timeout(5000),
+      headers: this.getAuthHeaders(),
+    })
+    if (!response.ok) throw new Error(`credential-status failed: ${response.status}`)
+    return (await response.json()) as any
+  }
 }

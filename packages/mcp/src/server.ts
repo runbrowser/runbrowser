@@ -334,6 +334,70 @@ server.tool(
   }),
 )
 
+// ============================================================================
+// Credential Tools
+// ============================================================================
+
+server.tool(
+  'login',
+  `Securely log into a website using stored credentials.
+The agent NEVER sees the password — credentials are handled by the credential broker
+and filled directly in the browser. Returns login status (success/failed/requires_2fa).
+The user must have a vault configured (Bitwarden or json-file).`,
+  {
+    domain: z.string().describe('Website domain (e.g. "github.com")'),
+    credentialHint: z.string().optional().describe('Optional hint to select account (e.g. "work")'),
+  },
+  toolHandler(async ({ domain, credentialHint }) => {
+    const sid = await ensureSession()
+    const result = await getClient().login(sid, domain, { credentialHint })
+    let text: string
+    if (result.status === 'success') {
+      text = `Successfully logged in as ${result.username} on ${result.domain}`
+    } else if (result.status === 'not_configured') {
+      text = 'Credential broker not configured. The user needs to set credentials.vault in ~/.runbrowser/config.json'
+    } else {
+      text = `Login ${result.status}: ${result.error || 'Unknown error'}`
+    }
+    return { content: [{ type: 'text', text }], isError: result.status !== 'success' }
+  }),
+)
+
+server.tool(
+  'credentials',
+  'List available credentials for a domain. Returns metadata only (username, label) — never passwords.',
+  {
+    domain: z.string().describe('Website domain to search credentials for'),
+  },
+  toolHandler(async ({ domain }) => {
+    const sid = await ensureSession()
+    const result = await getClient().listCredentials(sid, domain)
+    if (result.credentials.length === 0) {
+      return { content: [{ type: 'text', text: `No credentials found for ${domain}` }] }
+    }
+    const lines = result.credentials.map(
+      (c: any) => `- ${c.username}${c.label ? ` (${c.label})` : ''}`,
+    )
+    return {
+      content: [{ type: 'text', text: `Credentials for ${domain}:\n${lines.join('\n')}` }],
+    }
+  }),
+)
+
+server.tool(
+  'detect_forms',
+  'Detect login and other forms on the current page. Returns form types, field roles, and submit buttons.',
+  {},
+  toolHandler(async () => {
+    const sid = await ensureSession()
+    const result = await getClient().detectForms(sid)
+    if (!result.detected) {
+      return { content: [{ type: 'text', text: 'No login forms detected on the current page.' }] }
+    }
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }),
+)
+
 export { server }
 
 export async function startMcp(options: { host?: string; token?: string } = {}) {

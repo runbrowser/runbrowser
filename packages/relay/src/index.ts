@@ -142,3 +142,20 @@ export type { ActiveRecording } from './recording.js'
 // Port management
 export { killPortProcess, getListeningPidsForPort, isPortInUse } from './kill-port.js'
 export type { KillPortSignal } from './kill-port.js'
+
+// Credentials
+export { CredentialBroker } from './credentials/broker.js'
+export type { CredentialBrokerOptions } from './credentials/broker.js'
+export { PolicyEngine } from './credentials/policy.js'
+export { AuditLogger } from './credentials/audit.js'
+export type {
+  LoginRequest,
+  LoginResult,
+  LoginStatus,
+  CredentialMetadata,
+  CredentialPolicy,
+  CredentialConfig,
+  FormDetectionResult,
+  DetectedForm,
+  DetectedField,
+} from './credentials/types.js'

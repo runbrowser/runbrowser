@@ -51,12 +51,16 @@ export class CDPExecutor implements ExecutorLike {
   private getExtensionEntry: GetExtensionEntry
   private logger?: { log(...args: any[]): void; error(...args: any[]): void }
 
+  /** Bound sendCDP — avoids creating a new closure in every method call. */
+  private readonly boundSendCDP: commands.SendCDP
+
   constructor(options: CDPExecutorOptions) {
     this.extensionStableKey = options.extensionStableKey
     this.metadata = options.sessionMetadata
     this.sendToExtension = options.sendToExtension
     this.getExtensionEntry = options.getExtensionEntry
     this.logger = options.logger
+    this.boundSendCDP = (method, params) => this.sendCDP(method, params)
   }
 
   /** Get the Chrome CDP session ID of the active tab for this executor's extension. */
@@ -171,123 +175,100 @@ export class CDPExecutor implements ExecutorLike {
   private lastRefMap: Map<string, import('./snapshot.js').SnapshotRef> = new Map()
 
   async snapshot(options: { interactiveOnly?: boolean } = {}): Promise<SnapshotResult> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    const result = await getSnapshot(sendCDP, options)
+    const result = await getSnapshot(this.boundSendCDP, options)
     this.lastRefMap = result.refMap
     return result
   }
 
   async screenshot(): Promise<string> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return captureScreenshot(sendCDP)
+    return captureScreenshot(this.boundSendCDP)
   }
 
   async navigate(url: string): Promise<{ url: string; title: string }> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.navigate(sendCDP, url)
+    return commands.navigate(this.boundSendCDP, url)
   }
 
   async click(ref: string): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.click(sendCDP, ref, this.lastRefMap)
+    return commands.click(this.boundSendCDP, ref, this.lastRefMap)
   }
 
   async fill(ref: string, value: string): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.fill(sendCDP, ref, value, this.lastRefMap)
+    return commands.fill(this.boundSendCDP, ref, value, this.lastRefMap)
   }
 
   async type(text: string): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.type(sendCDP, text)
+    return commands.type(this.boundSendCDP, text)
   }
 
   async press(key: string): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.press(sendCDP, key)
+    return commands.press(this.boundSendCDP, key)
   }
 
   async scroll(direction: 'up' | 'down' | 'left' | 'right', amount?: number): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.scroll(sendCDP, direction, amount)
+    return commands.scroll(this.boundSendCDP, direction, amount)
   }
 
   async hover(ref: string): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.hover(sendCDP, ref, this.lastRefMap)
+    return commands.hover(this.boundSendCDP, ref, this.lastRefMap)
   }
 
   async getUrl(): Promise<string> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.getUrl(sendCDP)
+    return commands.getUrl(this.boundSendCDP)
   }
 
   async getTitle(): Promise<string> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.getTitle(sendCDP)
+    return commands.getTitle(this.boundSendCDP)
   }
 
   async getText(ref: string): Promise<string> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.getText(sendCDP, ref, this.lastRefMap)
+    return commands.getText(this.boundSendCDP, ref, this.lastRefMap)
   }
 
   async getHtml(ref: string): Promise<string> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.getHtml(sendCDP, ref, this.lastRefMap)
+    return commands.getHtml(this.boundSendCDP, ref, this.lastRefMap)
   }
 
   async getValue(ref: string): Promise<string> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.getValue(sendCDP, ref, this.lastRefMap)
+    return commands.getValue(this.boundSendCDP, ref, this.lastRefMap)
   }
 
   async getAttribute(ref: string, attr: string): Promise<string | null> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.getAttribute(sendCDP, ref, attr, this.lastRefMap)
+    return commands.getAttribute(this.boundSendCDP, ref, attr, this.lastRefMap)
   }
 
   async isVisible(ref: string): Promise<boolean> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.isVisible(sendCDP, ref, this.lastRefMap)
+    return commands.isVisible(this.boundSendCDP, ref, this.lastRefMap)
   }
 
   async isChecked(ref: string): Promise<boolean> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.isChecked(sendCDP, ref, this.lastRefMap)
+    return commands.isChecked(this.boundSendCDP, ref, this.lastRefMap)
   }
 
   async selectOption(ref: string, value: string): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.selectOption(sendCDP, ref, value, this.lastRefMap)
+    return commands.selectOption(this.boundSendCDP, ref, value, this.lastRefMap)
   }
 
   async waitFor(options: { ref?: string; text?: string; url?: string; ms?: number; load?: string; fn?: string }, timeout?: number): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.waitFor(sendCDP, options, this.lastRefMap, timeout)
+    return commands.waitFor(this.boundSendCDP, options, this.lastRefMap, timeout)
   }
 
   async viewport(width: number, height: number): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.viewport(sendCDP, width, height)
+    return commands.viewport(this.boundSendCDP, width, height)
   }
 
   async rawCDP(method: string, params?: unknown): Promise<unknown> {
-    return this.sendCDP(method, params)
+    return this.boundSendCDP(method, params)
   }
 
   async goBack(): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.goBack(sendCDP)
+    return commands.goBack(this.boundSendCDP)
   }
 
   async goForward(): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.goForward(sendCDP)
+    return commands.goForward(this.boundSendCDP)
   }
 
   async reload(): Promise<void> {
-    const sendCDP = (method: string, params?: unknown) => this.sendCDP(method, params)
-    return commands.reload(sendCDP)
+    return commands.reload(this.boundSendCDP)
   }
 }
