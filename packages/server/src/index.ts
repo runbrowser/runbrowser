@@ -143,5 +143,4 @@ export type { ActiveRecording } from './recording.js'
 export { killPortProcess, getListeningPidsForPort, isPortInUse } from './kill-port.js'
 export type { KillPortSignal } from './kill-port.js'
 
-// Credentials — disabled, reserved for future use
-// export { CredentialBroker } from './credentials/broker.js'
+

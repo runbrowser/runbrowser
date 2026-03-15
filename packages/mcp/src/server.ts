@@ -335,8 +335,6 @@ server.tool(
 )
 
 // ============================================================================
-// Credential tools — disabled, reserved for future use
-
 export { server }
 
 export async function startMcp(options: { host?: string; token?: string } = {}) {

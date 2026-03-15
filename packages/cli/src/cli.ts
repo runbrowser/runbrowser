@@ -808,17 +808,6 @@ await yargs(hideBin(process.argv))
           if (Object.keys(config).length === 0) { console.log('(empty)'); return }
           if (config.host) console.log(`  host:  ${config.host}`)
           if (config.token) console.log(`  token: ${'*'.repeat(config.token.length)}`)
-          if (config.credentials) {
-            console.log('  credentials:')
-            console.log(`    vault:     ${config.credentials.vault || 'none'}`)
-            if (config.credentials.vaultPath) console.log(`    vaultPath: ${config.credentials.vaultPath}`)
-            if (config.credentials.policy) {
-              const p = config.credentials.policy
-              if (p.allowedDomains) console.log(`    allowedDomains: ${p.allowedDomains.join(', ')}`)
-              if (p.approvalRequired?.length) console.log(`    approvalRequired: ${p.approvalRequired.join(', ')}`)
-            }
-            console.log(`    auditLog:  ${config.credentials.auditLog !== false}`)
-          }
           break
         }
       }

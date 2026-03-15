@@ -479,8 +479,7 @@ export async function startRunBrowserCDPRelayServer({
     getRecordingRelay: null as any,
     resolveRecordingRoute: null as any,
 
-    // Credentials (disabled — reserved for future use)
-    credentialBroker: null,
+
   }
 
   // ========================================================================
