@@ -345,9 +345,12 @@ runbrowser logfile  # prints log file paths
 | All pages return `about:blank` | Restart Chrome (known Chrome bug). |
 | Port 19988 in use | `lsof -ti :19988 \| xargs kill` |
 
-## Credits
+## Related Projects
 
-Based on [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi.
+- [bb-sites](https://github.com/epiral/bb-sites) — Community fetch recipes for bb-browser with 45+ site adapters (Reddit, GitHub, YouTube, Twitter, and more). Great inspiration for RunBrowser command extensions.
+- [bb-browser](https://github.com/epiral/bb-browser) — CLI + MCP server for AI agents to control Chrome with your login state.
+- [playwriter](https://github.com/remorses/playwriter) — Chrome extension to let agents control your browser via Playwright snippets. RunBrowser's original inspiration.
+- [agent-browser](https://github.com/vercel-labs/agent-browser) — Browser automation CLI for AI agents by Vercel.
 
 ## License
 
