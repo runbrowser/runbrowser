@@ -31,7 +31,7 @@ runbrowser click @e5 -s 1
 ### Add the Skill to Your Agent
 
 ```bash
-npx -y skills add yuanjiwei/runbrowser
+npx -y skills add runbrowser/runbrowser
 ```
 
 This teaches your agent how to use RunBrowser — selectors, timeouts, snapshots, and all available utilities.
