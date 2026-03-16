@@ -408,9 +408,10 @@ run({ command: "eval document.title" })
   title="vs BrowserUse"
   headers={['', 'BrowserUse', 'RunBrowser']}
   rows={[
-    ['ツール', '12+ 専用 MCP ツール', '2ツール (skill + run)'],
-    ['API', '限定的な操作', '完全な CDP アクセス'],
-    ['コンテキスト使用量', '高（ツールスキーマ）', '低'],
+    ['言語', 'Python', 'TypeScript / Node.js'],
+    ['ブラウザ', '新しい Chrome を起動（Playwright）', 'あなたの Chrome を使用'],
+    ['アプローチ', 'AI エージェントフレームワーク（LLM が判断）', 'CLI + MCP ツール（エージェントがコマンド送信）'],
+    ['ログイン状態', '新規', 'ログイン済み'],
     ['CLI', 'なし', 'あり — 50+ コマンド'],
   ]}
 />
