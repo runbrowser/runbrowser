@@ -238,13 +238,13 @@ export async function run(ctx, args) {
 
 <Section id="command-extensions" title="コマンド拡張">
 
-[runbrowser/commands](https://github.com/runbrowser/commands) リポジトリから**コミュニティメンテナンスのコマンド**を1つのコマンドでインストール。クローン不要、ビルド不要 — インストールしてすぐに使用。
+[runbrowser/commands](https://github.com/runbrowser/commands) リポジトリから**コミュニティメンテナンスのコマンド**をインストール。クローン不要、ビルド不要 — インストールしてすぐに使用。
 
 ```bash
-# 利用可能なコマンドパッケージを一覧表示
-runbrowser install --list
+# 利用可能なコマンド拡張を一覧表示
+runbrowser commands list
 
-# Available command packages:
+# Available command extensions:
 #
 #   reddit
 #   youtube
@@ -252,8 +252,8 @@ runbrowser install --list
 #   hackernews
 #   producthunt
 
-# パッケージをインストール
-runbrowser install reddit
+# 拡張をインストール
+runbrowser commands install reddit
 # ✓ Installed reddit/
 #   → ~/.runbrowser/commands/reddit/hot.ts
 #   → ~/.runbrowser/commands/reddit/search.ts
@@ -263,17 +263,17 @@ runbrowser reddit hot --limit 5
 runbrowser reddit search "ブラウザ自動化"
 
 # アンインストール
-runbrowser uninstall reddit
+runbrowser commands uninstall reddit
 # ✓ Uninstalled reddit/
 ```
 
 コミュニティコマンドは **TypeScript ファイル**として `~/.runbrowser/commands/<site>/` にダウンロードされます。カスタムサイトコマンドと同じ形式 — 閲覧、修正、フォークが可能。
 
-**仕組み：** CLI が `runbrowser/commands` GitHub リポジトリから `.ts` ファイルを取得しローカルに保存。リレーサーバーが jiti で実行時にロード — コンパイル不要。各パッケージは1つ以上のコマンドファイルを含むディレクトリ。
+**仕組み：** CLI が `runbrowser/commands` GitHub リポジトリから `.ts` ファイルを取得しローカルに保存。リレーサーバーが jiti で実行時にロード — コンパイル不要。各拡張は1つ以上のコマンドファイルを含むディレクトリ。
 
-**自分のコマンドを貢献：** [runbrowser/commands](https://github.com/runbrowser/commands) リポジトリにディレクトリを作成し、`.ts` ファイルを置いて PR を提出。あなたのコマンドが `runbrowser install` で全員に利用可能に。
+**自分のコマンドを貢献：** [runbrowser/commands](https://github.com/runbrowser/commands) リポジトリにディレクトリを作成し、`.ts` ファイルを置いて PR を提出。あなたのコマンドが `runbrowser commands install` で全員に利用可能に。
 
-<Caption>1コマンドでインストール。コミュニティメンテナンス。カスタムコマンドと同じ TypeScript 形式。</Caption>
+<Caption>一貫したサブコマンドパターン。コミュニティメンテナンス。カスタムコマンドと同じ TypeScript 形式。</Caption>
 
 </Section>
 

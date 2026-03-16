@@ -29,6 +29,7 @@ export function printMainHelp(
     'Execution':    [],
     'Session':      [],
     'Config':       [],
+    'Command Extensions': [],
     'Server':       [],
   }
 
@@ -39,7 +40,8 @@ export function printMainHelp(
   const execCmds = new Set(['eval', 'cdp'])
   const sessCmds = new Set(['session'])
   const cfgCmds = new Set(['config'])
-  const srvCmds = new Set(['serve', 'logfile', 'skill', 'diff', 'record', 'install', 'uninstall'])
+  const cmdsCmds = new Set(['commands'])
+  const srvCmds = new Set(['serve', 'logfile', 'skill', 'diff', 'record'])
 
   for (const cmd of builtinCommands) {
     const name = cmd.name.split(' ')[0]
@@ -49,6 +51,7 @@ export function printMainHelp(
     else if (execCmds.has(name)) categories['Execution'].push(cmd)
     else if (sessCmds.has(name)) categories['Session'].push(cmd)
     else if (cfgCmds.has(name)) categories['Config'].push(cmd)
+    else if (cmdsCmds.has(name)) categories['Command Extensions'].push(cmd)
     else if (srvCmds.has(name)) categories['Server'].push(cmd)
     else categories['Navigation'].push(cmd) // default
   }

@@ -250,13 +250,13 @@ export async function run(ctx, args) {
 
 <Section id="command-extensions" title="命令扩展">
 
-通过一条命令从 [runbrowser/commands](https://github.com/runbrowser/commands) 仓库安装**社区维护的命令**。无需克隆、无需构建 —— 安装即用。
+从 [runbrowser/commands](https://github.com/runbrowser/commands) 仓库安装**社区维护的命令**。无需克隆、无需构建 —— 安装即用。
 
 ```bash
-# 列出可用的命令包
-runbrowser install --list
+# 列出可用的命令扩展
+runbrowser commands list
 
-# Available command packages:
+# Available command extensions:
 #
 #   reddit
 #   youtube
@@ -264,8 +264,8 @@ runbrowser install --list
 #   hackernews
 #   producthunt
 
-# 安装一个包
-runbrowser install reddit
+# 安装一个扩展
+runbrowser commands install reddit
 # ✓ Installed reddit/
 #   → ~/.runbrowser/commands/reddit/hot.ts
 #   → ~/.runbrowser/commands/reddit/search.ts
@@ -275,17 +275,17 @@ runbrowser reddit hot --limit 5
 runbrowser reddit search "浏览器自动化"
 
 # 卸载
-runbrowser uninstall reddit
+runbrowser commands uninstall reddit
 # ✓ Uninstalled reddit/
 ```
 
 社区命令以 **TypeScript 文件**的形式下载到 `~/.runbrowser/commands/<site>/`。它们与自定义站点命令格式相同 —— 你可以查看、修改或 fork 它们。
 
-**工作原理：** CLI 从 `runbrowser/commands` GitHub 仓库获取 `.ts` 文件并保存到本地。中继服务器在运行时通过 jiti 加载它们 —— 无需编译。每个包是一个包含一个或多个命令文件的目录。
+**工作原理：** CLI 从 `runbrowser/commands` GitHub 仓库获取 `.ts` 文件并保存到本地。中继服务器在运行时通过 jiti 加载它们 —— 无需编译。每个扩展是一个包含一个或多个命令文件的目录。
 
-**贡献你自己的命令：** 在 [runbrowser/commands](https://github.com/runbrowser/commands) 仓库中创建一个目录，放入你的 `.ts` 文件并提交 PR。你的命令将通过 `runbrowser install` 对所有人可用。
+**贡献你自己的命令：** 在 [runbrowser/commands](https://github.com/runbrowser/commands) 仓库中创建一个目录，放入你的 `.ts` 文件并提交 PR。你的命令将通过 `runbrowser commands install` 对所有人可用。
 
-<Caption>一条命令安装。社区维护。与自定义命令相同的 TypeScript 格式。</Caption>
+<Caption>一致的子命令模式。社区维护。与自定义命令相同的 TypeScript 格式。</Caption>
 
 </Section>
 

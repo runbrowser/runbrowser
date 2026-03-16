@@ -238,13 +238,13 @@ export async function run(ctx, args) {
 
 <Section id="command-extensions" title="Extensiones de comandos">
 
-Instala **comandos mantenidos por la comunidad** del repositorio [runbrowser/commands](https://github.com/runbrowser/commands) con un solo comando. Sin clonar, sin pasos de construcción — instala y usa.
+Instala **comandos mantenidos por la comunidad** del repositorio [runbrowser/commands](https://github.com/runbrowser/commands). Sin clonar, sin pasos de construcción — instala y usa.
 
 ```bash
-# Listar paquetes de comandos disponibles
-runbrowser install --list
+# Listar extensiones de comandos disponibles
+runbrowser commands list
 
-# Available command packages:
+# Available command extensions:
 #
 #   reddit
 #   youtube
@@ -252,8 +252,8 @@ runbrowser install --list
 #   hackernews
 #   producthunt
 
-# Instalar un paquete
-runbrowser install reddit
+# Instalar una extensión
+runbrowser commands install reddit
 # ✓ Installed reddit/
 #   → ~/.runbrowser/commands/reddit/hot.ts
 #   → ~/.runbrowser/commands/reddit/search.ts
@@ -263,17 +263,17 @@ runbrowser reddit hot --limit 5
 runbrowser reddit search "automatización de navegador"
 
 # Desinstalar
-runbrowser uninstall reddit
+runbrowser commands uninstall reddit
 # ✓ Uninstalled reddit/
 ```
 
 Los comandos comunitarios se descargan como **archivos TypeScript** en `~/.runbrowser/commands/<site>/`. Siguen el mismo formato que los comandos de sitio personalizados — puedes leerlos, modificarlos o bifurcarlos.
 
-**Cómo funciona:** El CLI descarga archivos `.ts` del repositorio GitHub `runbrowser/commands` y los guarda localmente. El servidor relay los carga vía jiti en tiempo de ejecución — sin compilación necesaria. Cada paquete es un directorio con uno o más archivos de comandos.
+**Cómo funciona:** El CLI descarga archivos `.ts` del repositorio GitHub `runbrowser/commands` y los guarda localmente. El servidor relay los carga vía jiti en tiempo de ejecución — sin compilación necesaria. Cada extensión es un directorio con uno o más archivos de comandos.
 
-**Contribuye tus propios comandos:** Crea un directorio en el repositorio [runbrowser/commands](https://github.com/runbrowser/commands) con tus archivos `.ts` y envía un PR. Tus comandos estarán disponibles para todos vía `runbrowser install`.
+**Contribuye tus propios comandos:** Crea un directorio en el repositorio [runbrowser/commands](https://github.com/runbrowser/commands) con tus archivos `.ts` y envía un PR. Tus comandos estarán disponibles para todos vía `runbrowser commands install`.
 
-<Caption>Instalación con un comando. Mantenido por la comunidad. Mismo formato TypeScript que los comandos personalizados.</Caption>
+<Caption>Patrón de subcomandos consistente. Mantenido por la comunidad. Mismo formato TypeScript que los comandos personalizados.</Caption>
 
 </Section>
 

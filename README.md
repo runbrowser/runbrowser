@@ -186,6 +186,20 @@ runbrowser config set profile "Profile 11"
 open -a "Google Chrome" --args --auto-accept-this-tab-capture --profile-directory="Profile 11"
 ```
 
+### Command Extensions
+
+Install community-maintained site commands from the [runbrowser/commands](https://github.com/runbrowser/commands) repo.
+
+```bash
+runbrowser commands list              # list available extensions
+runbrowser commands install reddit    # install an extension
+runbrowser commands uninstall reddit  # remove an extension
+
+# Use installed commands immediately
+runbrowser reddit hot --limit 5
+runbrowser reddit search "browser automation"
+```
+
 ### Configuration
 
 ```bash

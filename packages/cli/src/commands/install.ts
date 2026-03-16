@@ -1,10 +1,10 @@
 /**
- * Install/uninstall community commands from runbrowser/commands repo.
+ * Commands subgroup: list, install, uninstall community commands.
  *
  * Usage:
- *   runbrowser install reddit          — downloads reddit/*.ts → ~/.runbrowser/commands/reddit/
- *   runbrowser install --list          — lists available packages
- *   runbrowser uninstall reddit        — removes ~/.runbrowser/commands/reddit/
+ *   runbrowser commands list              — lists available packages
+ *   runbrowser commands install reddit    — downloads reddit/*.ts → ~/.runbrowser/commands/reddit/
+ *   runbrowser commands uninstall reddit  — removes ~/.runbrowser/commands/reddit/
  */
 
 import fs from 'node:fs'
@@ -93,90 +93,96 @@ function uninstallPackage(site: string): boolean {
 }
 
 // ============================================================================
-// Register: install
+// Register: commands (subgroup with list, install, uninstall)
 // ============================================================================
 
 registerBuiltinCommand({
   def: {
-    name: 'install',
-    description: 'Install community commands from runbrowser/commands',
+    name: 'commands',
+    description: 'Manage command extensions: list, install, uninstall',
     positionals: [
-      { name: 'site', description: 'Package to install (e.g. reddit, x, youtube)' },
+      { name: 'action', description: 'Action: list, install, uninstall', required: true },
+      { name: 'package', description: 'Package name (e.g. reddit, youtube)' },
     ],
-    flags: {
-      list: { type: 'boolean', alias: 'l', description: 'List available packages' },
-    },
   },
   async execute(args: ParsedArgs, _resolveSession: SessionResolver) {
-    const isList = args.flags.get('list') || args.unknownFlags.get('list')
-    const site = args.subcommand
+    // args.subcommand = action (list, install, uninstall)
+    // args.positionals[0] = package name (for install/uninstall)
+    const action = args.subcommand
+    const pkg = args.positionals[0]
 
-    if (isList || (!site && !args.help)) {
-      // List available packages
-      try {
-        console.log(pc.bold('Available command packages:'))
-        console.log()
-        const packages = await listAvailable()
-        for (const pkg of packages) {
-          // Check if already installed
-          const installed = fs.existsSync(path.join(COMMANDS_DIR, pkg))
-          const marker = installed ? pc.green(' ✓ installed') : ''
-          console.log(`  ${pc.cyan(pkg)}${marker}`)
+    if (!action || args.help) {
+      console.log(pc.bold('Usage:'))
+      console.log(`  runbrowser commands list                  List available command extensions`)
+      console.log(`  runbrowser commands install <package>     Install a command extension`)
+      console.log(`  runbrowser commands uninstall <package>   Uninstall a command extension`)
+      process.exit(0)
+    }
+
+    switch (action) {
+      case 'list':
+      case 'ls': {
+        try {
+          console.log(pc.bold('Available command extensions:'))
+          console.log()
+          const packages = await listAvailable()
+          for (const p of packages) {
+            const installed = fs.existsSync(path.join(COMMANDS_DIR, p))
+            const marker = installed ? pc.green(' ✓ installed') : ''
+            console.log(`  ${pc.cyan(p)}${marker}`)
+          }
+          console.log()
+          console.log(`Run ${pc.cyan('runbrowser commands install <package>')} to install.`)
+        } catch (e: any) {
+          console.error(`Error: ${e.message}`)
+          process.exit(1)
         }
-        console.log()
-        console.log(`Run ${pc.cyan('runbrowser install <package>')} to install.`)
-      } catch (e: any) {
-        console.error(`Error: ${e.message}`)
+        break
+      }
+
+      case 'install':
+      case 'add': {
+        if (!pkg) {
+          console.error('Usage: runbrowser commands install <package>')
+          console.error(`Run ${pc.cyan('runbrowser commands list')} to see available packages.`)
+          process.exit(1)
+        }
+
+        try {
+          console.log(`Installing ${pc.cyan(pkg)}...`)
+          const files = await installPackage(pkg)
+          console.log(pc.green(`✓ Installed ${pkg}/`))
+          for (const f of files) {
+            console.log(pc.dim(`  → ~/.runbrowser/commands/${pkg}/${f}`))
+          }
+        } catch (e: any) {
+          console.error(`Error: ${e.message}`)
+          process.exit(1)
+        }
+        break
+      }
+
+      case 'uninstall':
+      case 'remove':
+      case 'rm': {
+        if (!pkg) {
+          console.error('Usage: runbrowser commands uninstall <package>')
+          process.exit(1)
+        }
+
+        if (uninstallPackage(pkg)) {
+          console.log(pc.green(`✓ Uninstalled ${pkg}/`))
+        } else {
+          console.error(`Package "${pkg}" is not installed.`)
+          process.exit(1)
+        }
+        break
+      }
+
+      default:
+        console.error(`Unknown action: ${action}`)
+        console.error(`Available actions: list, install, uninstall`)
         process.exit(1)
-      }
-      return
-    }
-
-    if (!site) {
-      console.error('Usage: runbrowser install <package>')
-      console.error(`Run ${pc.cyan('runbrowser install --list')} to see available packages.`)
-      process.exit(1)
-    }
-
-    // Install the package
-    try {
-      console.log(`Installing ${pc.cyan(site)}...`)
-      const files = await installPackage(site)
-      console.log(pc.green(`✓ Installed ${site}/`))
-      for (const f of files) {
-        console.log(pc.dim(`  → ~/.runbrowser/commands/${site}/${f}`))
-      }
-    } catch (e: any) {
-      console.error(`Error: ${e.message}`)
-      process.exit(1)
-    }
-  },
-})
-
-// ============================================================================
-// Register: uninstall
-// ============================================================================
-
-registerBuiltinCommand({
-  def: {
-    name: 'uninstall',
-    description: 'Remove installed community commands',
-    positionals: [
-      { name: 'site', description: 'Package to uninstall', required: true },
-    ],
-  },
-  async execute(args: ParsedArgs, _resolveSession: SessionResolver) {
-    const site = args.subcommand
-    if (!site) {
-      console.error('Usage: runbrowser uninstall <package>')
-      process.exit(1)
-    }
-
-    if (uninstallPackage(site)) {
-      console.log(pc.green(`✓ Uninstalled ${site}/`))
-    } else {
-      console.error(`Package "${site}" is not installed.`)
-      process.exit(1)
     }
   },
 })

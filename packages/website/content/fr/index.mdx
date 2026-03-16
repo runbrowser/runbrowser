@@ -238,13 +238,13 @@ export async function run(ctx, args) {
 
 <Section id="command-extensions" title="Extensions de commandes">
 
-Installez des **commandes maintenues par la communauté** depuis le dépôt [runbrowser/commands](https://github.com/runbrowser/commands) avec une seule commande. Pas de clonage, pas d'étape de build — installez et utilisez.
+Installez des **commandes maintenues par la communauté** depuis le dépôt [runbrowser/commands](https://github.com/runbrowser/commands). Pas de clonage, pas d'étape de build — installez et utilisez.
 
 ```bash
-# Lister les paquets de commandes disponibles
-runbrowser install --list
+# Lister les extensions de commandes disponibles
+runbrowser commands list
 
-# Available command packages:
+# Available command extensions:
 #
 #   reddit
 #   youtube
@@ -252,8 +252,8 @@ runbrowser install --list
 #   hackernews
 #   producthunt
 
-# Installer un paquet
-runbrowser install reddit
+# Installer une extension
+runbrowser commands install reddit
 # ✓ Installed reddit/
 #   → ~/.runbrowser/commands/reddit/hot.ts
 #   → ~/.runbrowser/commands/reddit/search.ts
@@ -263,17 +263,17 @@ runbrowser reddit hot --limit 5
 runbrowser reddit search "automatisation navigateur"
 
 # Désinstaller
-runbrowser uninstall reddit
+runbrowser commands uninstall reddit
 # ✓ Uninstalled reddit/
 ```
 
 Les commandes communautaires sont téléchargées comme **fichiers TypeScript** dans `~/.runbrowser/commands/<site>/`. Elles suivent le même format que les commandes de site personnalisées — vous pouvez les lire, modifier ou forker.
 
-**Fonctionnement :** Le CLI récupère les fichiers `.ts` depuis le dépôt GitHub `runbrowser/commands` et les sauvegarde localement. Le serveur relais les charge via jiti à l'exécution — pas de compilation nécessaire. Chaque paquet est un répertoire avec un ou plusieurs fichiers de commandes.
+**Fonctionnement :** Le CLI récupère les fichiers `.ts` depuis le dépôt GitHub `runbrowser/commands` et les sauvegarde localement. Le serveur relais les charge via jiti à l'exécution — pas de compilation nécessaire. Chaque extension est un répertoire avec un ou plusieurs fichiers de commandes.
 
-**Contribuez vos propres commandes :** Créez un répertoire dans le dépôt [runbrowser/commands](https://github.com/runbrowser/commands) avec vos fichiers `.ts` et soumettez une PR. Vos commandes deviennent disponibles pour tous via `runbrowser install`.
+**Contribuez vos propres commandes :** Créez un répertoire dans le dépôt [runbrowser/commands](https://github.com/runbrowser/commands) avec vos fichiers `.ts` et soumettez une PR. Vos commandes deviennent disponibles pour tous via `runbrowser commands install`.
 
-<Caption>Installation en une commande. Maintenu par la communauté. Même format TypeScript que les commandes personnalisées.</Caption>
+<Caption>Modèle de sous-commandes cohérent. Maintenu par la communauté. Même format TypeScript que les commandes personnalisées.</Caption>
 
 </Section>
 

@@ -164,6 +164,11 @@ config set <key> <value>        # Set config value
 config unset <key>              # Remove config value
 config show                     # Show current config
 
+# ── commands: manage command packages ──
+commands list                   # List available packages
+commands install <package>      # Install community commands
+commands uninstall <package>    # Remove installed commands
+
 # ── Utilities ──
 serve [--host] [--token]        # Start relay server
 logfile                         # Print log file paths
@@ -241,6 +246,9 @@ Session:
 Config:
   config                             Manage config: set, unset, show
 
+Commands:
+  commands                           Manage command packages: list, install, uninstall
+
 Server:
   serve                              Start the relay server
   logfile                            Print log file paths
@@ -253,7 +261,7 @@ Server:
 
 | Command | Why not |
 |---------|---------|
-| `install` | We use the user's Chrome. No browser to install. |
+| `install` (flat) | Ambiguous — install what? Browser? Commands? Use `commands install` instead. |
 | `set device/geo/offline/media` | This is the user's real browser. Don't mess with their settings. |
 | `trace/profiler/har` | Too specialized. Use `cdp` for raw protocol access. |
 | `cookies set/clear` | Modifying the user's real cookies is dangerous. |

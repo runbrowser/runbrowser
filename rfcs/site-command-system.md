@@ -178,9 +178,25 @@ The `run` MCP tool handles site commands as a fallback:
 
 ---
 
-## 5. Command Discovery: Full Flow
+## 5. Command Management & Discovery: Full Flow
 
 ```
+$ runbrowser commands list
+Available command packages:
+
+  reddit
+  youtube
+  x ✓ installed
+  hackernews
+  producthunt
+
+Run runbrowser commands install <package> to install.
+
+$ runbrowser commands install github
+Installing github...
+✓ Installed github/
+  → ~/.runbrowser/commands/github/trending.ts
+
 $ runbrowser github trending --limit 3
 
 RANK  NAME                 STARS   LANGUAGE
