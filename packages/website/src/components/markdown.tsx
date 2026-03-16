@@ -449,6 +449,9 @@ export function ComparisonTable({
   headers: [string, string, string]
   rows: Array<[string, string, string]>
 }) {
+  if (!headers || !rows) {
+    return null
+  }
   return (
     <div className='w-full max-w-full overflow-x-auto' style={{ padding: '8px 0' }}>
       {title && (

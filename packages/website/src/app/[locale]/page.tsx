@@ -82,7 +82,7 @@ export default async function Page({ params }: { params: Promise<{ locale: strin
 
   return (
     <EditorialPage toc={data.toc} logo='runbrowser' locale={locale}>
-      <MDXRemote source={content} components={mdxComponents} />
+      <MDXRemote source={content} components={mdxComponents} options={{ blockJS: false }} />
     </EditorialPage>
   )
 }
