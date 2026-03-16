@@ -1,7 +1,14 @@
 # RunBrowser: Agent Browser Runtime — System Design
 
+> Status: **Future / Aspirational** — Foundation (direct CDP) is implemented.
+> Credential Broker, Vision Engine, and Agent Identity are not yet implemented.
+>
 > A secure, extensible browser runtime for AI agents.
 > CDP + Extension + Credential Broker + Vision Fallback.
+>
+> **What's done:** Direct CDP layer (Section 3.1), high-level CLI commands,
+> session management, accessibility snapshots, screen recording.
+> **What's not done:** Credential Broker, Autofill Engine, Vision Engine, Agent Identity.
 
 ---
 

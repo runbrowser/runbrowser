@@ -147,19 +147,12 @@ export class CDPExecutor implements ExecutorLike {
     // Without this, connectedTargets stays empty and every subsequent sendCDP
     // call creates another blank tab.
     if (this.registerTarget && result.targetInfo) {
-      this.logger?.log(
-        `[CDPExecutor] registerTarget: extensionId=${extensionId} sessionId=${result.sessionId} targetId=${result.targetInfo.targetId}`,
-      )
       this.registerTarget({
         extensionId,
         sessionId: result.sessionId,
         targetId: result.targetInfo.targetId,
         targetInfo: result.targetInfo,
       })
-    } else {
-      this.logger?.log(
-        `[CDPExecutor] autoCreateTab: registerTarget=${!!this.registerTarget} targetInfo=${!!result.targetInfo} result=${JSON.stringify(result)}`,
-      )
     }
 
     return result.sessionId

@@ -55,7 +55,8 @@ export function registerApiCustomCommandRoutes(app: Hono, ctx: ServerContext) {
           if (result.isError) throw new Error(result.text)
           try {
             return JSON.parse(result.text)
-          } catch {
+          } catch (e) {
+            // If result.text is a plain string (not JSON), return it as-is
             return result.text
           }
         },
@@ -68,6 +69,7 @@ export function registerApiCustomCommandRoutes(app: Hono, ctx: ServerContext) {
 
       return c.json({ data, columns })
     } catch (error: any) {
+      ctx.logger?.error(`[CustomCommand] error:`, error.message, error.stack)
       return c.json({ error: error.message }, 500)
     }
   })
