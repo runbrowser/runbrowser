@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import matter from 'gray-matter'
 import { MDXRemote } from 'next-mdx-remote/rsc'
@@ -31,6 +32,11 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>
 }): Promise<Metadata> {
   const { locale } = await params
+
+  if (!routing.locales.includes(locale as (typeof routing.locales)[number])) {
+    return {}
+  }
+
   const t = await getTranslations({ locale, namespace: 'metadata' })
 
   return {
@@ -50,8 +56,11 @@ export async function generateMetadata({
   }
 }
 
-function loadContent(locale: string): { content: string; data: ContentFrontmatter } {
+function loadContent(locale: string): { content: string; data: ContentFrontmatter } | null {
   const filePath = path.join(process.cwd(), 'content', locale, 'index.mdx')
+  if (!fs.existsSync(filePath)) {
+    return null
+  }
   const raw = fs.readFileSync(filePath, 'utf-8')
   const { content, data } = matter(raw)
   return { content, data: data as ContentFrontmatter }
@@ -59,7 +68,17 @@ function loadContent(locale: string): { content: string; data: ContentFrontmatte
 
 export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
-  const { content, data } = loadContent(locale)
+
+  if (!routing.locales.includes(locale as (typeof routing.locales)[number])) {
+    notFound()
+  }
+
+  const result = loadContent(locale)
+  if (!result) {
+    notFound()
+  }
+
+  const { content, data } = result
 
   return (
     <EditorialPage toc={data.toc} logo='runbrowser' locale={locale}>
