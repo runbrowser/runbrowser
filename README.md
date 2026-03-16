@@ -2,7 +2,7 @@
 
 > Control your browser via CDP. Uses extension + CLI. No context bloat.
 
-Other browser MCPs spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. RunBrowser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
+Other Browser Automation spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. RunBrowser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
 
 |               | Playwright MCP    | RunBrowser                        |
 | ------------- | ----------------- | --------------------------------- |
