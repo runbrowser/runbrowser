@@ -14,6 +14,8 @@ toc:
     href: "#cli-commands"
   - label: "Comandos de sitio"
     href: "#site-commands"
+  - label: "Extensiones de comandos"
+    href: "#command-extensions"
   - label: "Sesiones"
     href: "#sessions"
   - label: "Grabación de pantalla"
@@ -234,6 +236,47 @@ export async function run(ctx, args) {
 
 </Section>
 
+<Section id="command-extensions" title="Extensiones de comandos">
+
+Instala **comandos mantenidos por la comunidad** del repositorio [runbrowser/commands](https://github.com/runbrowser/commands) con un solo comando. Sin clonar, sin pasos de construcción — instala y usa.
+
+```bash
+# Listar paquetes de comandos disponibles
+runbrowser install --list
+
+# Available command packages:
+#
+#   reddit
+#   youtube
+#   x ✓ installed
+#   hackernews
+#   producthunt
+
+# Instalar un paquete
+runbrowser install reddit
+# ✓ Installed reddit/
+#   → ~/.runbrowser/commands/reddit/hot.ts
+#   → ~/.runbrowser/commands/reddit/search.ts
+
+# Usar inmediatamente
+runbrowser reddit hot --limit 5
+runbrowser reddit search "automatización de navegador"
+
+# Desinstalar
+runbrowser uninstall reddit
+# ✓ Uninstalled reddit/
+```
+
+Los comandos comunitarios se descargan como **archivos TypeScript** en `~/.runbrowser/commands/<site>/`. Siguen el mismo formato que los comandos de sitio personalizados — puedes leerlos, modificarlos o bifurcarlos.
+
+**Cómo funciona:** El CLI descarga archivos `.ts` del repositorio GitHub `runbrowser/commands` y los guarda localmente. El servidor relay los carga vía jiti en tiempo de ejecución — sin compilación necesaria. Cada paquete es un directorio con uno o más archivos de comandos.
+
+**Contribuye tus propios comandos:** Crea un directorio en el repositorio [runbrowser/commands](https://github.com/runbrowser/commands) con tus archivos `.ts` y envía un PR. Tus comandos estarán disponibles para todos vía `runbrowser install`.
+
+<Caption>Instalación con un comando. Mantenido por la comunidad. Mismo formato TypeScript que los comandos personalizados.</Caption>
+
+</Section>
+
 <Section id="sessions" title="Sesiones">
 
 Las sesiones se **crean automáticamente** — solo ejecuta un comando y funciona. Para uso avanzado, gestiona sesiones explícitamente.
@@ -304,6 +347,45 @@ run({ command: "eval document.title" })
 ```
 
 La herramienta `run` sigue la misma sintaxis que el CLI. El agente no necesita aprender una API separada.
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌──────────────────────────────────────────────────────────────────────┐
+│                        Cliente MCP                                  │
+│                  (Claude, Cursor, Windsurf...)                      │
+└──────────────┬──────────────────────────────┬────────────────────────┘
+               │                              │
+          skill()                        run(command)
+               │                              │
+               v                              v
+┌──────────────────────────────────────────────────────────────────────┐
+│                     Servidor MCP RunBrowser                         │
+│                                                                     │
+│   ┌─────────────────┐              ┌──────────────────────────┐     │
+│   │  herramienta     │              │  herramienta             │     │
+│   │  skill           │              │  run                     │     │
+│   │                 │              │                          │     │
+│   │  Devuelve docs  │              │  Parsea comando          │     │
+│   │  CLI + lista de │              │  Envía al relay          │     │
+│   │  comandos       │              │  Devuelve resultado      │     │
+│   └─────────────────┘              └────────────┬─────────────┘     │
+│                                                 │                   │
+└─────────────────────────────────────────────────┼───────────────────┘
+                                                  │
+                                            HTTP / WS
+                                                  │
+                                                  v
+                                    ┌─────────────────────────┐
+                                    │   Relay :19988          │
+                                    │   CDPExecutor           │
+                                    └────────────┬────────────┘
+                                                 │
+                                            chrome.debugger
+                                                 │
+                                                 v
+                                    ┌─────────────────────────┐
+                                    │   Tu navegador Chrome   │
+                                    └─────────────────────────┘`}
+</CodeBlock>
 
 </Section>
 

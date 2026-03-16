@@ -14,6 +14,8 @@ toc:
     href: "#cli-commands"
   - label: "Site commands"
     href: "#site-commands"
+  - label: "Command extensions"
+    href: "#command-extensions"
   - label: "Sessions"
     href: "#sessions"
   - label: "Screen recording"
@@ -253,6 +255,47 @@ Commands are **loaded by the relay server** via jiti — the CLI is just an HTTP
 
 </Section>
 
+<Section id="command-extensions" title="Command extensions">
+
+Install **community-maintained commands** from the [runbrowser/commands](https://github.com/runbrowser/commands) repo with a single command. No cloning, no build steps — just install and use.
+
+```bash
+# List available command packages
+runbrowser install --list
+
+# Available command packages:
+#
+#   reddit
+#   youtube
+#   x ✓ installed
+#   hackernews
+#   producthunt
+
+# Install a package
+runbrowser install reddit
+# ✓ Installed reddit/
+#   → ~/.runbrowser/commands/reddit/hot.ts
+#   → ~/.runbrowser/commands/reddit/search.ts
+
+# Use it immediately
+runbrowser reddit hot --limit 5
+runbrowser reddit search "browser automation"
+
+# Uninstall
+runbrowser uninstall reddit
+# ✓ Uninstalled reddit/
+```
+
+Community commands are downloaded as **TypeScript files** into `~/.runbrowser/commands/<site>/`. They follow the same format as custom site commands — you can read, modify, or fork them.
+
+**How it works:** The CLI fetches `.ts` files from the `runbrowser/commands` GitHub repo and saves them locally. The relay server loads them via jiti at runtime — no compilation needed. Each package is a directory with one or more command files.
+
+**Contribute your own:** Create a directory in the [runbrowser/commands](https://github.com/runbrowser/commands) repo with your `.ts` files and submit a PR. Your commands become available to everyone via `runbrowser install`.
+
+<Caption>One-command install. Community-maintained. Same TypeScript format as custom commands.</Caption>
+
+</Section>
+
 <Section id="sessions" title="Sessions">
 
 Sessions are **auto-created** — just run a command and it works. For advanced use, manage sessions explicitly.
@@ -333,6 +376,44 @@ run({ command: "github trending --limit 5" })
 ```
 
 The `run` tool follows the same syntax as the CLI. The agent doesn't need to learn a separate API.
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌──────────────────────────────────────────────────────────────────────┐
+│                         MCP Client                                  │
+│                  (Claude, Cursor, Windsurf...)                      │
+└──────────────┬──────────────────────────────┬────────────────────────┘
+               │                              │
+          skill()                        run(command)
+               │                              │
+               v                              v
+┌──────────────────────────────────────────────────────────────────────┐
+│                       RunBrowser MCP Server                         │
+│                                                                     │
+│   ┌─────────────────┐              ┌──────────────────────────┐     │
+│   │   skill tool     │              │      run tool            │     │
+│   │                 │              │                          │     │
+│   │  Returns CLI    │              │  Parses command string   │     │
+│   │  docs + site    │              │  Dispatches to relay     │     │
+│   │  command list   │              │  Returns result          │     │
+│   └─────────────────┘              └────────────┬─────────────┘     │
+│                                                 │                   │
+└─────────────────────────────────────────────────┼───────────────────┘
+                                                  │
+                                            HTTP / WS
+                                                  │
+                                                  v
+                                    ┌─────────────────────────┐
+                                    │   Relay :19988          │
+                                    │   CDPExecutor           │
+                                    └────────────┬────────────┘
+                                                 │
+                                            chrome.debugger
+                                                 │
+                                                 v
+                                    ┌─────────────────────────┐
+                                    │   Your Chrome Browser   │
+                                    └─────────────────────────┘`}
+</CodeBlock>
 
 </Section>
 

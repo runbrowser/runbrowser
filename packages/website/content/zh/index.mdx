@@ -14,6 +14,8 @@ toc:
     href: "#cli-commands"
   - label: "站点命令"
     href: "#site-commands"
+  - label: "命令扩展"
+    href: "#command-extensions"
   - label: "会话"
     href: "#sessions"
   - label: "屏幕录制"
@@ -246,6 +248,47 @@ export async function run(ctx, args) {
 
 </Section>
 
+<Section id="command-extensions" title="命令扩展">
+
+通过一条命令从 [runbrowser/commands](https://github.com/runbrowser/commands) 仓库安装**社区维护的命令**。无需克隆、无需构建 —— 安装即用。
+
+```bash
+# 列出可用的命令包
+runbrowser install --list
+
+# Available command packages:
+#
+#   reddit
+#   youtube
+#   x ✓ installed
+#   hackernews
+#   producthunt
+
+# 安装一个包
+runbrowser install reddit
+# ✓ Installed reddit/
+#   → ~/.runbrowser/commands/reddit/hot.ts
+#   → ~/.runbrowser/commands/reddit/search.ts
+
+# 立即使用
+runbrowser reddit hot --limit 5
+runbrowser reddit search "浏览器自动化"
+
+# 卸载
+runbrowser uninstall reddit
+# ✓ Uninstalled reddit/
+```
+
+社区命令以 **TypeScript 文件**的形式下载到 `~/.runbrowser/commands/<site>/`。它们与自定义站点命令格式相同 —— 你可以查看、修改或 fork 它们。
+
+**工作原理：** CLI 从 `runbrowser/commands` GitHub 仓库获取 `.ts` 文件并保存到本地。中继服务器在运行时通过 jiti 加载它们 —— 无需编译。每个包是一个包含一个或多个命令文件的目录。
+
+**贡献你自己的命令：** 在 [runbrowser/commands](https://github.com/runbrowser/commands) 仓库中创建一个目录，放入你的 `.ts` 文件并提交 PR。你的命令将通过 `runbrowser install` 对所有人可用。
+
+<Caption>一条命令安装。社区维护。与自定义命令相同的 TypeScript 格式。</Caption>
+
+</Section>
+
 <Section id="sessions" title="会话">
 
 会话**自动创建** —— 直接运行命令即可。对于高级用途，可以显式管理会话。
@@ -326,6 +369,44 @@ run({ command: "github trending --limit 5" })
 ```
 
 `run` 工具使用与 CLI 相同的语法。Agent 不需要学习单独的 API。
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌──────────────────────────────────────────────────────────────────────┐
+│                         MCP 客户端                                   │
+│                  (Claude, Cursor, Windsurf...)                      │
+└──────────────┬──────────────────────────────┬────────────────────────┘
+               │                              │
+          skill()                        run(command)
+               │                              │
+               v                              v
+┌──────────────────────────────────────────────────────────────────────┐
+│                     RunBrowser MCP 服务器                             │
+│                                                                     │
+│   ┌─────────────────┐              ┌──────────────────────────┐     │
+│   │   skill 工具     │              │      run 工具            │     │
+│   │                 │              │                          │     │
+│   │  返回 CLI       │              │  解析命令字符串           │     │
+│   │  文档 + 站点    │              │  转发到中继服务器         │     │
+│   │  命令列表       │              │  返回结果                │     │
+│   └─────────────────┘              └────────────┬─────────────┘     │
+│                                                 │                   │
+└─────────────────────────────────────────────────┼───────────────────┘
+                                                  │
+                                            HTTP / WS
+                                                  │
+                                                  v
+                                    ┌─────────────────────────┐
+                                    │   中继服务器 :19988       │
+                                    │   CDPExecutor           │
+                                    └────────────┬────────────┘
+                                                 │
+                                            chrome.debugger
+                                                 │
+                                                 v
+                                    ┌─────────────────────────┐
+                                    │   你的 Chrome 浏览器     │
+                                    └─────────────────────────┘`}
+</CodeBlock>
 
 </Section>
 
