@@ -352,8 +352,9 @@ RunBrowser wouldn't exist without the work of these projects and their maintaine
 - [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. RunBrowser began as a fork of playwriter and owes its Chrome extension architecture to Tommaso's original design.
 - [bb-browser](https://github.com/epiral/bb-browser) & [bb-sites](https://github.com/epiral/bb-sites) — A beautifully designed browser automation tool with an impressive collection of 45+ community site adapters. The bb-sites ecosystem is a constant source of inspiration.
 - [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Pioneered many ideas around comprehensive browser CLIs for AI agents.
+- [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — The command extensions system (`runbrowser commands install/list/uninstall`) was inspired by pi's elegant approach to extensibility and package management.
 
-Thank you to all these maintainers for pushing browser automation forward.
+Thank you to all these maintainers for pushing the ecosystem forward.
 
 ## License
 
