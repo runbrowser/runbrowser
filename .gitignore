@@ -6,3 +6,4 @@ tmp/
 .env.local
 packages/extension/dist-*
 packages/cli/relay-server.log
+screenshots/
