@@ -347,14 +347,13 @@ runbrowser logfile  # prints log file paths
 
 ## Acknowledgements
 
-RunBrowser stands on the shoulders of giants. These projects pioneered the ideas that made RunBrowser possible — we learned from each of them and tried to push the design further.
+RunBrowser wouldn't exist without the work of these projects and their maintainers.
 
-- [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — Where it all started. Playwriter proved that a Chrome extension + Playwright sandbox is the right architecture for real-browser automation. RunBrowser began as a fork and evolved into a full CDP-native CLI with 50+ commands, accessibility snapshots, and a two-tool MCP model.
-- [bb-browser](https://github.com/epiral/bb-browser) — Showed that "your browser is the API" is a powerful idea. RunBrowser shares the same philosophy — your logins, your extensions, your cookies — and extends it with auto-sessions, visual feedback, and structured site commands.
-- [bb-sites](https://github.com/epiral/bb-sites) — An incredible collection of 45+ site adapters covering Reddit, GitHub, YouTube, Twitter, Bilibili, Zhihu, and more. A constant source of inspiration for RunBrowser's command extensions ecosystem.
-- [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Demonstrated the value of a comprehensive browser CLI for AI agents. RunBrowser takes a leaner approach — fewer commands, direct CDP instead of Playwright, and a single `run` tool instead of dozens of MCP tools.
+- [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. RunBrowser began as a fork of playwriter and owes its core architecture to Tommaso's original vision of a Chrome extension + sandbox approach.
+- [bb-browser](https://github.com/epiral/bb-browser) & [bb-sites](https://github.com/epiral/bb-sites) — A beautifully designed browser automation tool with an impressive collection of 45+ community site adapters. The bb-sites ecosystem is a constant source of inspiration.
+- [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Pioneered many ideas around comprehensive browser CLIs for AI agents.
 
-Thank you to all these projects and their maintainers. The browser automation space is better because of your work.
+Thank you to all these maintainers for pushing browser automation forward.
 
 ## License
 
