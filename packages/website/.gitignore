@@ -3,3 +3,4 @@ node_modules/
 build/
 .react-router/
 next-env.d.ts
+.vercel

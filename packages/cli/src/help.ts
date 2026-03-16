@@ -39,7 +39,7 @@ export function printMainHelp(
   const execCmds = new Set(['eval', 'cdp'])
   const sessCmds = new Set(['session'])
   const cfgCmds = new Set(['config'])
-  const srvCmds = new Set(['serve', 'logfile', 'skill', 'diff', 'record'])
+  const srvCmds = new Set(['serve', 'logfile', 'skill', 'diff', 'record', 'install', 'uninstall'])
 
   for (const cmd of builtinCommands) {
     const name = cmd.name.split(' ')[0]

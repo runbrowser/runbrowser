@@ -15,7 +15,7 @@
     "gray-matter": "^4.0.3",
     "next": "^15.1.0",
     "next-intl": "^3.26.0",
-    "next-mdx-remote": "^5.0.0",
+    "next-mdx-remote": "^6.0.0",
     "prismjs": "^1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

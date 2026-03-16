@@ -38,6 +38,7 @@ import './commands/interaction.js'
 import './commands/execution.js'
 import './commands/management.js'
 import './commands/recording.js'
+import './commands/install.js'
 
 import { getBuiltinCommand, getAllBuiltinCommands, type SessionResolver } from './commands/index.js'
 
