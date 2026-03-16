@@ -46,35 +46,60 @@ async function cdpGetOuterHTML(sendCDP: SendCDP, backendNodeId: number): Promise
 // Navigation
 // ============================================================================
 
-export async function navigate(sendCDP: SendCDP, url: string): Promise<{ url: string; title: string }> {
-  await sendCDP('Page.enable')
-  await sendCDP('Page.navigate', { url })
+export interface NavigateHooks {
+  /** Called after Page.navigate is sent — signals that a cross-origin target detach may happen. */
+  onNavigationSent?: () => void
+  /** Called when navigation completes or times out — cleanup. */
+  onComplete?: () => void
+}
 
-  // Wait for navigation to complete by polling readyState.
-  // Cross-origin navigations may destroy the execution context temporarily.
-  const maxWait = 10000
-  const start = Date.now()
+export async function navigate(sendCDP: SendCDP, url: string, hooks?: NavigateHooks): Promise<{ url: string; title: string }> {
+  try {
+    await sendCDP('Page.enable')
+    await sendCDP('Page.navigate', { url })
 
-  while (Date.now() - start < maxWait) {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    try {
-      const readyResult = await cdpEvaluate(sendCDP, 'document.readyState')
-      const ready = String(readyResult.result.value ?? '')
-      if (ready === 'complete' || ready === 'interactive') {
-        const titleResult = await cdpEvaluate(sendCDP, 'document.title')
-        const urlResult = await cdpEvaluate(sendCDP, 'window.location.href')
-        return {
-          url: String(urlResult.result.value ?? url),
-          title: String(titleResult.result.value ?? ''),
+    // Signal that the cross-origin detach/re-attach may now happen.
+    // From this point, sendCDP should wait for target re-attachment
+    // instead of creating a new tab.
+    hooks?.onNavigationSent?.()
+
+    // Wait for the page to load. Cross-origin navigations (especially from about:blank)
+    // temporarily destroy the execution context. If we poll too early, Runtime.evaluate
+    // fails and the error path in sendCDP may trigger autoCreateTab, spawning blank tabs.
+    // Wait 3s before the first poll to let Chrome complete the navigation.
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+
+    const maxWait = 12000
+    const start = Date.now()
+
+    while (Date.now() - start < maxWait) {
+      try {
+        const readyResult = await cdpEvaluate(sendCDP, 'document.readyState')
+        const ready = String(readyResult.result.value ?? '')
+        if (ready === 'complete' || ready === 'interactive') {
+          const urlResult = await cdpEvaluate(sendCDP, 'window.location.href')
+          const currentUrl = String(urlResult.result.value ?? '')
+          // Guard against reading readyState from a stale about:blank page
+          // when we're navigating to a real URL
+          if (currentUrl === 'about:blank' && url !== 'about:blank') {
+            continue
+          }
+          const titleResult = await cdpEvaluate(sendCDP, 'document.title')
+          return {
+            url: currentUrl || url,
+            title: String(titleResult.result.value ?? ''),
+          }
         }
+      } catch {
+        // Execution context destroyed during navigation — retry
       }
-    } catch {
-      // Execution context destroyed during navigation — retry
     }
-  }
 
-  // Fallback: return target URL even if we couldn't confirm load
-  return { url, title: '' }
+    // Fallback: return target URL even if we couldn't confirm load
+    return { url, title: '' }
+  } finally {
+    hooks?.onComplete?.()
+  }
 }
 
 export async function goBack(sendCDP: SendCDP): Promise<void> {

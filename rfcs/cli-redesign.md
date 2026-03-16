@@ -1,31 +1,70 @@
-# RFC: RunBrowser CLI Redesign
+# RFC: RunBrowser CLI Design
 
-> Make RunBrowser's CLI the best browser automation CLI for AI agents.
+> Status: **Implemented** (2026-03-15)
 
 ## Design Principles
 
-1. **Flat hot path** — The 15 commands agents use 95% of the time stay flat. One word = one action.
+1. **Flat hot path** — The 20+ commands agents use most stay flat. One word = one action.
 2. **Subgroups for domains** — Management, info queries, and feature clusters get proper subcommands.
 3. **No bloat** — Every command must earn its place. If `eval` can do it and it's rare, don't add a command.
-4. **"Your browser" advantage** — Tab management, cookie reading, and credential brokering are first-class because they leverage our unique position.
+4. **"Your browser" advantage** — Tab management and real-browser features are first-class.
 5. **Agent-optimized** — Short commands save tokens. `@ref` is the primary interaction model. `--json` on everything.
+6. **Auto-session** — Session is auto-created on first command. No mandatory `-s` flag.
 
-## Why Better Than Agent-Browser
+## Architecture
 
-| Aspect | agent-browser | RunBrowser |
-|--------|--------------|------------|
-| Command count | ~90 (bloated) | ~45 (focused) |
-| Browser model | Spawns headless Chromium | **Your running Chrome** |
-| Auth story | Auth vault (stores passwords) | **Credential broker** (agent never sees passwords) |
-| Session UX | Manual session management required | **Auto-session** (just works) |
-| Tab management | `tab new/list/close` on spawned browser | `tab` on **real tabs the user sees** |
-| Cookie access | Full read/write on empty browser | **Read existing cookies** (leverage real logins) |
-| `--help` | Overwhelming wall of text | Scannable categories |
-| CLI binary | Rust CLI → Node daemon (2 processes) | Node CLI → relay → extension (clean pipeline) |
-| Selector model | CSS + refs + semantic locators | `@ref` primary, CSS fallback, `find` for semantic |
-| Diff support | ✅ snapshot + screenshot + URL | ✅ snapshot diff |
-| iOS support | ✅ via Appium | ❌ (not our focus) |
-| Bot detection | Always detected (headless) | **Bypasses** (user's real browser) |
+### Hand-Written Argument Parser (Two-Phase)
+
+The CLI uses a **hand-written argument parser** (`args.ts`) instead of `cac` or `yargs`. This was chosen for:
+
+- **Two-phase flag resolution**: Phase 1 parses known flags, stashes unknown flags. Phase 2 (future) resolves extension-registered flags.
+- **No dependency bloat**: Zero external parser dependencies.
+- **Full control**: Custom `@ref` handling, subcommand detection, variadic positionals.
+
+```
+Phase 1: Parse known flags (global + command-specific)
+  ↓
+Phase 2 (future): Re-resolve unknown flags from extension registry
+```
+
+### Command Registry
+
+Commands are defined as `CommandDef` objects with metadata for auto-generated `--help`:
+
+```typescript
+interface CommandDef {
+  name: string
+  aliases?: string[]
+  description: string
+  positionals?: PositionalDef[]
+  flags?: Record<string, FlagDef>
+}
+```
+
+Commands self-register via `registerBuiltinCommand()` in category files:
+- `commands/navigation.ts` — navigate, back, forward, reload, close
+- `commands/observation.ts` — snapshot, screenshot, get, is
+- `commands/interaction.ts` — click, dblclick, fill, type, press, select, check, uncheck, scroll, hover, focus, upload, drag, viewport, wait, find, tab, frame
+- `commands/execution.ts` — eval, cdp, diff
+- `commands/management.ts` — session, config, serve, logfile, skill
+- `commands/recording.ts` — record (start, stop, status, cancel)
+
+### Auto-Session
+
+The `resolveSession()` function auto-creates sessions:
+
+1. If `--session` or `RUNBROWSER_SESSION` is set → use that session
+2. If sessions exist → reuse the first one
+3. If no sessions → wait for extension → create a new session
+
+This means agents can start with `runbrowser navigate https://example.com` — no setup.
+
+### Output Formatting
+
+All commands support:
+- `--json` for structured JSON output
+- `--format table|json|csv|md|yaml` for tabular data (site commands)
+- Plain text for human-readable output
 
 ## Complete Command Reference
 
@@ -33,7 +72,7 @@
 
 ```bash
 # Navigation
-open <url>                      # Navigate (aliases: goto, navigate)
+navigate <url>                  # Navigate (aliases: open, goto)
 back                            # History back
 forward                         # History forward
 reload                          # Reload page
@@ -57,6 +96,7 @@ hover <ref>                     # Hover element
 focus <ref>                     # Focus element
 upload <ref> <files...>         # Upload files
 drag <src> <dst>                # Drag and drop
+viewport <w> <h>                # Set viewport size
 
 # Wait (polymorphic — one command, many modes)
 wait <ref|ms>                   # Wait for element visible or time
@@ -73,62 +113,58 @@ cdp <method> [params]           # Raw Chrome DevTools Protocol
 ### Subgrouped Commands
 
 ```bash
-# ── get: query info from elements or page ──────────────────
+# ── get: query info from elements or page ──
 get text <ref>                  # Get text content
 get html <ref>                  # Get innerHTML
 get value <ref>                 # Get input value
-get attr <ref> <name>           # Get attribute
+get attr <ref> --attr-name <n>  # Get attribute
 get url                         # Get current URL
 get title                       # Get page title
-get count <selector>            # Count matching elements       [NEW]
+get count <selector>            # Count matching elements
 
-# ── is: check element state ────────────────────────────────
+# ── is: check element state ──
 is visible <ref>                # Check if visible
 is checked <ref>                # Check if checked
-is enabled <ref>                # Check if enabled              [NEW]
+is enabled <ref>                # Check if enabled
 
-# ── find: semantic locators with chained action ────────────  [NEW]
+# ── find: semantic locators with chained action ──
 find role <role> <action> [val] # By ARIA role (--name, --exact)
 find text <text> <action>       # By text content
-find label <label> <action> [val] # By label
-find placeholder <ph> <action> [val] # By placeholder
-find testid <id> <action> [val] # By data-testid
-find first <sel> <action> [val] # First match
-find nth <n> <sel> <action> [val] # Nth match
-#   actions: click, fill, type, hover, focus, check, uncheck, text
+find label <label> <action>     # By label
+find placeholder <ph> <action>  # By placeholder
+find testid <id> <action>       # By data-testid
 
-# ── tab: manage real browser tabs ──────────────────────────  [NEW]
+# ── tab: manage real browser tabs ──
 tab                             # List open tabs
 tab new [url]                   # Open new tab
 tab <n>                         # Switch to tab n
 tab close [n]                   # Close tab
 
-# ── frame: iframe navigation ──────────────────────────────  [NEW]
+# ── frame: iframe navigation ──
 frame <selector>                # Switch to iframe
 frame main                      # Back to main frame
 
-# ── diff: compare snapshots ───────────────────────────────  [NEW]
+# ── diff: compare states ──
 diff snapshot                   # Diff current vs last snapshot
-diff snapshot --baseline <file> # Diff current vs saved file
 diff screenshot --baseline <f>  # Visual pixel diff
 
-# ── session: manage sessions ──────────────────────────────
+# ── record: video recording ──
+record start -o <path>          # Start recording (MP4)
+record stop                     # Stop and save
+record status                   # Check if recording
+record cancel                   # Cancel without saving
+
+# ── session: manage sessions ──
 session new [--browser <key>]   # Create session
 session list                    # List active sessions
 session delete <id>             # Delete session
 
-# ── password: credential broker ──────────────────────────────
-password login <domain>             # Securely log in (agent never sees password)
-password list <domain>              # List available credentials
-password status                     # Show broker status
-password detect                     # Detect login forms on current page
-
-# ── config: persistent settings ──────────────────────────
+# ── config: persistent settings ──
 config set <key> <value>        # Set config value
 config unset <key>              # Remove config value
 config show                     # Show current config
 
-# ── Utilities ────────────────────────────────────────────
+# ── Utilities ──
 serve [--host] [--token]        # Start relay server
 logfile                         # Print log file paths
 skill                           # Print agent usage instructions
@@ -141,220 +177,124 @@ snapshot                        # Full tree
 snapshot -i                     # Interactive elements only
 snapshot -c                     # Compact (remove empty containers)
 snapshot -d <n>                 # Limit depth
-snapshot -s <selector>          # Scope to CSS selector
-snapshot -i -c -d 5             # Combine options
+snapshot -S <selector>          # Scope to CSS selector
 ```
 
-## Screenshot Options
+## Global Options
 
-```bash
-screenshot                      # Capture to stdout info
-screenshot page.png             # Save to file
-screenshot --full               # Full page
-screenshot --annotate           # Numbered labels on elements
-screenshot @e3 page.png         # Scope to element
+```
+-s, --session <id>      Session ID (auto-created if omitted)
+--host <host>           Remote relay host (or RUNBROWSER_HOST)
+--token <token>         Auth token (or RUNBROWSER_TOKEN)
+--json                  JSON output
+-f, --format <fmt>      Output format: table, json, csv, md, yaml
+-h, --help              Show help
+-v, --version           Show version
+```
+
+## `--help` Output
+
+```
+runbrowser v0.0.6 — Control your running Chrome browser
+
+Usage: runbrowser <command> [options]
+
+Navigation:
+  navigate (open, goto)              Navigate to a URL
+  back                               Go back in history
+  forward                            Go forward in history
+  reload                             Reload the page
+  close (quit, exit)                 Close browser session
+
+Observation:
+  snapshot                           Accessibility snapshot with @refs
+  screenshot                         Take a screenshot
+  get                                Get info: text, html, value, attr, url, title, count
+  is                                 Check element state: visible, checked, enabled
+
+Interaction:
+  click                              Click an element by @ref
+  dblclick                           Double-click an element
+  fill                               Clear and fill an input
+  type                               Type text at current focus
+  press                              Press a key
+  select                             Select a dropdown option
+  check / uncheck                    Toggle checkbox
+  scroll                             Scroll the page
+  hover                              Hover over an element
+  focus                              Focus an element
+  upload                             Upload files
+  drag                               Drag source to target
+  viewport                           Set viewport size
+  wait                               Wait for element, time, text, URL, load, JS
+  find                               Find by semantic locator and act
+  tab                                Manage browser tabs
+  frame                              Switch to iframe
+
+Execution:
+  eval                               Run JavaScript in browser context
+  cdp                                Raw CDP command
+
+Session:
+  session                            Manage sessions: new, list, delete
+
+Config:
+  config                             Manage config: set, unset, show
+
+Server:
+  serve                              Start the relay server
+  logfile                            Print log file paths
+  skill                              Print full usage instructions
+  diff                               Compare states: snapshot, screenshot
+  record                             Video recording: start, stop, status, cancel
 ```
 
 ## What We Intentionally Do NOT Add
-
-These exist in agent-browser but don't belong in RunBrowser:
 
 | Command | Why not |
 |---------|---------|
 | `install` | We use the user's Chrome. No browser to install. |
 | `set device/geo/offline/media` | This is the user's real browser. Don't mess with their settings. |
 | `trace/profiler/har` | Too specialized. Use `cdp` for raw protocol access. |
-| `network route/unroute` | Complex. Use `eval` to set up interceptors. |
-| `cookies set/clear` | Modifying the user's real cookies is dangerous. Read-only access is safer. |
+| `cookies set/clear` | Modifying the user's real cookies is dangerous. |
 | `storage set/clear` | Same — don't modify user's real storage. |
-| `state save/load` | Different model — the user's browser IS the persistent state. |
 | `mouse move/down/up/wheel` | Too low-level. `click`, `hover`, `scroll` cover 99% of cases. |
-| `keyboard type/inserttext` | `type` and `press` already cover this. |
-| `highlight` | Niche debugging. Use `eval` to inject styles. |
-| `pdf` | Niche. Use `cdp Page.printToPDF`. |
-| `viewport` as flat | Moved to `set viewport` only if we add more `set` commands. Keep flat for now since it's the only browser setting we expose. |
+| `exec` (Playwright) | Playwright is removed. `eval` runs JS in browser context. `cdp` for raw CDP. |
 
-## `--help` Output
+## Implementation Notes
+
+### Visual Feedback
+
+Every interaction command triggers visual feedback in the browser:
+- **Page border flash** — brief green border glow on the page
+- **Element highlight** — target element gets a green outline pulse
+
+This makes it easy for users to see what the agent is doing in real time.
+
+### Cross-Origin Navigation
+
+Navigate handles cross-origin navigations (e.g., `about:blank` → `https://example.com`) where Chrome detaches and re-attaches the debugging target. The `waitForReattach` mechanism in `CDPExecutor` handles this transparently.
+
+### Site Command Dispatch
+
+When a command doesn't match any built-in, the CLI tries it as a site command:
 
 ```
-runbrowser v0.1.0 — Control your running Chrome browser
-
-Browser actions:
-  open <url>              Navigate to URL (aliases: goto, navigate)
-  click <ref>             Click element by @ref
-  dblclick <ref>          Double-click element
-  fill <ref> <value>      Clear + fill input
-  type <text>             Type at current focus
-  press <key>             Press key (Enter, Tab, Escape, ...)
-  select <ref> <value>    Select dropdown option
-  check / uncheck <ref>   Toggle checkbox
-  scroll <dir> [amount]   Scroll up/down/left/right
-  hover <ref>             Hover element
-  focus <ref>             Focus element
-  upload <ref> <files>    Upload files
-  drag <src> <dst>        Drag and drop
-  snapshot                Accessibility tree with @refs (-i -c -d -s)
-  screenshot [path]       Take screenshot (--full, --annotate)
-  wait <ref|ms|flags>     Wait for element, time, text, URL, load, JS
-  eval <code>             Run JavaScript in page context
-  cdp <method> [params]   Raw Chrome DevTools Protocol command
-  back / forward / reload Navigation history
-  close                   Close session (aliases: quit, exit)
-
-Subcommands:
-  get <what> [ref]        text, html, value, attr, url, title, count
-  is <check> <ref>        visible, checked, enabled
-  find <by> <action>      role, text, label, placeholder, testid, first, nth
-  tab [cmd]               list, new, switch, close (manage real tabs)
-  frame <sel|main>        Switch to iframe or back to main
-  diff <type>             snapshot, screenshot (compare states)
-  session <cmd>           new, list, delete
-  password <cmd>              login, list, status, detect
-  config <cmd>            set, unset, show
-
-Utilities:
-  serve                   Start relay server (--host, --token)
-  viewport <w> <h>        Set viewport size
-  logfile                 Print log file paths
-  skill                   Print full usage instructions
-
-Global options:
-  -s, --session <id>      Session ID (auto-created if omitted)
-  --host <host>           Remote relay host
-  --token <token>         Auth token
-  --json                  JSON output for all commands
+runbrowser github trending --limit 5
+         ↓
+command = "github", subcommand = "trending"
+         ↓
+POST /api/command/run { sessionId, site: "github", name: "trending", args: { limit: 5 } }
+         ↓
+Relay loads ~/.runbrowser/commands/github/trending.ts via jiti
+         ↓
+Returns structured data → formatted as table/json/csv/md
 ```
 
-## Migration from Current CLI
-
-| Current | New | Breaking? |
-|---------|-----|-----------|
-| `open <url>` | `open <url>` | No |
-| `navigate <url>` | `open <url>` (alias kept) | No |
-| `session-new` | `session new` | Yes |
-| `session-list` | `session list` | Yes |
-| `session-delete <id>` | `session delete <id>` | Yes |
-| `config-set` | `config set` | Yes |
-| `config-unset` | `config unset` | Yes |
-| `config-show` | `config show` | Yes |
-| `login <domain>` | `password login <domain>` | Yes |
-| `credentials <domain>` | `password list <domain>` | Yes |
-| `credential-status` | `password status` | Yes |
-| `detect-forms` | `password detect` | Yes |
-| `get-url` | `get url` | Already works |
-| `get-title` | `get title` | Already works |
-
-## Agent Workflow (Optimal Pattern)
-
-```bash
-# 1. Auto-session created on first command
-runbrowser open https://example.com
-
-# 2. Get interactive elements
-runbrowser snapshot -i
-
-# 3. Interact via refs
-runbrowser fill @e3 "hello@example.com"
-runbrowser click @e5
-
-# 4. Re-snapshot after page change
-runbrowser snapshot -i
-
-# 5. Chain commands for speed
-runbrowser fill @e1 "user" && runbrowser fill @e2 "pass" && runbrowser click @e3
-
-# 6. Semantic locators when refs aren't available
-runbrowser find role button click --name "Submit"
-
-# 7. Credential broker for secure login
-runbrowser password login github.com
-
-# 8. Tab management on real browser
-runbrowser tab new https://docs.example.com
-runbrowser tab 0    # switch back to first tab
-```
-
-## New API Methods Needed in RelayApiClient
-
-```typescript
-// Missing from current api-client.ts:
-dblclick(sessionId, ref): Promise<void>
-check(sessionId, ref): Promise<void>
-uncheck(sessionId, ref): Promise<void>
-focus(sessionId, ref): Promise<void>
-upload(sessionId, ref, files: string[]): Promise<void>
-drag(sessionId, src, dst): Promise<void>
-isEnabled(sessionId, ref): Promise<{ enabled: boolean }>
-getCount(sessionId, selector): Promise<{ count: number }>
-
-// Tab management:
-listTabs(sessionId): Promise<{ tabs: Tab[] }>
-newTab(sessionId, url?): Promise<{ index: number }>
-switchTab(sessionId, index): Promise<void>
-closeTab(sessionId, index?): Promise<void>
-
-// Frame management:
-switchFrame(sessionId, selector): Promise<void>
-switchToMainFrame(sessionId): Promise<void>
-
-// Find + action:
-findAndAct(sessionId, by, value, action, actionValue?, options?): Promise<unknown>
-
-// Diff:
-diffSnapshot(sessionId, baseline?): Promise<{ diff: string }>
-diffScreenshot(sessionId, baseline, output?): Promise<{ path: string }>
-
-// Close:
-close(sessionId): Promise<void>
-
-// Enhanced snapshot:
-snapshot(sessionId, options?: {
-  interactiveOnly?: boolean
-  compact?: boolean
-  maxDepth?: number
-  selector?: string
-}): Promise<{ snapshot: string; refs: unknown[] }>
-
-// Enhanced screenshot:
-captureScreenshot(sessionId, options?: {
-  path?: string
-  fullPage?: boolean
-  annotate?: boolean
-  selector?: string
-}): Promise<{ data: string; mimeType: string; annotations?: Annotation[] }>
-```
-
-## Implementation Order
-
-### Phase 1: Subgroup restructuring (breaking changes)
-- Convert `session-*` → `session` subgroup
-- Convert `config-*` → `config` subgroup
-- Convert credential commands → `password` subgroup
-- Add `close` command
-- Add command aliases (`goto`/`navigate` for `open`)
-
-### Phase 2: Missing basic interactions
-- Add `dblclick`, `check`, `uncheck`, `focus`, `upload`, `drag`
-- Add `is enabled`, `get count`
-- Enhance `snapshot` with `-i`, `-c`, `-d`, `-s` options
-- Enhance `screenshot` with `--full`, `--annotate`
-
-### Phase 3: Tab and frame management
-- Implement `tab` subgroup (list, new, switch, close)
-- Implement `frame` subgroup (switch, main)
-
-### Phase 4: Advanced features
-- Implement `find` semantic locator subgroup
-- Implement `diff` subgroup
-- Add `--annotate` screenshot labeling with ref mapping
-
-## Command Count Comparison
+## Comparison
 
 | CLI | Flat | Subgrouped | Total |
 |-----|------|-----------|-------|
-| **RunBrowser (current)** | 22 | 5 (poorly organized) | 27 |
-| **RunBrowser (proposed)** | 22 | 23 | **45** |
+| **RunBrowser** | 22 | 28 | **~50** |
 | **Playwriter** | 3 | 5 | 8 |
 | **Agent-browser** | 35 | 55+ | **90+** |
-
-RunBrowser hits the sweet spot: comprehensive enough for any task, organized enough to be learnable, focused enough to avoid bloat.

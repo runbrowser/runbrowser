@@ -148,7 +148,12 @@ async function main() {
     const { sessionId, client } = await resolveSession(args)
 
     try {
-      const result = await client.runCommand(sessionId, site, name, Object.fromEntries(args.flags))
+      // Custom command args are in unknownFlags (not registered as built-in flags)
+      const commandArgs = {
+        ...Object.fromEntries(args.flags),
+        ...Object.fromEntries(args.unknownFlags),
+      }
+      const result = await client.runCommand(sessionId, site, name, commandArgs)
 
       if (args.json) {
         console.log(JSON.stringify(result.data))

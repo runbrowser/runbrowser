@@ -6,11 +6,12 @@
 
 import type { ExecutorManagerLike } from './server.js'
 import type { SessionMetadata } from './state.js'
-import { CDPExecutor, type SendToExtension, type GetExtensionEntry } from './cdp-executor.js'
+import { CDPExecutor, type SendToExtension, type GetExtensionEntry, type RegisterTarget } from './cdp-executor.js'
 
 export interface CDPExecutorManagerOptions {
   sendToExtension: SendToExtension
   getExtensionEntry: GetExtensionEntry
+  registerTarget?: RegisterTarget
   logger?: { log(...args: any[]): void; error(...args: any[]): void }
 }
 
@@ -18,11 +19,13 @@ export class CDPExecutorManager implements ExecutorManagerLike {
   private executors: Map<string, CDPExecutor> = new Map()
   private sendToExtension: SendToExtension
   private getExtensionEntry: GetExtensionEntry
+  private registerTarget?: RegisterTarget
   private logger?: { log(...args: any[]): void; error(...args: any[]): void }
 
   constructor(options: CDPExecutorManagerOptions) {
     this.sendToExtension = options.sendToExtension
     this.getExtensionEntry = options.getExtensionEntry
+    this.registerTarget = options.registerTarget
     this.logger = options.logger
   }
 
@@ -47,6 +50,7 @@ export class CDPExecutorManager implements ExecutorManagerLike {
       },
       sendToExtension: this.sendToExtension,
       getExtensionEntry: this.getExtensionEntry,
+      registerTarget: this.registerTarget,
       logger: this.logger,
     })
 

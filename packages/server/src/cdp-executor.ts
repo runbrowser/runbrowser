@@ -23,12 +23,20 @@ export type SendToExtension = (params: {
 
 export type GetExtensionEntry = (stableKeyOrId: string | null) => ExtensionEntry | null
 
+export type RegisterTarget = (params: {
+  extensionId: string
+  sessionId: string
+  targetId: string
+  targetInfo: any
+}) => void
+
 export interface CDPExecutorOptions {
   /** The stableKey of the extension to send commands to (stored in session metadata) */
   extensionStableKey: string | null
   sessionMetadata: SessionMetadata
   sendToExtension: SendToExtension
   getExtensionEntry: GetExtensionEntry
+  registerTarget?: RegisterTarget
   logger?: { log(...args: any[]): void; error(...args: any[]): void }
 }
 
@@ -41,16 +49,21 @@ export class CDPExecutor implements ExecutorLike {
   private metadata: SessionMetadata
   private sendToExtension: SendToExtension
   private getExtensionEntry: GetExtensionEntry
+  private registerTarget?: RegisterTarget
   private logger?: { log(...args: any[]): void; error(...args: any[]): void }
 
   /** Bound sendCDP — avoids creating a new closure in every method call. */
   private readonly boundSendCDP: commands.SendCDP
+
+  /** True while a cross-origin navigation is in progress — prevents autoCreateTab during target re-attachment. */
+  private waitForReattach = false
 
   constructor(options: CDPExecutorOptions) {
     this.extensionStableKey = options.extensionStableKey
     this.metadata = options.sessionMetadata
     this.sendToExtension = options.sendToExtension
     this.getExtensionEntry = options.getExtensionEntry
+    this.registerTarget = options.registerTarget
     this.logger = options.logger
     this.boundSendCDP = (method, params) => this.sendCDP(method, params)
   }
@@ -79,8 +92,18 @@ export class CDPExecutor implements ExecutorLike {
       throw new Error('Extension not connected')
     }
     if (!cdpSessionId) {
-      // Auto-create a tab instead of failing
-      cdpSessionId = await this.autoCreateTab(extensionId)
+      if (this.waitForReattach) {
+        // During cross-origin navigation, wait for the target to re-attach instead
+        // of creating a new tab. Chrome detaches the old target and re-attaches
+        // with a new session ID after the navigation commits.
+        cdpSessionId = await this.waitForTarget(10000)
+        if (!cdpSessionId) {
+          throw new Error('Navigation target lost — no CDP session re-attached within timeout')
+        }
+      } else {
+        // Auto-create a tab instead of failing
+        cdpSessionId = await this.autoCreateTab(extensionId)
+      }
     }
     return this.sendToExtension({
       extensionId,
@@ -88,6 +111,21 @@ export class CDPExecutor implements ExecutorLike {
       params: { method, params, sessionId: cdpSessionId },
       timeout,
     })
+  }
+
+  /**
+   * Poll for a CDP target to (re-)appear on this extension.
+   * Used during cross-origin navigations where Chrome detaches the old target
+   * and re-attaches a new one after a brief gap.
+   */
+  private async waitForTarget(maxWaitMs: number): Promise<string | null> {
+    const start = Date.now()
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      const { cdpSessionId } = this.getActiveCdpSession()
+      if (cdpSessionId) return cdpSessionId
+    }
+    return null
   }
 
   /** Auto-create a browser tab when none are attached */
@@ -102,9 +140,27 @@ export class CDPExecutor implements ExecutorLike {
       throw new Error('No connected browser tab found and failed to auto-create one. Click the RunBrowser extension icon on a tab.')
     }
 
-    // Note: target registration in relay state is handled by the extension-ws
-    // route when it receives the Target.attachedToTarget event from the extension.
-    // We don't mutate connectedTargets directly here (that would be Feature Envy).
+    // Register the target in relay state ourselves.
+    // The extension uses skipAttachedEvent: true for createInitialTab (to avoid
+    // duplicates with Playwright's Target.setAutoAttach), so the normal
+    // Target.attachedToTarget → handleTargetAttached registration path is skipped.
+    // Without this, connectedTargets stays empty and every subsequent sendCDP
+    // call creates another blank tab.
+    if (this.registerTarget && result.targetInfo) {
+      this.logger?.log(
+        `[CDPExecutor] registerTarget: extensionId=${extensionId} sessionId=${result.sessionId} targetId=${result.targetInfo.targetId}`,
+      )
+      this.registerTarget({
+        extensionId,
+        sessionId: result.sessionId,
+        targetId: result.targetInfo.targetId,
+        targetInfo: result.targetInfo,
+      })
+    } else {
+      this.logger?.log(
+        `[CDPExecutor] autoCreateTab: registerTarget=${!!this.registerTarget} targetInfo=${!!result.targetInfo} result=${JSON.stringify(result)}`,
+      )
+    }
 
     return result.sessionId
   }
@@ -202,7 +258,10 @@ export class CDPExecutor implements ExecutorLike {
   }
 
   async navigate(url: string): Promise<{ url: string; title: string }> {
-    return commands.navigate(this.boundSendCDP, url)
+    return commands.navigate(this.boundSendCDP, url, {
+      onNavigationSent: () => { this.waitForReattach = true },
+      onComplete: () => { this.waitForReattach = false },
+    })
   }
 
   async click(ref: string): Promise<void> {

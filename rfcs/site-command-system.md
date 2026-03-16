@@ -1,12 +1,9 @@
-# RFC: Site Command System — Architecture Design
+# RFC: Site Command System
 
-> Add site commands to RunBrowser: TypeScript plugins that turn any website into a CLI command.
-
-## Status
-
-- **Authors:** RunBrowser Team
-- **Date:** 2026-03-15
-- **Status:** Draft
+> Status: **Partially Implemented** (2026-03-15)
+>
+> Core infrastructure is in place. Loader, executor, CLI dispatch, and API routes work.
+> Remaining: `@jiweiyuan/commands` helper package, built-in example commands, MCP `skill` discovery enhancement.
 
 ---
 
@@ -14,21 +11,20 @@
 
 RunBrowser controls browsers. But agents often need **structured data** from websites — trending repos, hot posts, search results. Today they must: navigate → snapshot → parse text → extract data. This is slow, fragile, and wastes tokens.
 
-Site commands let users write `.ts` files that encapsulate this: `runbrowser github trending --limit 5` returns clean JSON. Like OpenCLI, but built on RunBrowser's existing relay infrastructure.
+Site commands let users write `.ts` files that encapsulate this: `runbrowser github trending --limit 5` returns clean JSON.
 
 ---
 
 ## 2. Design Principles
 
 1. **One language: TypeScript** — No YAML. Commands are `.ts` files with full IDE support.
-2. **Relay executes commands** — The relay server (Node.js) loads and runs site commands via jiti. The CLI is just an HTTP client.
+2. **Relay executes commands** — The relay server loads and runs site commands via jiti. The CLI is just an HTTP client.
 3. **Two MCP tools** — `skill` (discover) and `run` (execute). Simple interface for agents.
-4. **One binary, two modes** — `runbrowser <command>` (CLI) and `runbrowser serve` (relay daemon). Same npm package.
-5. **Node.js everywhere** — No Rust, no Bun compile. `npm install -g` is the distribution model. Binary distribution is a future optimization.
+4. **Node.js everywhere** — No Rust, no Bun compile. `npm install -g` is the distribution model.
 
 ---
 
-## 3. Architecture
+## 3. Architecture (Implemented)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -36,37 +32,33 @@ Site commands let users write `.ts` files that encapsulate this: `runbrowser git
 │                                                         │
 │   CLI (Node.js)              MCP Server (Node.js)       │
 │   ┌─────────────────┐       ┌─────────────────────┐    │
-│   │ • Arg parsing    │       │ • skill tool         │    │
-│   │ • HTTP client    │       │ • run tool           │    │
-│   │ • --help gen     │       │ • navigate tool      │    │
-│   │ • Output format  │       │ • snapshot tool      │    │
-│   │   (table/json/   │       │ • click tool         │    │
-│   │    csv/md)        │       │ • ... (existing)     │    │
+│   │ • Hand-written   │       │ • skill tool         │    │
+│   │   arg parser     │       │ • run tool           │    │
+│   │ • HTTP client    │       │   (dispatches to     │    │
+│   │ • --help gen     │       │    relay API)        │    │
+│   │ • Output format  │       │                      │    │
+│   │   (table/json/   │       │                      │    │
+│   │    csv/md/yaml)  │       │                      │    │
 │   └────────┬────────┘       └──────────┬──────────┘    │
 │            │ HTTP                       │ HTTP          │
 │            └───────────┬───────────────┘               │
 │                        ▼                                │
 │   ┌────────────────────────────────────────────────┐    │
-│   │       Relay Server (Node.js, background)        │    │
-│   │       Started by: runbrowser serve              │    │
+│   │       Relay Server (Node.js, port 19988)        │    │
 │   │       Auto-started by CLI on first use          │    │
 │   │                                                 │    │
 │   │  ┌─────────────┐  ┌──────────────────────────┐ │    │
-│   │  │ Existing API │  │ Site Command Engine (NEW)│ │    │
+│   │  │ Existing API │  │ Site Command Engine       │ │    │
 │   │  │ /api/navigate│  │                          │ │    │
 │   │  │ /api/snapshot│  │ • jiti loads .ts files   │ │    │
-│   │  │ /api/click   │  │ • Command registry      │ │    │
-│   │  │ /api/evaluate│  │ • GET /api/commands      │ │    │
-│   │  │ /api/session │  │ • POST /api/command/run  │ │    │
-│   │  │ /api/...     │  │ • GET /api/command/meta  │ │    │
+│   │  │ /api/click   │  │ • GET /api/commands      │ │    │
+│   │  │ /api/evaluate│  │ • POST /api/command/run  │ │    │
+│   │  │ /api/...     │  │                          │ │    │
 │   │  └─────────────┘  └──────────────────────────┘ │    │
 │   │                                                 │    │
-│   │  ┌─────────────────────────────────────────┐    │    │
-│   │  │ CDP ↔ Extension ↔ Chrome                │    │    │
-│   │  └─────────────────────────────────────────┘    │    │
+│   │  CDPExecutor → Extension → chrome.debugger      │    │
 │   └────────────────────────────────────────────────┘    │
 │                        ▲ WebSocket                      │
-│                        │                                │
 │   ┌────────────────────┴───────────────────────────┐    │
 │   │          Chrome + RunBrowser Extension          │    │
 │   └────────────────────────────────────────────────┘    │
@@ -76,10 +68,10 @@ Site commands let users write `.ts` files that encapsulate this: `runbrowser git
 ### Process Model
 
 ```
-runbrowser serve              ← Relay daemon (long-running, background)
+runbrowser serve              ← Relay daemon (long-running, auto-started)
   ├── WebSocket ↔ Extension   (persistent connection)
   ├── HTTP API :19988         (serves CLI and MCP)
-  ├── Session state           (persists across CLI calls)
+  ├── CDPExecutor sessions    (persists across CLI calls)
   └── Site command executor   (jiti + command registry)
 
 runbrowser navigate <url>     ← CLI (short-lived, exits after result)
@@ -89,542 +81,106 @@ runbrowser github trending    ← CLI (short-lived)
   └── HTTP POST /api/command/run → relay executes .ts → result → stdout → exit
 ```
 
-### Installation
-
-```bash
-npm install -g @jiweiyuan/runbrowser    # CLI + server, one package
-```
-
 ---
 
-## 4. Relay Server: New Endpoints
+## 4. Current Implementation
 
-Three new endpoints on the existing Hono relay server:
+### 4.1 Command Definition Format
 
-```
-GET  /api/commands                    → list all registered site commands
-GET  /api/command/meta/:site/:name    → command metadata (for --help)
-POST /api/command/run                 → execute a site command
-```
-
-#### `GET /api/commands`
-
-Returns all registered site commands. Used by:
-- Rust CLI for `--help` and dynamic subcommand discovery
-- MCP `skill` tool
-
-```json
-{
-  "commands": [
-    {
-      "site": "github",
-      "name": "trending",
-      "description": "GitHub trending repositories",
-      "args": {
-        "limit": { "type": "number", "default": 20, "description": "Number of items" },
-        "language": { "type": "string", "description": "Filter by language" }
-      },
-      "columns": ["rank", "name", "description", "stars", "language"]
-    }
-  ]
-}
-```
-
-#### `GET /api/command/meta/:site/:name`
-
-Returns metadata for a single command. Used by CLI for per-command `--help`.
-
-```json
-{
-  "site": "github",
-  "name": "trending",
-  "description": "GitHub trending repositories",
-  "args": {
-    "limit": { "type": "number", "default": 20, "description": "Number of items" },
-    "language": { "type": "string", "description": "Filter by language" }
-  },
-  "columns": ["rank", "name", "description", "stars", "language"],
-  "schema": {
-    "rank": "Position in trending list",
-    "name": "Repository full name (owner/repo)",
-    "stars": "Stars gained in time period",
-    "language": "Primary programming language"
-  }
-}
-```
-
-#### `POST /api/command/run`
-
-Executes a site command. Returns structured data (array of objects).
-
-Request:
-```json
-{
-  "sessionId": "1",
-  "site": "github",
-  "name": "trending",
-  "args": { "limit": 5 }
-}
-```
-
-Response:
-```json
-{
-  "data": [
-    { "rank": 1, "name": "denoland/deno", "stars": "5.2k", "language": "Rust" },
-    { "rank": 2, "name": "tauri-apps/tauri", "stars": "3.8k", "language": "Rust" }
-  ],
-  "columns": ["rank", "name", "stars", "language"]
-}
-```
-
-### 4.2 Background Server Self-Spawn
-
-When the Rust CLI runs `runbrowser navigate https://example.com`, the relay must be running. Today's Node.js CLI calls `ensureRelayServer()` which spawns `node start.js` as a detached process.
-
-The Rust CLI will:
-
-1. Check if relay is running: `GET http://127.0.0.1:19988/version`
-2. If not, spawn it: `runbrowser-server` (installed via `npm install -g @jiweiyuan/runbrowser-server`)
-3. Wait for it to be ready (poll `/version`)
-
-```rust
-fn ensure_relay_server() -> Result<()> {
-    // Check if already running
-    if let Ok(version) = check_relay_version().await {
-        return Ok(());
-    }
-
-    // Try to spawn the relay server
-    let child = Command::new("runbrowser-server")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()?;
-
-    // Detach the child process
-    std::mem::forget(child);
-
-    // Wait for server to be ready
-    for _ in 0..25 {
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        if check_relay_version().await.is_ok() {
-            return Ok(());
-        }
-    }
-
-    Err(anyhow!("Failed to start relay server within 5s"))
-}
-```
-
----
-
-## 5. Site Commands: TypeScript Only
-
-### 5.1 Command Definition
+Site commands are `.ts` or `.js` files in `~/.runbrowser/commands/<site>/<name>.ts`:
 
 ```typescript
 // ~/.runbrowser/commands/github/trending.ts
-import { command } from '@jiweiyuan/commands'
 
-export default command({
-  site: 'github',
-  name: 'trending',
-  description: 'GitHub trending repositories',
+export const description = 'GitHub trending repositories'
 
-  args: {
-    limit:    { type: 'number', default: 20, description: 'Number of items' },
-    language: { type: 'string', description: 'Filter by language' },
-    since:    { type: 'string', default: 'daily', description: 'Time range',
-                choices: ['daily', 'weekly', 'monthly'] },
-  },
-
-  columns: ['rank', 'name', 'description', 'stars', 'language'],
-
-  schema: {
-    rank: 'Position in trending list',
-    name: 'Repository full name (owner/repo)',
-    stars: 'Stars gained in time period',
-    language: 'Primary programming language',
-  },
-
-  async run(browser, args) {
-    await browser.navigate('https://github.com/trending')
-
-    const data = await browser.evaluate(`
-      [...document.querySelectorAll('article.Box-row')].map(el => ({
-        name: el.querySelector('h2 a')?.textContent?.trim().replace(/\\s+/g, ''),
-        description: el.querySelector('p')?.textContent?.trim() || '',
-        stars: el.querySelector('.octicon-star')?.parentElement?.textContent?.trim() || '0',
-        language: el.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim() || '',
-      }))
-    `)
-
-    return data
-      .filter(item => !args.language || item.language.toLowerCase() === args.language.toLowerCase())
-      .slice(0, args.limit)
-      .map((item, i) => ({ rank: i + 1, ...item }))
-  },
-})
-```
-
-### 5.2 The `command()` Function
-
-Exported from `@jiweiyuan/commands` (part of `@jiweiyuan/runbrowser-server`).
-
-```typescript
-// packages/server/src/commands/api.ts
-
-export interface CommandArgs {
-  [name: string]: {
-    type: 'string' | 'number' | 'boolean'
-    default?: any
-    description?: string
-    required?: boolean
-    choices?: string[]
-  }
+export const args = {
+  limit: { type: 'number', default: 20, description: 'Number of items' },
+  language: { type: 'string', description: 'Filter by language' },
 }
 
-export interface BrowserAPI {
-  navigate(url: string): Promise<{ url: string; title: string }>
-  evaluate(code: string): Promise<any>
-  click(ref: string): Promise<void>
-  snapshot(): Promise<{ snapshot: string }>
-  screenshot(): Promise<{ data: string; mimeType: string }>
-  fill(ref: string, value: string): Promise<void>
-  type(text: string): Promise<void>
-  press(key: string): Promise<void>
-  scroll(direction: 'up' | 'down', amount?: number): Promise<void>
-  hover(ref: string): Promise<void>
-  waitFor(options: { text?: string; url?: string; ms?: number; fn?: string; timeout?: number }): Promise<void>
-  getUrl(): Promise<{ url: string }>
-  getTitle(): Promise<{ title: string }>
-  back(): Promise<void>
-  forward(): Promise<void>
-  reload(): Promise<void>
-}
+export const columns = ['rank', 'name', 'description', 'stars', 'language']
 
-export interface CommandDefinition<A extends CommandArgs = CommandArgs> {
-  site: string
-  name: string
-  description: string
-  args?: A
-  columns?: string[]
-  schema?: Record<string, string>
-  browser?: boolean  // default: true. Set false for public API commands.
-  run: (browser: BrowserAPI, args: ResolvedArgs<A>) => Promise<any[]>
-}
+export async function run(ctx, args) {
+  await ctx.navigate('https://github.com/trending')
 
-export function command<A extends CommandArgs>(def: CommandDefinition<A>): CommandDefinition<A> {
-  return def
-}
+  const data = await ctx.evaluate(`
+    [...document.querySelectorAll('article.Box-row')].map(el => ({
+      name: el.querySelector('h2 a')?.textContent?.trim().replace(/\\s+/g, ''),
+      description: el.querySelector('p')?.textContent?.trim() || '',
+      stars: el.querySelector('.octicon-star')?.parentElement?.textContent?.trim() || '0',
+      language: el.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim() || '',
+    }))
+  `)
 
-// Type helper: resolve arg types from definition
-type ResolvedArgs<A extends CommandArgs> = {
-  [K in keyof A]: A[K]['type'] extends 'number' ? number
-    : A[K]['type'] extends 'boolean' ? boolean
-    : string
+  return data
+    .filter(item => !args.language || item.language.toLowerCase() === args.language.toLowerCase())
+    .slice(0, args.limit)
+    .map((item, i) => ({ rank: i + 1, ...item }))
 }
 ```
 
-### 5.3 Command Loading (Relay Server Side)
+### 4.2 Command Loader (`custom-commands.ts`)
 
-The relay server loads commands on startup using [jiti](https://github.com/unjs/jiti):
+The relay server loads commands on demand using [jiti](https://github.com/unjs/jiti):
 
 ```typescript
-// packages/server/src/commands/loader.ts
+// Scans ~/.runbrowser/commands/<site>/<name>.ts
+const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
 
-import { createJiti } from 'jiti'
-import * as commandApi from './api.js'
+// List all available commands (for --help, /api/commands)
+function listCustomCommands(): CommandDef[]
 
-const VIRTUAL_MODULES = {
-  '@jiweiyuan/commands': commandApi,
-}
+// Load and execute a specific command
+function loadCommand(site: string, name: string): CommandModule | null
+```
 
-const COMMAND_DIRS = [
-  // Built-in commands (shipped with package)
-  path.join(getPackageDir(), 'commands'),
-  // User global commands
-  path.join(os.homedir(), '.runbrowser', 'commands'),
-  // Project-local commands
-  path.join(process.cwd(), '.runbrowser', 'commands'),
-]
+### 4.3 Command Context
 
-export async function loadCommands(): Promise<Map<string, CommandDefinition>> {
-  const registry = new Map<string, CommandDefinition>()
+The `run()` function receives a `CommandContext` with browser access:
 
-  for (const dir of COMMAND_DIRS) {
-    if (!fs.existsSync(dir)) continue
-
-    for (const site of fs.readdirSync(dir)) {
-      const siteDir = path.join(dir, site)
-      if (!fs.statSync(siteDir).isDirectory()) continue
-
-      for (const file of fs.readdirSync(siteDir)) {
-        if (!file.endsWith('.ts') && !file.endsWith('.js')) continue
-
-        const filePath = path.join(siteDir, file)
-        try {
-          const jiti = createJiti(import.meta.url, {
-            moduleCache: false,
-            alias: { '@jiweiyuan/commands': path.resolve(__dirname, './api.js') },
-          })
-          const mod = await jiti.import(filePath, { default: true })
-          const cmd = mod as CommandDefinition
-          registry.set(`${cmd.site}/${cmd.name}`, cmd)
-        } catch (err) {
-          console.error(`Failed to load command ${filePath}: ${err}`)
-        }
-      }
-    }
-  }
-
-  return registry
+```typescript
+interface CommandContext {
+  navigate: (url: string) => Promise<void>
+  evaluate: (code: string) => Promise<any>
+  wait: (ms: number) => Promise<void>
 }
 ```
 
-### 5.4 Command Execution (Relay Server Side)
+### 4.4 API Routes (`routes/api-custom-commands.ts`)
 
-```typescript
-// packages/server/src/commands/executor.ts
-
-export async function executeCommand(
-  cmd: CommandDefinition,
-  sessionId: string,
-  args: Record<string, any>,
-  executorManager: CDPExecutorManager,
-): Promise<{ data: any[]; columns: string[] }> {
-
-  // Resolve args with defaults
-  const resolvedArgs: Record<string, any> = {}
-  if (cmd.args) {
-    for (const [name, def] of Object.entries(cmd.args)) {
-      resolvedArgs[name] = args[name] ?? def.default
-    }
-  }
-
-  // Create BrowserAPI wrapper around CDPExecutor
-  const executor = executorManager.getExecutor(sessionId)
-  const browser = createBrowserAPI(executor)
-
-  // Execute the command's run function
-  const data = await cmd.run(browser, resolvedArgs)
-
-  return {
-    data: Array.isArray(data) ? data : [data],
-    columns: cmd.columns ?? (data.length > 0 ? Object.keys(data[0]) : []),
-  }
-}
-
-function createBrowserAPI(executor: CDPExecutor): BrowserAPI {
-  return {
-    async navigate(url) { return executor.navigate(url) },
-    async evaluate(code) { return executor.evaluate(code) },
-    async click(ref) { return executor.click(ref) },
-    async snapshot() { return executor.snapshot() },
-    async screenshot() { return executor.captureScreenshot() },
-    async fill(ref, value) { return executor.fill(ref, value) },
-    async type(text) { return executor.type(text) },
-    async press(key) { return executor.press(key) },
-    async scroll(dir, amount) { return executor.scroll(dir, amount) },
-    async hover(ref) { return executor.hover(ref) },
-    async waitFor(opts) { return executor.waitFor(opts) },
-    async getUrl() { return executor.getUrl() },
-    async getTitle() { return executor.getTitle() },
-    async back() { return executor.back() },
-    async forward() { return executor.forward() },
-    async reload() { return executor.reload() },
-  }
-}
+```
+GET  /api/commands                    → list all registered site commands
+POST /api/command/run                 → execute a site command
+     { sessionId, site, name, args }  → { data, columns }
 ```
 
----
+### 4.5 CLI Dispatch (`cli.ts`)
 
-## 6. CLI: Site Command Integration
-
-The existing Node.js CLI (hand-written arg parser, no yargs) dispatches site commands to the relay server via HTTP.
-
-### 6.1 Dispatch Flow
+When no built-in command matches:
 
 ```typescript
-// packages/cli/src/cli.ts
-
-// 1. Try built-in command (navigate, click, snapshot, etc.)
-const builtin = getBuiltinCommand(args.command)
-if (builtin) {
-  await builtin.execute(args, resolveSession)
-  return
-}
-
-// 2. Try site command: `runbrowser <site> <name>`
-if (args.command && args.subcommand) {
-  const client = createClient(args)
-  await client.ensureServer()
-
-  if (args.help) {
-    const meta = await client.getCommandMeta(args.command, args.subcommand)
-    printCommandHelp(metaToCommandDef(meta))
-    return
-  }
-
-  const { sessionId } = await resolveSession(args)
-  const result = await client.runCommand(sessionId, args.command, args.subcommand, flagsToArgs(args))
-
-  // Format output
-  const format = args.format || (args.json ? 'json' : 'table')
+// command = "github", subcommand = "trending"
+if (args.subcommand) {
+  const result = await client.runCommand(sessionId, site, name, commandArgs)
   console.log(formatTable(result.data, result.columns, format))
-  return
 }
 ```
 
-### 6.2 RelayApiClient Additions
+### 4.6 MCP Integration
+
+The `run` MCP tool handles site commands as a fallback:
 
 ```typescript
-// packages/server/src/api-client.ts — new methods
-
-async listCommands(): Promise<CommandMeta[]> {
-  const resp = await fetch(`${this.getBaseUrl()}/api/commands`)
-  const data = await resp.json()
-  return data.commands
-}
-
-async getCommandMeta(site: string, name: string): Promise<CommandMeta> {
-  return this.post('/api/command/meta', { site, name })
-}
-
-async runCommand(sessionId: string, site: string, name: string, args: Record<string, any>): Promise<CommandResult> {
-  return this.post('/api/command/run', { sessionId, site, name, args })
-}
+// run({ command: "github trending --limit 5" })
+// → dispatches to client.runCommand(sid, "github", "trending", { limit: 5 })
 ```
 
 ---
 
-## 7. MCP Integration
-
-Two new tools, translating to CLI/relay semantics:
-
-```typescript
-// packages/mcp/src/server.ts
-
-server.tool(
-  'skill',
-  'Show available site commands and their usage. Call this first to discover what commands are available.',
-  {},
-  toolHandler(async () => {
-    const sid = await ensureSession()
-    const commands = await getClient().listCommands()
-
-    const lines = commands.map(cmd => {
-      const argStr = cmd.args
-        ? Object.entries(cmd.args).map(([name, def]) =>
-            def.required ? ` <${name}>` : ` [--${name}]`
-          ).join('')
-        : ''
-      return `runbrowser ${cmd.site} ${cmd.name}${argStr}  # ${cmd.description}`
-    })
-
-    return {
-      content: [{ type: 'text', text: lines.join('\n') }],
-    }
-  }),
-)
-
-server.tool(
-  'run',
-  'Run a site command to fetch structured data from a website. Use the skill tool first to discover available commands.',
-  {
-    site: z.string().describe('Site name (e.g. github, bilibili)'),
-    command: z.string().describe('Command name (e.g. trending, hot)'),
-    args: z.record(z.any()).optional().describe('Command arguments as key-value pairs'),
-  },
-  toolHandler(async ({ site, command, args }) => {
-    const sid = await ensureSession()
-    const result = await getClient().runCommand(sid, site, command, args ?? {})
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result.data, null, 2) }],
-    }
-  }),
-)
-```
-
----
-
-## 8. Distribution
-
-### 8.1 What Gets Published
-
-| Package | Registry | Contents |
-|---------|----------|----------|
-| `@jiweiyuan/runbrowser` | npm | CLI + server (one package) |
-| `@jiweiyuan/runbrowser-mcp` | npm | MCP server (thin wrapper, calls relay API) |
-| `@jiweiyuan/runbrowser-server` | npm | Relay server (also used standalone) |
-
-### 8.2 Installation
-
-```bash
-npm install -g @jiweiyuan/runbrowser
-```
-
-One command. CLI + server. Done.
-
-### 8.3 Future: Binary Distribution
-
-When the product matures, compile with Bun for zero-dependency installation:
-
-```bash
-curl -fsSL https://runbrowser.com/install.sh | sh
-# or
-brew install runbrowser
-```
-
-This is a future optimization, not a priority now.
-
----
-
-## 9. Command Discovery: Full Flow
+## 5. Command Discovery: Full Flow
 
 ```
-$ runbrowser --help
-
-runbrowser v1.0.0 — Control your running Chrome browser
-
-Usage: runbrowser <command> [options]
-
-Navigation:
-  navigate (open, goto)    Navigate to a URL
-  back                     Go back in history
-  ...
-
-Interaction:
-  click <ref>              Click an element
-  fill <ref> <value>       Fill an input
-  ...
-
-Site Commands:                              ← fetched from relay
-  github trending          GitHub trending repos
-  bilibili hot             Bilibili 热门视频
-  hackernews top           Hacker News top stories
-
-Global Options:
-  -s, --session <string>   Session ID
-  ...
-
-$ runbrowser github trending --help         ← metadata from relay
-
-Usage: runbrowser github trending [options]
-
-GitHub trending repositories
-
-Options:
-  --limit <number>         Number of items (default: 20)
-  --language <string>      Filter by language
-  --since <string>         Time range (default: daily) [daily, weekly, monthly]
-
-Returns:
-  rank       Position in trending list
-  name       Repository full name (owner/repo)
-  stars      Stars gained in time period
-  language   Primary programming language
-
 $ runbrowser github trending --limit 3
 
 RANK  NAME                 STARS   LANGUAGE
@@ -644,101 +200,48 @@ $ runbrowser github trending --limit 3 --json
 
 ---
 
-## 10. Implementation Plan
+## 6. Remaining Work
 
-### Phase 1: Command Engine on Relay Server
+### 6.1 `@jiweiyuan/commands` Helper Package (Not Yet)
 
-Add site command infrastructure to the existing relay server.
+The RFC originally proposed a `command()` helper function for type-safe command definitions. Current implementation uses plain exports (`export const description`, `export async function run`). The helper would add:
 
-| Task | Description |
-|------|-------------|
-| 1.1 | Add `jiti` dependency to server package |
-| 1.2 | Implement `command()` API and `BrowserAPI` interface (`packages/server/src/commands/api.ts`) |
-| 1.3 | Implement jiti-based command loader (`packages/server/src/commands/loader.ts`) |
-| 1.4 | Implement command executor wrapping CDPExecutor (`packages/server/src/commands/executor.ts`) |
-| 1.5 | Add `/api/commands`, `/api/command/meta`, `/api/command/run` Hono routes |
+- Type-safe argument resolution
+- IDE autocompletion for `BrowserAPI`
+- Schema validation
 
-**Deliverable:** Relay server can load `.ts` commands and serve them via HTTP API.
+### 6.2 Built-In Example Commands (Not Yet)
 
-### Phase 2: CLI Integration
+No example commands ship with the package yet. Planned:
+- `hackernews/top.ts` — public API, no browser needed
+- `github/trending.ts` — browser + DOM scraping
 
-Wire the CLI to dispatch site commands to the relay.
+### 6.3 Enhanced `skill` Discovery (Partial)
 
-| Task | Description |
-|------|-------------|
-| 2.1 | Add `listCommands()`, `getCommandMeta()`, `runCommand()` to `RelayApiClient` |
-| 2.2 | Add site command dispatch in CLI (`args.command` + `args.subcommand` → relay API) |
-| 2.3 | Generate `--help` from relay command metadata |
-| 2.4 | Include site commands in main `--help` output |
-| 2.5 | Output formatting for site command results (table/json/csv/md) |
+The MCP `skill` tool appends available site commands to the documentation. The `--help` output does not yet fetch site commands from the relay.
 
-**Deliverable:** `runbrowser github trending --limit 5` works end-to-end.
+### 6.4 Richer CommandContext (Partial)
 
-### Phase 3: MCP Integration
-
-Add two MCP tools for agent access.
-
-| Task | Description |
-|------|-------------|
-| 3.1 | Add `skill` MCP tool (lists commands from relay) |
-| 3.2 | Add `run` MCP tool (executes command via relay) |
-
-**Deliverable:** AI agent can discover and execute site commands via MCP.
-
-### Phase 4: Example Commands
-
-Ship built-in commands to prove the system works.
-
-| Task | Description |
-|------|-------------|
-| 4.1 | `hackernews/top.ts` — public API, no browser needed |
-| 4.2 | `github/trending.ts` — browser, DOM scraping |
-| 4.3 | `v2ex/hot.ts` — public API |
-
-**Deliverable:** Three working example commands users can reference.
-
-### Phase 5 (Future): Extension Flags + Binary Distribution
-
-| Task | Description |
-|------|-------------|
-| 5.1 | Extension flag registration API on relay |
-| 5.2 | Two-phase flag resolution in CLI |
-| 5.3 | Bun compile for binary distribution |
+The `CommandContext` only exposes `navigate`, `evaluate`, `wait`. Could be expanded to include `click`, `fill`, `snapshot`, `screenshot` etc.
 
 ---
 
-## 11. Key Decisions
+## 7. Key Decisions
 
-### Why Node.js, not Rust?
+### Why Node.js CLI, not Rust?
 
-The relay server must be Node.js (jiti, WebSocket, npm ecosystem). The CLI is a thin HTTP client — the bottleneck is always the browser (100ms-5s), not the CLI (20ms). Maintaining two languages for 15ms startup improvement is not worth it.
+The relay server must be Node.js (jiti, WebSocket, npm ecosystem). The CLI is a thin HTTP client — the bottleneck is always the browser (100ms–5s), not the CLI (~20ms). Maintaining two languages for 15ms startup improvement is not worth it.
 
 ### Why TypeScript-only for site commands (no YAML)?
 
 YAML site commands are YAML wrappers around embedded JS strings — the worst of both worlds. TypeScript gives full IDE support, type checking, and debugging.
 
-### Why two MCP tools (skill + run) instead of one per site command?
+### Why two MCP tools (skill + run) instead of one per command?
 
-47 MCP tools overwhelm agents. Two generic tools (`skill` to discover, `run` to execute) are simpler and scale to any number of site commands.
+Many MCP tools overwhelm agents. Two generic tools (`skill` to discover, `run` to execute) are simpler and scale to any number of commands.
 
 ### Why execute commands on the relay, not the CLI?
 
 1. The relay already has the CDP connection — no extra round-trip.
 2. jiti lives on the relay — the CLI stays dependency-light.
-3. Future Rust/Bun CLI can call the same API without change.
-4. The relay is always running — no cold start for command loading.
-
-### Why `npm install -g`, not binary?
-
-Users are developers. They have Node.js. Binary distribution (Bun compile) is a future optimization when the product matures.
-
----
-
-## 12. Success Criteria
-
-1. `runbrowser github trending --limit 5` returns data in <2 seconds (excluding browser time)
-2. `runbrowser --help` shows site commands fetched from relay
-3. `runbrowser github trending --help` shows args/columns from command metadata
-4. User can create a new site command by dropping a `.ts` file into `~/.runbrowser/commands/`
-5. MCP agent can discover and execute site commands via `skill` + `run`
-6. Output supports `--json` (agent-friendly) and `table` (human-friendly)
+3. The relay is always running — no cold start for command loading.

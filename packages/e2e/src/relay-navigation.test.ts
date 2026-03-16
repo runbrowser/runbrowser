@@ -495,4 +495,70 @@ describe('Relay Navigation Tests', () => {
   }, 60000)
 
   // Skip: chrome.tabCapture.getMediaStreamId() requires activeTab permission
+
+  it('should navigate from about:blank via REST API without creating extra tabs', async () => {
+    // Regression test: cross-origin navigation from about:blank used to trigger
+    // autoCreateTab in a loop, creating 10+ blank tabs instead of navigating.
+    const BASE_URL = `http://127.0.0.1:${TEST_PORT}`
+
+    // Create a new session via REST API
+    const sessionRes = await fetch(`${BASE_URL}/api/session/new`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    expect(sessionRes.status).toBe(200)
+    const sessionData = (await sessionRes.json()) as { sessionId: string }
+    expect(sessionData.sessionId).toBeDefined()
+    const { sessionId } = sessionData
+
+    // Verify initial tab is about:blank
+    const initialUrlRes = await fetch(`${BASE_URL}/api/url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId }),
+    })
+    if (initialUrlRes.ok) {
+      const urlData = (await initialUrlRes.json()) as { url: string }
+      // The initial tab should be about:blank or similar
+      expect(urlData.url).toMatch(/about:blank|^$/)
+    }
+
+    // Create a simple local server to navigate to (avoids external network dependency)
+    const server = await createSimpleServer({
+      routes: {
+        '/': '<!doctype html><html><head><title>Nav Test Page</title></head><body><h1>Hello</h1></body></html>',
+      },
+    })
+
+    try {
+      // Navigate from about:blank to a real URL via REST API (this is the CDPExecutor path)
+      const navRes = await fetch(`${BASE_URL}/api/navigate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, url: server.baseUrl }),
+      })
+      expect(navRes.status).toBe(200)
+      const navData = (await navRes.json()) as { url: string; title: string }
+
+      // Should have navigated to the target URL, not stayed on about:blank
+      expect(navData.url).toContain(server.baseUrl)
+      expect(navData.title).toBe('Nav Test Page')
+
+      // Verify only 1 tab exists (no extra tabs created by autoCreateTab cascade)
+      const jsonRes = await fetch(`${BASE_URL}/json`)
+      const tabs = (await jsonRes.json()) as Array<{ url: string }>
+      const aboutBlankTabs = tabs.filter((t) => t.url === 'about:blank')
+      expect(aboutBlankTabs.length).toBe(0) // No leftover about:blank tabs
+      expect(tabs.length).toBeLessThanOrEqual(2) // At most the navigated tab + maybe 1 from setup
+    } finally {
+      // Cleanup session
+      await fetch(`${BASE_URL}/api/session/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      })
+      await server.close()
+    }
+  }, 30000)
 })

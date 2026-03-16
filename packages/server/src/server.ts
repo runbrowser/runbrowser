@@ -476,6 +476,11 @@ export async function startRunBrowserCDPRelayServer({
     sendToExtension: ctx.sendToExtension,
     getExtensionEntry: (stableKeyOrId) =>
       ctx.getExtensionConnection(stableKeyOrId, { allowFallback: true }),
+    registerTarget: ({ extensionId, sessionId, targetId, targetInfo }) => {
+      ctx.store.setState((s) =>
+        relayState.addTarget(s, { extensionId, sessionId, targetId, targetInfo }),
+      )
+    },
     logger,
   })
 
