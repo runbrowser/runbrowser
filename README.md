@@ -345,12 +345,16 @@ runbrowser logfile  # prints log file paths
 | All pages return `about:blank` | Restart Chrome (known Chrome bug). |
 | Port 19988 in use | `lsof -ti :19988 \| xargs kill` |
 
-## Related Projects
+## Acknowledgements
 
-- [bb-sites](https://github.com/epiral/bb-sites) — Community fetch recipes for bb-browser with 45+ site adapters (Reddit, GitHub, YouTube, Twitter, and more). Great inspiration for RunBrowser command extensions.
-- [bb-browser](https://github.com/epiral/bb-browser) — CLI + MCP server for AI agents to control Chrome with your login state.
-- [playwriter](https://github.com/remorses/playwriter) — Chrome extension to let agents control your browser via Playwright snippets. RunBrowser's original inspiration.
-- [agent-browser](https://github.com/vercel-labs/agent-browser) — Browser automation CLI for AI agents by Vercel.
+RunBrowser stands on the shoulders of giants. These projects pioneered the ideas that made RunBrowser possible — we learned from each of them and tried to push the design further.
+
+- [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — Where it all started. Playwriter proved that a Chrome extension + Playwright sandbox is the right architecture for real-browser automation. RunBrowser began as a fork and evolved into a full CDP-native CLI with 50+ commands, accessibility snapshots, and a two-tool MCP model.
+- [bb-browser](https://github.com/epiral/bb-browser) — Showed that "your browser is the API" is a powerful idea. RunBrowser shares the same philosophy — your logins, your extensions, your cookies — and extends it with auto-sessions, visual feedback, and structured site commands.
+- [bb-sites](https://github.com/epiral/bb-sites) — An incredible collection of 45+ site adapters covering Reddit, GitHub, YouTube, Twitter, Bilibili, Zhihu, and more. A constant source of inspiration for RunBrowser's command extensions ecosystem.
+- [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Demonstrated the value of a comprehensive browser CLI for AI agents. RunBrowser takes a leaner approach — fewer commands, direct CDP instead of Playwright, and a single `run` tool instead of dozens of MCP tools.
+
+Thank you to all these projects and their maintainers. The browser automation space is better because of your work.
 
 ## License
 
