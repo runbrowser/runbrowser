@@ -3,6 +3,7 @@
  */
 
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pc from 'picocolors'
@@ -227,21 +228,125 @@ registerBuiltinCommand({
 // skill
 // ============================================================================
 
+/**
+ * Locate a markdown file shipped inside the published package.
+ *
+ * `dist/commands/` at runtime, `src/commands/` when run from source, so the
+ * package root is two or three levels up depending on which one it is.
+ */
+function packageFile(name: string): string | null {
+  const candidates = [
+    path.join(__dirname, '..', '..', 'src', name),
+    path.join(__dirname, '..', 'src', name),
+    path.join(__dirname, name),
+  ]
+  return candidates.find((p) => fs.existsSync(p)) ?? null
+}
+
+/**
+ * Marks a SKILL.md as one we wrote. A file without this line belongs to the
+ * user — an edited copy, or a symlink to a checkout they are working on — and
+ * is never overwritten or removed.
+ */
+const OWNERSHIP_MARKER = '<!-- installed by runbrowser -->'
+
+/**
+ * Skill directories every agent we know about reads.
+ *
+ * Defaults to the current project rather than $HOME: a skill installed next to
+ * the code it is used on can be committed, reviewed and versioned with that
+ * repo, and installing it never silently changes how agents behave in every
+ * other checkout on the machine. `--global` opts into that.
+ */
+function skillTargets(global: boolean): string[] {
+  const base = global ? os.homedir() : process.cwd()
+  return [
+    path.join(base, '.claude', 'skills', 'runbrowser'),
+    path.join(base, '.agents', 'skills', 'runbrowser'),
+  ]
+}
+
 registerBuiltinCommand({
   def: {
     name: 'skill',
-    description: 'Print full usage instructions',
+    description: 'Print the agent reference, or install it into your agent skill directories',
+    positionals: [
+      { name: 'action', description: 'install, uninstall, path — omit to print the reference' },
+    ],
+    flags: {
+      global: { type: 'boolean', alias: 'g', description: 'Install into $HOME instead of the current project' },
+    },
   },
-  async execute() {
-    const p = path.join(__dirname, '..', 'src', 'skill.md')
-    if (fs.existsSync(p)) {
-      console.log(fs.readFileSync(p, 'utf-8'))
-    } else {
-      // Fallback for built dist
-      const distP = path.join(__dirname, '..', '..', 'src', 'skill.md')
-      if (fs.existsSync(distP)) console.log(fs.readFileSync(distP, 'utf-8'))
-      else console.log('skill.md not found')
+  async execute(args) {
+    const action = args.subcommand
+    const global = Boolean(args.flags.get('global'))
+
+    if (!action) {
+      const reference = packageFile('skill.md')
+      if (!reference) throw new Error('skill.md is missing from this install')
+      console.log(fs.readFileSync(reference, 'utf-8'))
+      return
     }
+
+    if (action === 'path') {
+      const reference = packageFile('skill.md')
+      if (!reference) throw new Error('skill.md is missing from this install')
+      console.log(reference)
+      return
+    }
+
+    if (action === 'install') {
+      const source = packageFile('agent-skill.md')
+      if (!source) throw new Error('agent-skill.md is missing from this install')
+      const body = fs.readFileSync(source, 'utf-8').trimEnd() + `\n\n${OWNERSHIP_MARKER}\n`
+
+      const installed: string[] = []
+      for (const dir of skillTargets(global)) {
+        const target = path.join(dir, 'SKILL.md')
+        if (fs.existsSync(target)) {
+          const existing = fs.readFileSync(target, 'utf-8')
+          if (!existing.includes(OWNERSHIP_MARKER)) {
+            console.error(
+              pc.yellow(`skipped ${target} — not ours, leaving it alone. Remove it to reinstall.`),
+            )
+            continue
+          }
+          if (existing === body) {
+            console.log(pc.dim(`unchanged ${target}`))
+            continue
+          }
+        }
+        fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(target, body, 'utf-8')
+        installed.push(target)
+      }
+
+      for (const p of installed) console.log(pc.green(`✓ ${p}`))
+      if (installed.length === 0) console.log('Already up to date.')
+      return
+    }
+
+    if (action === 'uninstall') {
+      let removed = 0
+      for (const dir of skillTargets(global)) {
+        const target = path.join(dir, 'SKILL.md')
+        if (!fs.existsSync(target)) continue
+        if (!fs.readFileSync(target, 'utf-8').includes(OWNERSHIP_MARKER)) {
+          console.error(pc.yellow(`skipped ${target} — not ours, leaving it alone.`))
+          continue
+        }
+        fs.rmSync(target)
+        // Only remove the directory if installing it is all that ever put
+        // anything there.
+        if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
+        console.log(pc.green(`✓ removed ${target}`))
+        removed++
+      }
+      if (removed === 0) console.log('Nothing installed.')
+      return
+    }
+
+    throw new Error(`Unknown skill command: ${action}. Use: install, uninstall, path`)
   },
 })
 

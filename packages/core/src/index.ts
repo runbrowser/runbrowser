@@ -17,28 +17,6 @@ export type { ReadResult, SearchMatch, EditResult } from './editor.js'
 export { Debugger } from './debugger.js'
 export type { BreakpointInfo, LocationInfo, EvaluateResult, ScriptInfo } from './debugger.js'
 
-// FFmpeg utilities
-export {
-  concatenateVideos,
-  speedUpSections,
-  computeIdleSections,
-  createDemoVideo,
-  probeVideo,
-  detectEncoder,
-  INTERACTION_BUFFER_SECONDS,
-} from './ffmpeg.js'
-export type {
-  InputFile,
-  ConcatenateOptions,
-  SpeedSection,
-  SpeedUpSectionsOptions,
-  VideoInfo,
-  CreateDemoVideoOptions,
-} from './ffmpeg.js'
-
-// Diff utilities
-export { createSmartDiff } from './diff-utils.js'
-
 // HTML rewrite (internal utility)
 export { formatHtmlForPrompt } from './htmlrewrite.js'
 export type { FormatHtmlOptions } from './htmlrewrite.js'

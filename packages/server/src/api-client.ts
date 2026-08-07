@@ -342,7 +342,11 @@ export class RelayApiClient {
   }
 
   // --------------------------------------------------------------------------
-  // High-level browser commands (Phase 2+)
+  // Browser API
+  //
+  // Two calls reach the page: cdp and evaluate. Everything a caller wants to
+  // do to a document is a CDP method, so there is no per-action client method
+  // to keep in sync with a route, a CLI flag and a doc line.
   // --------------------------------------------------------------------------
 
   private async post<T>(path: string, body: Record<string, unknown>, timeoutMs = 15000): Promise<T> {
@@ -360,226 +364,25 @@ export class RelayApiClient {
     return (await response.json()) as T
   }
 
-  async navigate(sessionId: string, url: string): Promise<{ url: string; title: string }> {
-    return this.post('/api/navigate', { sessionId, url })
-  }
-
-  async snapshot(sessionId: string, options?: { interactiveOnly?: boolean }): Promise<{ snapshot: string; refs: unknown[] }> {
-    return this.post('/api/snapshot', { sessionId, ...options })
-  }
-
-  async captureScreenshot(sessionId: string): Promise<{ data: string; mimeType: string }> {
-    return this.post('/api/screenshot', { sessionId })
-  }
-
-  async click(sessionId: string, ref: string): Promise<void> {
-    await this.post('/api/click', { sessionId, ref })
-  }
-
-  async fill(sessionId: string, ref: string, value: string): Promise<void> {
-    await this.post('/api/fill', { sessionId, ref, value })
-  }
-
-  async type(sessionId: string, text: string): Promise<void> {
-    await this.post('/api/type', { sessionId, text })
-  }
-
-  async press(sessionId: string, key: string): Promise<void> {
-    await this.post('/api/press', { sessionId, key })
-  }
-
-  async scroll(sessionId: string, direction: 'up' | 'down' | 'left' | 'right', amount?: number): Promise<void> {
-    await this.post('/api/scroll', { sessionId, direction, amount })
-  }
-
-  async hover(sessionId: string, ref: string): Promise<void> {
-    await this.post('/api/hover', { sessionId, ref })
-  }
-
-  async evaluate(sessionId: string, code: string, timeout?: number): Promise<ExecuteResult> {
-    return this.post('/api/evaluate', { sessionId, code, timeout })
-  }
-
-  async getUrl(sessionId: string): Promise<{ url: string }> {
-    return this.post('/api/get-url', { sessionId })
-  }
-
-  async getTitle(sessionId: string): Promise<{ title: string }> {
-    return this.post('/api/get-title', { sessionId })
-  }
-
-  async back(sessionId: string): Promise<void> {
-    await this.post('/api/back', { sessionId })
-  }
-
-  async forward(sessionId: string): Promise<void> {
-    await this.post('/api/forward', { sessionId })
-  }
-
-  async reload(sessionId: string): Promise<void> {
-    await this.post('/api/reload', { sessionId })
-  }
-
-  async getText(sessionId: string, ref: string): Promise<{ text: string }> {
-    return this.post('/api/get-text', { sessionId, ref })
-  }
-
-  async getHtml(sessionId: string, ref: string): Promise<{ html: string }> {
-    return this.post('/api/get-html', { sessionId, ref })
-  }
-
-  async getValue(sessionId: string, ref: string): Promise<{ value: string }> {
-    return this.post('/api/get-value', { sessionId, ref })
-  }
-
-  async getAttribute(sessionId: string, ref: string, attr: string): Promise<{ value: string | null }> {
-    return this.post('/api/get-attr', { sessionId, ref, attr })
-  }
-
-  async isVisible(sessionId: string, ref: string): Promise<{ visible: boolean }> {
-    return this.post('/api/is-visible', { sessionId, ref })
-  }
-
-  async isChecked(sessionId: string, ref: string): Promise<{ checked: boolean }> {
-    return this.post('/api/is-checked', { sessionId, ref })
-  }
-
-  async selectOption(sessionId: string, ref: string, value: string): Promise<void> {
-    await this.post('/api/select', { sessionId, ref, value })
-  }
-
-  async waitFor(sessionId: string, options: { ref?: string; text?: string; url?: string; ms?: number; load?: string; fn?: string; timeout?: number }): Promise<void> {
-    const timeoutMs = (options.timeout || 10000) + 5000
-    await this.post('/api/wait', { sessionId, ...options }, timeoutMs)
-  }
-
-  async viewport(sessionId: string, width: number, height: number): Promise<void> {
-    await this.post('/api/viewport', { sessionId, width, height })
-  }
-
+  /** Send a raw CDP command to the session's active tab. */
   async cdp(sessionId: string, method: string, params?: unknown): Promise<{ result: unknown }> {
     return this.post('/api/cdp', { sessionId, method, params })
   }
 
-  // --------------------------------------------------------------------------
-  // New interaction commands
-  // --------------------------------------------------------------------------
-
-  async dblclick(sessionId: string, ref: string): Promise<void> {
-    await this.post('/api/dblclick', { sessionId, ref })
-  }
-
-  async check(sessionId: string, ref: string): Promise<void> {
-    await this.post('/api/check', { sessionId, ref })
-  }
-
-  async uncheck(sessionId: string, ref: string): Promise<void> {
-    await this.post('/api/uncheck', { sessionId, ref })
-  }
-
-  async focus(sessionId: string, ref: string): Promise<void> {
-    await this.post('/api/focus', { sessionId, ref })
-  }
-
-  /**
-   * Upload files to an <input type="file"> element.
-   * For local mode, sends file paths. For remote mode, reads and base64-encodes files.
-   */
-  async upload(sessionId: string, ref: string, files: string[]): Promise<void> {
-    if (this.isRemote) {
-      // Remote: read files and send as base64
-      const fs = await import('node:fs')
-      const path = await import('node:path')
-      const fileData = files.map((filePath) => {
-        const resolved = path.resolve(filePath)
-        const buffer = fs.readFileSync(resolved)
-        return {
-          name: path.basename(resolved),
-          data: buffer.toString('base64'),
-        }
-      })
-      await this.post('/api/upload', { sessionId, ref, fileData })
-    } else {
-      // Local: send absolute file paths directly
-      const path = await import('node:path')
-      const absoluteFiles = files.map((f) => path.resolve(f))
-      await this.post('/api/upload', { sessionId, ref, files: absoluteFiles })
-    }
-  }
-
-  /**
-   * Download a file from the browser by clicking a ref or navigating to a URL.
-   * Returns the file data as base64.
-   */
-  async download(sessionId: string, options: {
-    ref?: string
-    url?: string
-    timeout?: number
-  }): Promise<DownloadResult> {
-    return this.post('/api/download', { sessionId, ...options }, (options.timeout ?? 30000) + 10000)
-  }
-
-  /**
-   * Download a file and save it to a local path.
-   */
-  async downloadToFile(sessionId: string, outputPath: string, options: {
-    ref?: string
-    url?: string
-    timeout?: number
-  }): Promise<{ path: string; size: number; filename: string }> {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-
-    const result = await this.download(sessionId, options)
-    const resolvedPath = path.resolve(outputPath)
-
-    // If outputPath is a directory, use the suggested filename
-    let finalPath = resolvedPath
-    try {
-      const stat = fs.statSync(resolvedPath)
-      if (stat.isDirectory()) {
-        finalPath = path.join(resolvedPath, result.suggestedFilename)
-      }
-    } catch {
-      // Path doesn't exist — use as-is (it's a file path)
-    }
-
-    // Ensure parent directory exists
-    const dir = path.dirname(finalPath)
-    fs.mkdirSync(dir, { recursive: true })
-
-    // Write the file
-    const buffer = Buffer.from(result.data, 'base64')
-    fs.writeFileSync(finalPath, buffer)
-
-    return {
-      path: finalPath,
-      size: result.totalBytes,
-      filename: result.suggestedFilename,
-    }
-  }
-
-  async drag(sessionId: string, source: string, target: string): Promise<void> {
-    await this.post('/api/drag', { sessionId, source, target })
-  }
-
-  async isEnabled(sessionId: string, ref: string): Promise<{ enabled: boolean }> {
-    return this.post('/api/is-enabled', { sessionId, ref })
-  }
-
-  async getCount(sessionId: string, selector: string): Promise<{ count: number }> {
-    return this.post('/api/get-count', { sessionId, selector })
+  /** Runtime.evaluate with the result marshalled to text. */
+  async evaluate(sessionId: string, code: string, timeout?: number): Promise<ExecuteResult> {
+    return this.post('/api/evaluate', { sessionId, code, timeout })
   }
 
   // --------------------------------------------------------------------------
-  // Tab management
+  // Tabs — connection state, not page state
   // --------------------------------------------------------------------------
 
-  async listTabs(sessionId: string): Promise<{ tabs: Array<{ index: number; url: string; title: string; active: boolean }> }> {
+  async listTabs(sessionId: string): Promise<{ tabs: Array<{ index: number; targetId: string; url: string; title: string; active: boolean }> }> {
     return this.post('/api/tab/list', { sessionId })
   }
 
-  async newTab(sessionId: string, url?: string): Promise<{ index: number }> {
+  async newTab(sessionId: string, url?: string): Promise<{ index: number; targetId: string }> {
     return this.post('/api/tab/new', { sessionId, url })
   }
 
@@ -589,34 +392,6 @@ export class RelayApiClient {
 
   async closeTab(sessionId: string, index?: number): Promise<void> {
     await this.post('/api/tab/close', { sessionId, index })
-  }
-
-  // --------------------------------------------------------------------------
-  // Frame management
-  // --------------------------------------------------------------------------
-
-  async switchFrame(sessionId: string, selector: string): Promise<void> {
-    await this.post('/api/frame/switch', { sessionId, selector })
-  }
-
-  async switchToMainFrame(sessionId: string): Promise<void> {
-    await this.post('/api/frame/main', { sessionId })
-  }
-
-  // --------------------------------------------------------------------------
-  // Find + act (semantic locators)
-  // --------------------------------------------------------------------------
-
-  async findAndAct(sessionId: string, options: {
-    by: string
-    value: string
-    action: string
-    actionValue?: string
-    name?: string
-    exact?: boolean
-    index?: number
-  }): Promise<unknown> {
-    return this.post('/api/find', { sessionId, ...options })
   }
 
   // --------------------------------------------------------------------------
@@ -642,92 +417,4 @@ export class RelayApiClient {
     return this.post('/api/command/run', { sessionId, site, name, args })
   }
 
-  // --------------------------------------------------------------------------
-  // Diff
-  // --------------------------------------------------------------------------
-
-  async diffSnapshot(sessionId: string, baseline?: string): Promise<{ diff: string; changed: boolean }> {
-    return this.post('/api/diff/snapshot', { sessionId, baseline })
-  }
-
-  async diffScreenshot(sessionId: string, baseline: string, output?: string): Promise<{ path: string; diffPixels: number }> {
-    return this.post('/api/diff/screenshot', { sessionId, baseline, output })
-  }
-
-  // --------------------------------------------------------------------------
-  // Recording
-  // --------------------------------------------------------------------------
-
-  async startRecording(sessionId: string, options: {
-    outputPath: string
-    frameRate?: number
-    audio?: boolean
-    videoBitsPerSecond?: number
-    audioBitsPerSecond?: number
-  }): Promise<StartRecordingApiResult> {
-    const baseUrl = this.getBaseUrl()
-    const response = await fetch(`${baseUrl}/recording/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-      body: JSON.stringify({ sessionId, ...options }),
-      signal: AbortSignal.timeout(15000),
-    })
-    return (await response.json()) as StartRecordingApiResult
-  }
-
-  async stopRecording(sessionId: string): Promise<StopRecordingApiResult> {
-    const baseUrl = this.getBaseUrl()
-    const response = await fetch(`${baseUrl}/recording/stop`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-      body: JSON.stringify({ sessionId }),
-      signal: AbortSignal.timeout(35000),
-    })
-    return (await response.json()) as StopRecordingApiResult
-  }
-
-  async recordingStatus(sessionId: string): Promise<RecordingStatusApiResult> {
-    const baseUrl = this.getBaseUrl()
-    const url = `${baseUrl}/recording/status?sessionId=${encodeURIComponent(sessionId)}`
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(5000),
-      headers: this.getAuthHeaders(),
-    })
-    return (await response.json()) as RecordingStatusApiResult
-  }
-
-  async cancelRecording(sessionId: string): Promise<CancelRecordingApiResult> {
-    const baseUrl = this.getBaseUrl()
-    const response = await fetch(`${baseUrl}/recording/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
-      body: JSON.stringify({ sessionId }),
-      signal: AbortSignal.timeout(10000),
-    })
-    return (await response.json()) as CancelRecordingApiResult
-  }
-
-}
-
-// ============================================================================
-// Recording result types
-// ============================================================================
-
-export type StartRecordingApiResult =
-  | { success: true; tabId: number; startedAt: number }
-  | { success: false; error: string }
-
-export type StopRecordingApiResult =
-  | { success: true; tabId: number; duration: number; path: string; size: number }
-  | { success: false; error: string }
-
-export type RecordingStatusApiResult = {
-  isRecording: boolean
-  tabId?: number
-  startedAt?: number
-}
-
-export type CancelRecordingApiResult = {
-  success: boolean
-  error?: string
 }

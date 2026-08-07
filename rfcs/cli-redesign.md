@@ -1,6 +1,11 @@
 # RFC: RunBrowser CLI Design
 
-> Status: **Implemented** (2026-03-15)
+> Status: **Superseded** by [minimal-cdp-surface.md](./minimal-cdp-surface.md) (2026-08-07)
+>
+> Implemented 2026-03-15; the verb layer described below was removed. Kept
+> because it records what the `@ref` model was for and why it looked right at
+> the time — principle 5 ("`@ref` is the primary interaction model") is exactly
+> the assumption the successor RFC overturns.
 
 ## Design Principles
 

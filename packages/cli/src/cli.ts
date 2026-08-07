@@ -7,7 +7,7 @@
  * Phase 2: After extensions/site commands load, re-resolve unknown flags
  *
  * Supports:
- * - Built-in commands: navigate, click, snapshot, session, ...
+ * - Built-in commands: cdp, eval, tab, status, session, ...
  * - Site commands: runbrowser github trending, runbrowser bilibili hot
  * - Extension-registered flags
  */
@@ -32,12 +32,9 @@ import { printMainHelp, printCommandHelp } from './help.js'
 
 
 // Import command registrations (side-effect: registers commands)
-import './commands/navigation.js'
-import './commands/observation.js'
-import './commands/interaction.js'
 import './commands/execution.js'
+import './commands/browser.js'
 import './commands/management.js'
-import './commands/recording.js'
 import './commands/install.js'
 
 import { getBuiltinCommand, getAllBuiltinCommands, type SessionResolver } from './commands/index.js'
@@ -116,6 +113,24 @@ async function main() {
     } else {
       console.log(`runbrowser v${VERSION}`)
       console.log(`Run ${pc.cyan('runbrowser --help')} to see available commands.`)
+    }
+    process.exit(0)
+  }
+
+  // ── help [command] — the same output as --help, as a word ──
+  // Agents reach for `<tool> help` before they reach for `<tool> --help`, and
+  // failing that guess with "Unknown command" is a wasted turn.
+  if (args.command === 'help') {
+    const topic = args.subcommand
+    if (topic) {
+      const target = getBuiltinCommand(topic)
+      if (!target) {
+        console.error(`Unknown command: ${topic}`)
+        process.exit(1)
+      }
+      printCommandHelp(target.def)
+    } else {
+      printMainHelp(VERSION, getAllBuiltinCommands(), [])
     }
     process.exit(0)
   }

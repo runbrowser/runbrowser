@@ -8,13 +8,19 @@
 import WebSocket from 'ws'
 import type { ExecutorLike } from './server.js'
 import type { SessionMetadata } from './state.js'
-import { getSnapshot, type SnapshotResult } from './snapshot.js'
-import { captureScreenshot } from './screenshot.js'
-import * as commands from './commands.js'
 
 // ============================================================================
 // Types
 // ============================================================================
+
+/**
+ * Sends one CDP command and resolves with its raw result.
+ *
+ * Everything the executor exposes to callers is this shape or built from it —
+ * there is deliberately no layer of named page actions on top. Chrome's
+ * protocol is the API.
+ */
+export type SendCDP = (method: string, params?: unknown) => Promise<unknown>
 
 export interface CDPExecutorOptions {
   /** Direct CDP WebSocket URL (e.g. ws://127.0.0.1:9222/devtools/browser/...) */
@@ -33,7 +39,7 @@ export class CDPExecutor implements ExecutorLike {
   private logger?: { log(...args: any[]): void; error(...args: any[]): void }
 
   /** Bound sendCDP — avoids creating a new closure in every method call. */
-  private readonly boundSendCDP: commands.SendCDP
+  private readonly boundSendCDP: SendCDP
 
   /** WebSocket connection to Chrome's browser-level CDP endpoint */
   private browserWs: WebSocket | null = null
@@ -345,121 +351,76 @@ export class CDPExecutor implements ExecutorLike {
   }
 
   // --------------------------------------------------------------------------
-  // High-level browser actions
+  // The API
   // --------------------------------------------------------------------------
 
-  private lastRefMap: Map<string, import('./snapshot.js').SnapshotRef> = new Map()
-
-  async snapshot(options: { interactiveOnly?: boolean } = {}): Promise<SnapshotResult> {
-    await this.ensurePageConnection()
-    const result = await getSnapshot(this.boundSendCDP, options)
-    this.lastRefMap = result.refMap
-    return result
-  }
-
-  async screenshot(): Promise<string> {
-    await this.ensurePageConnection()
-    return captureScreenshot(this.boundSendCDP)
-  }
-
-  async navigate(url: string): Promise<{ url: string; title: string }> {
-    await this.ensurePageConnection()
-    return commands.navigate(this.boundSendCDP, url)
-  }
-
-  async click(ref: string): Promise<void> {
-    return commands.click(this.boundSendCDP, ref, this.lastRefMap)
-  }
-
-  async fill(ref: string, value: string): Promise<void> {
-    return commands.fill(this.boundSendCDP, ref, value, this.lastRefMap)
-  }
-
-  async type(text: string): Promise<void> {
-    return commands.type(this.boundSendCDP, text)
-  }
-
-  async press(key: string): Promise<void> {
-    return commands.press(this.boundSendCDP, key)
-  }
-
-  async scroll(direction: 'up' | 'down' | 'left' | 'right', amount?: number): Promise<void> {
-    return commands.scroll(this.boundSendCDP, direction, amount)
-  }
-
-  async hover(ref: string): Promise<void> {
-    return commands.hover(this.boundSendCDP, ref, this.lastRefMap)
-  }
-
-  async getUrl(): Promise<string> {
-    return commands.getUrl(this.boundSendCDP)
-  }
-
-  async getTitle(): Promise<string> {
-    return commands.getTitle(this.boundSendCDP)
-  }
-
-  async getText(ref: string): Promise<string> {
-    return commands.getText(this.boundSendCDP, ref, this.lastRefMap)
-  }
-
-  async getHtml(ref: string): Promise<string> {
-    return commands.getHtml(this.boundSendCDP, ref, this.lastRefMap)
-  }
-
-  async getValue(ref: string): Promise<string> {
-    return commands.getValue(this.boundSendCDP, ref, this.lastRefMap)
-  }
-
-  async getAttribute(ref: string, attr: string): Promise<string | null> {
-    return commands.getAttribute(this.boundSendCDP, ref, attr, this.lastRefMap)
-  }
-
-  async isVisible(ref: string): Promise<boolean> {
-    return commands.isVisible(this.boundSendCDP, ref, this.lastRefMap)
-  }
-
-  async isChecked(ref: string): Promise<boolean> {
-    return commands.isChecked(this.boundSendCDP, ref, this.lastRefMap)
-  }
-
-  async selectOption(ref: string, value: string): Promise<void> {
-    return commands.selectOption(this.boundSendCDP, ref, value, this.lastRefMap)
-  }
-
-  async waitFor(options: { ref?: string; text?: string; url?: string; ms?: number; load?: string; fn?: string }, timeout?: number): Promise<void> {
-    return commands.waitFor(this.boundSendCDP, options, this.lastRefMap, timeout)
-  }
-
-  async viewport(width: number, height: number): Promise<void> {
-    return commands.viewport(this.boundSendCDP, width, height)
-  }
-
-  async upload(ref: string, files: string[]): Promise<void> {
-    return commands.upload(this.boundSendCDP, ref, files, this.lastRefMap)
-  }
-
-  async uploadBase64(ref: string, fileData: Array<{ name: string; data: string; mimeType?: string }>, tempDir: string): Promise<void> {
-    return commands.uploadBase64(this.boundSendCDP, ref, fileData, this.lastRefMap, tempDir)
-  }
-
-  async download(options: { ref?: string; url?: string; timeout?: number }): Promise<commands.DownloadResult> {
-    return commands.download(this.boundSendCDP, options, this.lastRefMap)
-  }
-
+  /**
+   * Send an arbitrary CDP method to the active page target.
+   *
+   * This is the entire page-facing surface. Clicking, typing, reading the DOM
+   * and capturing screenshots are all CDP methods, so none of them needs a
+   * wrapper here.
+   */
   async rawCDP(method: string, params?: unknown): Promise<unknown> {
+    await this.ensurePageConnection()
     return this.boundSendCDP(method, params)
   }
 
-  async goBack(): Promise<void> {
-    return commands.goBack(this.boundSendCDP)
+  // --------------------------------------------------------------------------
+  // Tabs
+  //
+  // Tabs are about the connection, not the page: which target this session is
+  // bound to is state the caller cannot derive from a CDP result. Everything
+  // here runs on the browser-level socket.
+  // --------------------------------------------------------------------------
+
+  /** Page targets, in a stable order, with the session's active one marked. */
+  async listTabs(): Promise<Array<{ index: number; targetId: string; url: string; title: string; active: boolean }>> {
+    const targets = await this.listTargets()
+    return targets.map((t, index) => ({
+      index,
+      targetId: t.targetId,
+      url: t.url,
+      title: t.title,
+      active: t.targetId === this.activeTargetId,
+    }))
   }
 
-  async goForward(): Promise<void> {
-    return commands.goForward(this.boundSendCDP)
+  /** Open a tab and bind the session to it. */
+  async newTab(url?: string): Promise<{ index: number; targetId: string }> {
+    const browserWs = await this.ensureBrowserConnection()
+    const created = (await this.sendViaBrowserWs(browserWs, 'Target.createTarget', {
+      url: url || 'about:blank',
+    })) as { targetId: string }
+    await this.switchTarget(created.targetId)
+    const tabs = await this.listTabs()
+    const index = tabs.findIndex((t) => t.targetId === created.targetId)
+    return { index: index === -1 ? tabs.length - 1 : index, targetId: created.targetId }
   }
 
-  async reload(): Promise<void> {
-    return commands.reload(this.boundSendCDP)
+  /** Bind the session to the tab at `index` (as reported by listTabs). */
+  async switchTab(index: number): Promise<void> {
+    const tabs = await this.listTabs()
+    const target = tabs[index]
+    if (!target) throw new Error(`No tab at index ${index} (${tabs.length} open)`)
+    await this.switchTarget(target.targetId)
+  }
+
+  /** Close the tab at `index`, defaulting to the session's active tab. */
+  async closeTab(index?: number): Promise<void> {
+    const tabs = await this.listTabs()
+    const target = index == null ? tabs.find((t) => t.active) : tabs[index]
+    if (!target) {
+      throw new Error(index == null ? 'No active tab to close' : `No tab at index ${index}`)
+    }
+    const browserWs = await this.ensureBrowserConnection()
+    await this.sendViaBrowserWs(browserWs, 'Target.closeTarget', { targetId: target.targetId })
+
+    const ws = this.pageWsMap.get(target.targetId)
+    if (ws) {
+      ws.close()
+      this.pageWsMap.delete(target.targetId)
+    }
+    if (this.activeTargetId === target.targetId) this.activeTargetId = null
   }
 }

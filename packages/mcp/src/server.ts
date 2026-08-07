@@ -154,251 +154,71 @@ Call this first to learn the @ref selector model and what site commands are avai
   }),
 )
 
-// ── navigate: page-level navigation ──
+// ── status: is a browser attached ──
 
 server.tool(
-  'navigate',
-  `Page-level navigation. The "action" field determines behavior:
-  • goto    — load a URL (requires "url")
-  • back    — history back
-  • forward — history forward
-  • reload  — reload current page
-  • reset   — reset the relay connection (use if commands hang)`,
-  {
-    action: z.enum(['goto', 'back', 'forward', 'reload', 'reset'])
-      .describe('Navigation action'),
-    url: z.string().optional()
-      .describe('Target URL — required when action="goto"'),
-  },
-  toolHandler(async ({ action, url }) => {
-    const sid = await ensureSession()
+  'status',
+  `Report whether the relay is up and a browser extension is attached.
+Call this when a browser call fails — it distinguishes "no browser connected"
+from a genuine page error. It does not start or change anything.`,
+  {},
+  toolHandler(async () => {
     const c = getClient()
-    switch (action) {
-      case 'goto': {
-        const u = requireField(url, 'url', 'goto')
-        const r = await c.navigate(sid, u)
-        return textResult(`Navigated to ${r.url}\nTitle: ${r.title}`)
-      }
-      case 'back':    await c.back(sid);    return textResult('Navigated back')
-      case 'forward': await c.forward(sid); return textResult('Navigated forward')
-      case 'reload':  await c.reload(sid);  return textResult('Page reloaded')
-      case 'reset': {
-        const r = await c.reset(sid)
-        return textResult(`Connection reset. Current URL: ${r.pageUrl}`)
-      }
+    const extensions = await c.fetchExtensionsStatus().catch(() => [])
+    const sessions = await c.listSessions().catch(() => [])
+    if (extensions.length === 0) {
+      return textResult(
+        'No browser attached. Ask the user to click the RunBrowser extension icon on a tab.',
+      )
     }
+    const who = extensions
+      .map((e: any) => `${e.browser || 'Chrome'} ${e.profile?.email || '(not signed in)'}`)
+      .join(', ')
+    return textResult(`Attached: ${who}\nSessions: ${sessions.length}`)
   }),
 )
 
-// ── interact: page-state-changing actions ──
+// ── tab: which target the session is bound to ──
 
 server.tool(
-  'interact',
-  `Interact with the page. The "action" field determines which other fields apply.
-Use the @ref labels from \`query({ what: "snapshot" })\` for ref-targeted actions.
+  'tab',
+  `List, open, switch and close browser tabs.
 
-  • click / dblclick / hover / focus / check / uncheck — requires ref
-  • fill   — requires ref + value
-  • type   — requires text (typed into focused element)
-  • press  — requires key (e.g. "Enter", "Tab", "Control+a")
-  • scroll — optional direction (default "down") + optional amount (px)
-  • select — requires ref + value (option value or label)
-  • upload — requires ref + files (absolute paths)
-  • download — requires ref OR url
-  • drag   — requires source + target (both refs)
-  • wait   — provide one of: ref / text / url / ms`,
+Tabs are connection state, not page state — everything you do *to* a page goes
+through \`cdp\`. The "action" field selects behavior:
+  • list   — page targets, with the bound one marked
+  • new    — open a tab (optional "url") and bind to it
+  • switch — bind to the tab at "index"
+  • close  — close the tab at "index", or the bound one if omitted`,
   {
-    action: z.enum([
-      'click', 'dblclick', 'fill', 'type', 'press', 'hover', 'focus',
-      'check', 'uncheck', 'scroll', 'select', 'upload', 'download', 'drag', 'wait',
-    ]).describe('Interaction action'),
-    ref: z.string().optional().describe('Element @ref from snapshot (e.g. "@e5")'),
-    value: z.string().optional().describe('Value for fill / select'),
-    text: z.string().optional().describe('Text for type'),
-    key: z.string().optional().describe('Key chord for press (e.g. "Enter", "Control+a")'),
-    direction: z.enum(['up', 'down', 'left', 'right']).optional().describe('Direction for scroll'),
-    amount: z.number().optional().describe('Pixels for scroll'),
-    files: z.array(z.string()).optional().describe('Absolute file paths for upload'),
-    url: z.string().optional().describe('URL for download (alternative to ref)'),
-    source: z.string().optional().describe('Source @ref for drag'),
-    target: z.string().optional().describe('Target @ref for drag'),
-    ms: z.number().optional().describe('Wait this many milliseconds (wait action)'),
-    timeout: z.number().optional().describe('Per-action timeout in ms'),
+    action: z.enum(['list', 'new', 'switch', 'close']).describe('Tab action'),
+    url: z.string().optional().describe('URL for action="new"'),
+    index: z.number().optional().describe('Tab index for switch/close'),
   },
-  toolHandler(async (args) => {
+  toolHandler(async ({ action, url, index }) => {
     const sid = await ensureSession()
     const c = getClient()
-    const { action } = args
-
     switch (action) {
-      case 'click': {
-        const ref = requireField(args.ref, 'ref', action)
-        await c.click(sid, ref)
-        return textResult(`Clicked ${ref}`)
+      case 'list': {
+        const r = await c.listTabs(sid)
+        return textResult(
+          r.tabs
+            .map((t: any) => `${t.active ? '→' : ' '} [${t.index}] ${t.title || '(untitled)'} — ${t.url}`)
+            .join('\n') || '(no tabs)',
+        )
       }
-      case 'dblclick': {
-        const ref = requireField(args.ref, 'ref', action)
-        await c.dblclick(sid, ref)
-        return textResult(`Double-clicked ${ref}`)
+      case 'new': {
+        const r = await c.newTab(sid, url)
+        return textResult(`Opened tab ${r.index}${url ? ` at ${url}` : ''}`)
       }
-      case 'hover': {
-        const ref = requireField(args.ref, 'ref', action)
-        await c.hover(sid, ref)
-        return textResult(`Hovered ${ref}`)
+      case 'switch': {
+        const i = requireField(index, 'index', 'switch')
+        await c.switchTab(sid, i)
+        return textResult(`Switched to tab ${i}`)
       }
-      case 'focus': {
-        const ref = requireField(args.ref, 'ref', action)
-        await c.focus(sid, ref)
-        return textResult(`Focused ${ref}`)
-      }
-      case 'check': {
-        const ref = requireField(args.ref, 'ref', action)
-        await c.check(sid, ref)
-        return textResult(`Checked ${ref}`)
-      }
-      case 'uncheck': {
-        const ref = requireField(args.ref, 'ref', action)
-        await c.uncheck(sid, ref)
-        return textResult(`Unchecked ${ref}`)
-      }
-      case 'fill': {
-        const ref = requireField(args.ref, 'ref', action)
-        const value = requireField(args.value, 'value', action)
-        await c.fill(sid, ref, value)
-        return textResult(`Filled ${ref}`)
-      }
-      case 'type': {
-        const text = requireField(args.text, 'text', action)
-        await c.type(sid, text)
-        return textResult(`Typed "${text}"`)
-      }
-      case 'press': {
-        const key = requireField(args.key, 'key', action)
-        await c.press(sid, key)
-        return textResult(`Pressed ${key}`)
-      }
-      case 'scroll': {
-        const direction = args.direction ?? 'down'
-        await c.scroll(sid, direction, args.amount)
-        return textResult(`Scrolled ${direction}${args.amount ? ` ${args.amount}px` : ''}`)
-      }
-      case 'select': {
-        const ref = requireField(args.ref, 'ref', action)
-        const value = requireField(args.value, 'value', action)
-        await c.selectOption(sid, ref, value)
-        return textResult(`Selected "${value}" in ${ref}`)
-      }
-      case 'upload': {
-        const ref = requireField(args.ref, 'ref', action)
-        const files = args.files
-        if (!files || files.length === 0) throw new Error('files required for action="upload"')
-        await c.upload(sid, ref, files)
-        return textResult(`Uploaded ${files.length} file(s) to ${ref}`)
-      }
-      case 'download': {
-        if (!args.ref && !args.url) throw new Error('ref or url required for action="download"')
-        const r = await c.download(sid, { ref: args.ref, url: args.url, timeout: args.timeout })
-        return {
-          content: [
-            { type: 'text', text: `Downloaded: ${r.suggestedFilename} (${r.totalBytes} bytes)` },
-            { type: 'text', text: `Base64 data length: ${r.data.length} chars` },
-          ],
-        }
-      }
-      case 'drag': {
-        const source = requireField(args.source, 'source', action)
-        const target = requireField(args.target, 'target', action)
-        await c.drag(sid, source, target)
-        return textResult(`Dragged ${source} → ${target}`)
-      }
-      case 'wait': {
-        const opts = {
-          ref: args.ref,
-          ms: args.ms,
-          timeout: args.timeout,
-        }
-        if (!opts.ref && opts.ms === undefined) {
-          throw new Error('wait requires ref or ms')
-        }
-        await c.waitFor(sid, opts)
-        return textResult('Wait completed')
-      }
-    }
-  }),
-)
-
-// ── query: read state without side effects ──
-
-server.tool(
-  'query',
-  `Read state from the page without modifying it. The "what" field selects what to read.
-
-  • snapshot   — accessibility tree with @ref labels (start here to find elements)
-  • screenshot — image of the current viewport
-  • url        — current page URL
-  • title      — current page title
-  • text       — text content of an element (requires ref)
-  • html       — outer HTML of an element (requires ref)
-  • value      — input value (requires ref)
-  • visible    — whether element is visible (requires ref)
-  • checked    — checkbox/radio state (requires ref)
-  • enabled    — whether element is enabled (requires ref)
-  • count      — how many elements match a CSS selector (requires selector)`,
-  {
-    what: z.enum([
-      'snapshot', 'screenshot', 'url', 'title',
-      'text', 'html', 'value', 'visible', 'checked', 'enabled', 'count',
-    ]).describe('What to query'),
-    ref: z.string().optional().describe('Element @ref for ref-targeted queries'),
-    selector: z.string().optional().describe('CSS selector for what="count"'),
-    interactive: z.boolean().optional().describe('snapshot: only interactive elements'),
-  },
-  toolHandler(async ({ what, ref, selector, interactive }) => {
-    const sid = await ensureSession()
-    const c = getClient()
-    switch (what) {
-      case 'snapshot': {
-        const r = await c.snapshot(sid, { interactiveOnly: interactive })
-        return textResult(r.snapshot)
-      }
-      case 'screenshot': {
-        const r = await c.captureScreenshot(sid)
-        return {
-          content: [
-            { type: 'text', text: 'Screenshot captured.' },
-            { type: 'image', data: r.data, mimeType: r.mimeType },
-          ],
-        }
-      }
-      case 'url':     return textResult((await c.getUrl(sid)).url)
-      case 'title':   return textResult((await c.getTitle(sid)).title)
-      case 'text': {
-        const r2 = requireField(ref, 'ref', 'text')
-        return textResult((await c.getText(sid, r2)).text)
-      }
-      case 'html': {
-        const r2 = requireField(ref, 'ref', 'html')
-        return textResult((await c.getHtml(sid, r2)).html)
-      }
-      case 'value': {
-        const r2 = requireField(ref, 'ref', 'value')
-        return textResult((await c.getValue(sid, r2)).value)
-      }
-      case 'visible': {
-        const r2 = requireField(ref, 'ref', 'visible')
-        return textResult(String((await c.isVisible(sid, r2)).visible))
-      }
-      case 'checked': {
-        const r2 = requireField(ref, 'ref', 'checked')
-        return textResult(String((await c.isChecked(sid, r2)).checked))
-      }
-      case 'enabled': {
-        const r2 = requireField(ref, 'ref', 'enabled')
-        return textResult(String((await c.isEnabled(sid, r2)).enabled))
-      }
-      case 'count': {
-        const s = requireField(selector, 'selector', 'count')
-        return textResult(String((await c.getCount(sid, s)).count))
+      case 'close': {
+        await c.closeTab(sid, index)
+        return textResult(`Closed tab${index != null ? ` ${index}` : ''}`)
       }
     }
   }),
@@ -430,11 +250,17 @@ The code runs inside the page — \`document\`, \`window\`, \`fetch\` are availa
 
 server.tool(
   'cdp',
-  `Send a raw Chrome DevTools Protocol command. Escape hatch for operations not covered by other tools.
+  `Send a Chrome DevTools Protocol command. This is the page API — there are no
+click/type/read tools, because those are all CDP methods you already know.
 
-Example:
+  cdp({ method: "Page.navigate", params: { url: "https://example.com" } })
+  cdp({ method: "Accessibility.getFullAXTree" })   // find elements; filter the result yourself
+  cdp({ method: "Input.dispatchMouseEvent", params: { type: "mousePressed", x, y, button: "left", clickCount: 1 } })
   cdp({ method: "Page.captureScreenshot", params: { format: "png" } })
-  cdp({ method: "Network.enable" })`,
+
+Read the page before acting on it: getFullAXTree returns roles, names and
+backendNodeIds; resolve a node's box with DOM.getBoxModel and click its centre.
+Prefer that over screenshots — it is cheaper and searchable.`,
   {
     method: z.string().describe('CDP method (e.g. "Page.captureScreenshot")'),
     params: z.record(z.string(), z.unknown()).optional().describe('CDP params object'),
