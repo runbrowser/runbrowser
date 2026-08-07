@@ -562,6 +562,185 @@ export async function viewport(
 }
 
 // ============================================================================
+// Upload files to <input type="file">
+// ============================================================================
+
+export async function upload(
+  sendCDP: SendCDP,
+  ref: string,
+  files: string[],
+  refMap: Map<string, SnapshotRef>,
+): Promise<void> {
+  const resolved = requireRef(ref, refMap)
+  await scrollIntoView(sendCDP, resolved.backendNodeId)
+  await flashPageBorder(sendCDP)
+  await highlightElement(sendCDP, resolved.backendNodeId)
+
+  // Use DOM.setFileInputFiles to set files on the <input type="file"> element
+  await sendCDP('DOM.setFileInputFiles', {
+    files,
+    backendNodeId: resolved.backendNodeId,
+  })
+}
+
+/**
+ * Upload files using base64-encoded data (for remote scenarios).
+ * Writes data to temp files, sets them on the input, then cleans up.
+ */
+export async function uploadBase64(
+  sendCDP: SendCDP,
+  ref: string,
+  fileData: Array<{ name: string; data: string; mimeType?: string }>,
+  refMap: Map<string, SnapshotRef>,
+  tempDir: string,
+): Promise<void> {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+
+  const resolved = requireRef(ref, refMap)
+  await scrollIntoView(sendCDP, resolved.backendNodeId)
+  await flashPageBorder(sendCDP)
+  await highlightElement(sendCDP, resolved.backendNodeId)
+
+  // Write base64 data to temp files
+  const tempFiles: string[] = []
+  try {
+    for (const file of fileData) {
+      const tempPath = path.join(tempDir, file.name)
+      fs.writeFileSync(tempPath, Buffer.from(file.data, 'base64'))
+      tempFiles.push(tempPath)
+    }
+
+    await sendCDP('DOM.setFileInputFiles', {
+      files: tempFiles,
+      backendNodeId: resolved.backendNodeId,
+    })
+  } finally {
+    // Clean up temp files
+    for (const f of tempFiles) {
+      try { fs.unlinkSync(f) } catch {}
+    }
+  }
+}
+
+// ============================================================================
+// Download file — trigger a download and capture the result
+// ============================================================================
+
+export interface DownloadResult {
+  /** Original filename from the browser */
+  suggestedFilename: string
+  /** Base64-encoded file content */
+  data: string
+  /** Total bytes downloaded */
+  totalBytes: number
+}
+
+/**
+ * Trigger a download and capture the file content.
+ *
+ * Uses in-page fetch() to download files since chrome.debugger cannot access
+ * browser-level download commands (Page.setDownloadBehavior). For ref-based
+ * downloads, resolves the href from the element first, then fetches in-page.
+ */
+export async function download(
+  sendCDP: SendCDP,
+  options: {
+    /** @ref of a download link/button to click */
+    ref?: string
+    /** URL to download directly */
+    url?: string
+    /** Max time to wait for download to complete (ms) */
+    timeout?: number
+  },
+  refMap: Map<string, SnapshotRef>,
+): Promise<DownloadResult> {
+  const timeout = options.timeout ?? 30000
+
+  let downloadUrl: string | null = null
+
+  if (options.ref) {
+    // Resolve the element's href/src to get the download URL
+    const resolved = requireRef(options.ref, refMap)
+    const objectId = await resolveToObjectId(sendCDP, resolved.backendNodeId, options.ref)
+    const result = await cdpCallFunctionOn(
+      sendCDP,
+      objectId,
+      `function() {
+        if (this.href) return this.href;
+        let el = this.closest('a');
+        if (el && el.href) return el.href;
+        if (this.src) return this.src;
+        return null;
+      }`,
+    )
+    downloadUrl = result.result.value as string | null
+    if (!downloadUrl) {
+      throw new Error(`Cannot determine download URL from ref "${options.ref}". Element has no href or src attribute.`)
+    }
+  } else if (options.url) {
+    downloadUrl = options.url
+  } else {
+    throw new Error('download requires either ref or url')
+  }
+
+  // Use in-page fetch() to download the file and return it as base64
+  const fetchExpression = `(async () => {
+    const url = ${JSON.stringify(downloadUrl)};
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Download failed: ' + response.status + ' ' + response.statusText);
+
+    // Get the filename from Content-Disposition header or URL
+    let filename = '';
+    const disposition = response.headers.get('content-disposition');
+    if (disposition) {
+      const match = disposition.match(/filename[*]?=(?:UTF-8''|")?([^";\\n]+)"?/i);
+      if (match) filename = decodeURIComponent(match[1]);
+    }
+    if (!filename) {
+      const urlPath = new URL(url, location.href).pathname;
+      filename = urlPath.split('/').pop() || 'download';
+    }
+
+    const blob = await response.blob();
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+
+    // Convert to base64 in chunks to avoid call stack overflow
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    const base64 = btoa(binary);
+
+    return JSON.stringify({
+      suggestedFilename: filename,
+      data: base64,
+      totalBytes: bytes.length,
+    });
+  })()`
+
+  const result = (await sendCDP('Runtime.evaluate', {
+    expression: fetchExpression,
+    awaitPromise: true,
+    returnByValue: true,
+    timeout,
+  })) as { result: { value: unknown }; exceptionDetails?: { exception?: { description?: string }; text?: string } }
+
+  if (result?.exceptionDetails) {
+    const errMsg =
+      result.exceptionDetails.exception?.description ||
+      result.exceptionDetails.text ||
+      'Download failed'
+    throw new Error(errMsg)
+  }
+
+  return JSON.parse(result.result.value as string) as DownloadResult
+}
+
+// ============================================================================
 // Raw CDP passthrough
 // ============================================================================
 

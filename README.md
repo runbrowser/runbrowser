@@ -120,7 +120,10 @@ runbrowser scroll down -s 1                 # scroll direction (up/down/left/rig
 runbrowser scroll down 500 -s 1             # scroll by pixels
 runbrowser hover @e5 -s 1                   # hover element
 runbrowser focus @e5 -s 1                   # focus element
-runbrowser upload @e5 ./file.png -s 1       # upload files
+runbrowser upload @e5 ./file.png -s 1       # upload files to input
+runbrowser upload @e5 a.png b.pdf -s 1      # upload multiple files
+runbrowser download @e5 -o ./out.pdf -s 1   # download by clicking element
+runbrowser download https://example.com/f.pdf -o ./f.pdf -s 1  # download by URL
 runbrowser drag @e1 @e2 -s 1               # drag source to target
 runbrowser viewport 1280 720 -s 1           # set viewport size
 ```

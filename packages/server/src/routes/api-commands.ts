@@ -194,6 +194,45 @@ export function registerApiCommandRoutes(app: Hono, ctx: ServerContext) {
   })
 
   // --------------------------------------------------------------------------
+  // Upload — set files on <input type="file"> elements
+  // --------------------------------------------------------------------------
+
+  commandRoute(app, ctx, '/api/upload', {
+    required: ['ref'],
+    handler: async (exec, { ref, files, fileData }) => {
+      if (fileData && Array.isArray(fileData) && fileData.length > 0) {
+        // Remote mode: base64-encoded file data
+        const os = await import('node:os')
+        const fs = await import('node:fs')
+        const path = await import('node:path')
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'runbrowser-upload-'))
+        try {
+          await exec.uploadBase64(ref, fileData, tempDir)
+        } finally {
+          try { fs.rmSync(tempDir, { recursive: true, force: true }) } catch {}
+        }
+      } else if (files && Array.isArray(files) && files.length > 0) {
+        // Local mode: file paths on the server machine
+        await exec.upload(ref, files)
+      } else {
+        throw new Error('Either files (paths) or fileData (base64) is required')
+      }
+      return { success: true }
+    },
+  })
+
+  // --------------------------------------------------------------------------
+  // Download — trigger a download and capture the file
+  // --------------------------------------------------------------------------
+
+  commandRoute(app, ctx, '/api/download', {
+    handler: async (exec, { ref, url, timeout }) => {
+      const result = await exec.download({ ref, url, timeout })
+      return result
+    },
+  })
+
+  // --------------------------------------------------------------------------
   // Tab management — use CDP to query browser tabs
   // --------------------------------------------------------------------------
 

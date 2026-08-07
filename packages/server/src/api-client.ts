@@ -40,6 +40,15 @@ export interface SessionInfo {
   profile: { email: string; id: string } | null
 }
 
+export interface DownloadResult {
+  /** Original filename suggested by the browser */
+  suggestedFilename: string
+  /** Base64-encoded file content */
+  data: string
+  /** Total bytes downloaded */
+  totalBytes: number
+}
+
 export interface SessionListEntry {
   id: string
   stateKeys: string[]
@@ -472,8 +481,82 @@ export class RelayApiClient {
     await this.post('/api/focus', { sessionId, ref })
   }
 
+  /**
+   * Upload files to an <input type="file"> element.
+   * For local mode, sends file paths. For remote mode, reads and base64-encodes files.
+   */
   async upload(sessionId: string, ref: string, files: string[]): Promise<void> {
-    await this.post('/api/upload', { sessionId, ref, files })
+    if (this.isRemote) {
+      // Remote: read files and send as base64
+      const fs = await import('node:fs')
+      const path = await import('node:path')
+      const fileData = files.map((filePath) => {
+        const resolved = path.resolve(filePath)
+        const buffer = fs.readFileSync(resolved)
+        return {
+          name: path.basename(resolved),
+          data: buffer.toString('base64'),
+        }
+      })
+      await this.post('/api/upload', { sessionId, ref, fileData })
+    } else {
+      // Local: send absolute file paths directly
+      const path = await import('node:path')
+      const absoluteFiles = files.map((f) => path.resolve(f))
+      await this.post('/api/upload', { sessionId, ref, files: absoluteFiles })
+    }
+  }
+
+  /**
+   * Download a file from the browser by clicking a ref or navigating to a URL.
+   * Returns the file data as base64.
+   */
+  async download(sessionId: string, options: {
+    ref?: string
+    url?: string
+    timeout?: number
+  }): Promise<DownloadResult> {
+    return this.post('/api/download', { sessionId, ...options }, (options.timeout ?? 30000) + 10000)
+  }
+
+  /**
+   * Download a file and save it to a local path.
+   */
+  async downloadToFile(sessionId: string, outputPath: string, options: {
+    ref?: string
+    url?: string
+    timeout?: number
+  }): Promise<{ path: string; size: number; filename: string }> {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+
+    const result = await this.download(sessionId, options)
+    const resolvedPath = path.resolve(outputPath)
+
+    // If outputPath is a directory, use the suggested filename
+    let finalPath = resolvedPath
+    try {
+      const stat = fs.statSync(resolvedPath)
+      if (stat.isDirectory()) {
+        finalPath = path.join(resolvedPath, result.suggestedFilename)
+      }
+    } catch {
+      // Path doesn't exist — use as-is (it's a file path)
+    }
+
+    // Ensure parent directory exists
+    const dir = path.dirname(finalPath)
+    fs.mkdirSync(dir, { recursive: true })
+
+    // Write the file
+    const buffer = Buffer.from(result.data, 'base64')
+    fs.writeFileSync(finalPath, buffer)
+
+    return {
+      path: finalPath,
+      size: result.totalBytes,
+      filename: result.suggestedFilename,
+    }
   }
 
   async drag(sessionId: string, source: string, target: string): Promise<void> {

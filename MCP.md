@@ -21,12 +21,23 @@ Add to your MCP client settings:
 2. MCP automatically starts relay server and connects to enabled tabs
 3. Use the tools to control the browser:
 
-The MCP exposes:
+The MCP exposes two tools:
 
-- `execute` tool — run Playwright code snippets
-- `reset` tool — reconnect if connection issues occur
-- `snapshot` tool — take accessibility snapshot of the page
-- `screenshot` tool — take screenshot with accessibility labels
+- `skill` — show full CLI reference and available commands
+- `run` — execute any RunBrowser CLI command
+
+Example commands via `run`:
+
+```
+run({ command: "navigate https://example.com" })
+run({ command: "snapshot" })
+run({ command: "click @e1" })
+run({ command: "fill @e3 hello" })
+run({ command: "upload @e5 ./photo.png" })
+run({ command: "download @e2 -o ./file.pdf" })
+run({ command: "screenshot" })
+run({ command: "eval document.title" })
+```
 
 ## Environment Variables
 

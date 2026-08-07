@@ -49,9 +49,16 @@ export { ScopedFS } from './scoped-fs.js'
 // Browser config
 export { getBrowserExecutablePath } from './browser-config.js'
 
+// Chrome discovery (direct CDP mode)
+export {
+  discoverChromeInstances,
+  resolveDirectInput,
+  probePort,
+} from './chrome-discovery.js'
+export type { DiscoveredInstance } from './chrome-discovery.js'
+
 // Shared utilities (re-export from relay)
 export {
-  EXTENSION_IDS,
   parseRelayHost,
   getCdpUrl,
   LOG_FILE_PATH,

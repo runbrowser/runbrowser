@@ -72,6 +72,7 @@ export type {
   ResetResult,
   SessionInfo,
   SessionListEntry,
+  DownloadResult,
   StartRecordingApiResult,
   StopRecordingApiResult,
   RecordingStatusApiResult,

@@ -1,31 +1,27 @@
 /**
  * CDPExecutorManager - Manages CDPExecutor instances keyed by session ID.
- * Implements ExecutorManagerLike to replace the injected executorManagerFactory pattern.
- * The relay server can now create executors natively without external factories.
+ *
+ * Each session gets its own CDPExecutor that connects directly to Chrome's
+ * CDP WebSocket endpoint (no extension required).
  */
 
 import type { ExecutorManagerLike } from './server.js'
 import type { SessionMetadata } from './state.js'
-import { CDPExecutor, type SendToExtension, type GetExtensionEntry, type RegisterTarget } from './cdp-executor.js'
+import { CDPExecutor, type CDPExecutorOptions } from './cdp-executor.js'
 
 export interface CDPExecutorManagerOptions {
-  sendToExtension: SendToExtension
-  getExtensionEntry: GetExtensionEntry
-  registerTarget?: RegisterTarget
+  /** Default CDP WebSocket URL if not provided per-session */
+  defaultCdpUrl?: string
   logger?: { log(...args: any[]): void; error(...args: any[]): void }
 }
 
 export class CDPExecutorManager implements ExecutorManagerLike {
   private executors: Map<string, CDPExecutor> = new Map()
-  private sendToExtension: SendToExtension
-  private getExtensionEntry: GetExtensionEntry
-  private registerTarget?: RegisterTarget
+  private defaultCdpUrl?: string
   private logger?: { log(...args: any[]): void; error(...args: any[]): void }
 
   constructor(options: CDPExecutorManagerOptions) {
-    this.sendToExtension = options.sendToExtension
-    this.getExtensionEntry = options.getExtensionEntry
-    this.registerTarget = options.registerTarget
+    this.defaultCdpUrl = options.defaultCdpUrl
     this.logger = options.logger
   }
 
@@ -36,26 +32,28 @@ export class CDPExecutorManager implements ExecutorManagerLike {
   getExecutor(options: {
     sessionId: string
     cwd?: string
+    cdpUrl?: string
     sessionMetadata?: SessionMetadata
   }): CDPExecutor {
     const existing = this.executors.get(options.sessionId)
     if (existing) return existing
 
+    const cdpUrl = options.cdpUrl || this.defaultCdpUrl
+    if (!cdpUrl) {
+      throw new Error('No CDP WebSocket URL provided. Enable Chrome debugging first.')
+    }
+
     const executor = new CDPExecutor({
-      extensionStableKey: options.sessionMetadata?.extensionId || null,
+      cdpUrl,
       sessionMetadata: {
-        extensionId: options.sessionMetadata?.extensionId || null,
         browser: options.sessionMetadata?.browser || null,
         profile: options.sessionMetadata?.profile || null,
       },
-      sendToExtension: this.sendToExtension,
-      getExtensionEntry: this.getExtensionEntry,
-      registerTarget: this.registerTarget,
       logger: this.logger,
     })
 
     this.executors.set(options.sessionId, executor)
-    this.logger?.log(`CDPExecutorManager: created executor for session ${options.sessionId}`)
+    this.logger?.log(`CDPExecutorManager: created executor for session ${options.sessionId} → ${cdpUrl}`)
     return executor
   }
 
@@ -67,12 +65,14 @@ export class CDPExecutorManager implements ExecutorManagerLike {
         stateKeys: [],
         browser: meta.browser,
         profile: meta.profile,
-        extensionId: meta.extensionId,
       }
     })
   }
 
-  deleteExecutor(sessionId: string): boolean {
+  async deleteExecutor(sessionId: string): Promise<boolean> {
+    const executor = this.executors.get(sessionId)
+    if (!executor) return false
+    await executor.dispose()
     return this.executors.delete(sessionId)
   }
 }

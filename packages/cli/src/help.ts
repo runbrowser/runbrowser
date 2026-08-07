@@ -36,7 +36,7 @@ export function printMainHelp(
   // Assign commands to categories based on name
   const navCmds = new Set(['navigate', 'back', 'forward', 'reload', 'close'])
   const obsCmds = new Set(['snapshot', 'screenshot', 'get', 'is'])
-  const intCmds = new Set(['click', 'dblclick', 'fill', 'type', 'press', 'select', 'check', 'uncheck', 'scroll', 'hover', 'focus', 'upload', 'drag', 'viewport', 'wait', 'find', 'tab', 'frame'])
+  const intCmds = new Set(['click', 'dblclick', 'fill', 'type', 'press', 'select', 'check', 'uncheck', 'scroll', 'hover', 'focus', 'upload', 'download', 'drag', 'viewport', 'wait', 'find', 'tab', 'frame'])
   const execCmds = new Set(['eval', 'cdp'])
   const sessCmds = new Set(['session'])
   const cfgCmds = new Set(['config'])

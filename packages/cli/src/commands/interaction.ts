@@ -238,6 +238,41 @@ registerBuiltinCommand({
 })
 
 // ============================================================================
+// download
+// ============================================================================
+
+registerBuiltinCommand({
+  def: {
+    name: 'download',
+    description: 'Download a file by clicking a @ref or from a URL',
+    positionals: [
+      { name: 'target', description: '@ref to click or URL to download' },
+    ],
+    flags: {
+      output:  { type: 'string',  alias: 'o', description: 'Output file path (default: current directory)', required: true },
+      timeout: { type: 'number',  alias: 't', description: 'Max wait time in ms', default: 30000 },
+    },
+  },
+  async execute(args, resolveSession) {
+    const target = args.subcommand
+    const outputPath = args.flags.get('output') as string
+    const timeout = (args.flags.get('timeout') as number) ?? 30000
+
+    if (!target) throw new Error('Usage: runbrowser download <@ref|url> -o <output>')
+    if (!outputPath) throw new Error('Output path required: -o <path>')
+
+    const isUrl = target.startsWith('http://') || target.startsWith('https://')
+    const options = isUrl
+      ? { url: target, timeout }
+      : { ref: target, timeout }
+
+    const { sessionId, client } = await resolveSession(args)
+    const result = await client.downloadToFile(sessionId, outputPath, options)
+    ok(`Downloaded ${result.filename} (${result.size} bytes) → ${result.path}`, args.json)
+  },
+})
+
+// ============================================================================
 // drag
 // ============================================================================
 

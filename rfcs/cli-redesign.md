@@ -44,7 +44,7 @@ interface CommandDef {
 Commands self-register via `registerBuiltinCommand()` in category files:
 - `commands/navigation.ts` — navigate, back, forward, reload, close
 - `commands/observation.ts` — snapshot, screenshot, get, is
-- `commands/interaction.ts` — click, dblclick, fill, type, press, select, check, uncheck, scroll, hover, focus, upload, drag, viewport, wait, find, tab, frame
+- `commands/interaction.ts` — click, dblclick, fill, type, press, select, check, uncheck, scroll, hover, focus, upload, download, drag, viewport, wait, find, tab, frame
 - `commands/execution.ts` — eval, cdp, diff
 - `commands/management.ts` — session, config, serve, logfile, skill
 - `commands/recording.ts` — record (start, stop, status, cancel)
@@ -94,7 +94,8 @@ uncheck <ref>                   # Uncheck checkbox
 scroll <dir> [amount]           # Scroll up/down/left/right
 hover <ref>                     # Hover element
 focus <ref>                     # Focus element
-upload <ref> <files...>         # Upload files
+upload <ref> <files...>         # Upload files to input
+download <ref|url> -o <path>   # Download file
 drag <src> <dst>                # Drag and drop
 viewport <w> <h>                # Set viewport size
 
@@ -228,7 +229,8 @@ Interaction:
   scroll                             Scroll the page
   hover                              Hover over an element
   focus                              Focus an element
-  upload                             Upload files
+  upload                             Upload files to input
+  download                           Download file by @ref or URL
   drag                               Drag source to target
   viewport                           Set viewport size
   wait                               Wait for element, time, text, URL, load, JS
