@@ -97,9 +97,6 @@ importers:
       cac:
         specifier: ^6.7.14
         version: 6.7.14
-      string-dedent:
-        specifier: ^3.0.2
-        version: 3.0.2
       zod:
         specifier: ^4.3.5
         version: 4.3.6
@@ -2117,10 +2114,6 @@ packages:
 
   std-env@3.10.0:
     resolution: {integrity: sha512-5GS12FdOZNliM5mAOxFRg7Ir0pWz8MdpYm6AY6VPkGpbA7ZzmbzNcBJQ0GPvvyWgcY7QAhCgf9Uy89I03faLkg==}
-
-  string-dedent@3.0.2:
-    resolution: {integrity: sha512-M4q+HpHCtGXlbyzYDOcOo7V185dlq6YXvGUPcWZqL4vttCX9gFYoWIOxcPd7v5CAYcTJsGLs3ZJCAH2TXONF/g==}
-    engines: {node: '>=0.12.0'}
 
   stringify-entities@4.0.4:
     resolution: {integrity: sha512-IwfBptatlO+QCJUo19AqvrPNqlVMpW9YEL2LIVY+Rpv2qsjCGxaDLNRgeGsQWJhfItebuJhsGSLjaBbNSQ+ieg==}
@@ -4402,8 +4395,6 @@ snapshots:
   statuses@2.0.2: {}
 
   std-env@3.10.0: {}
-
-  string-dedent@3.0.2: {}
 
   stringify-entities@4.0.4:
     dependencies:

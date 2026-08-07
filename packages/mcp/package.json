@@ -42,7 +42,6 @@
     "@jiweiyuan/runbrowser-server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "cac": "^6.7.14",
-    "string-dedent": "^3.0.2",
     "zod": "^4.3.5"
   },
   "devDependencies": {

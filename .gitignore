@@ -1,9 +1,10 @@
-node_modules/
-dist/
-*.tsbuildinfo
-tmp/
 .env
 .env.local
-packages/extension/dist-*
+*.log
+*.tsbuildinfo
+dist/
+node_modules/
 packages/cli/relay-server.log
+packages/extension/dist-*
 screenshots/
+tmp/
