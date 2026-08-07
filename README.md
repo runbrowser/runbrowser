@@ -84,8 +84,12 @@ runbrowser session new|list|delete       # isolated state, one per agent
 
 Why no `click`/`snapshot`/`@ref` layer: every wrapper is an abstraction someone
 decided the model needs, and it becomes a constraint the model has to work
-around. Chrome's protocol is already complete, documented and stable, and LLMs
-were trained on it. The wrapper layer was removed rather than maintained.
+around. Chrome's protocol is complete and documented, and LLMs were trained on
+it. The wrapper layer was removed rather than maintained.
+
+Navigation and screenshots are single CDP methods. Clicking and typing are short
+CDP sequences — `runbrowser skill` documents them, including the parts a `click`
+verb used to hide (scroll into view, no actionability check, `keyUp` pairing).
 
 ### The page API
 

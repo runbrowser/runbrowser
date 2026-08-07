@@ -7,7 +7,8 @@ description: Drive the user's own Chrome — their tabs, logins and cookies — 
 
 The user's real browser, over CDP. Two commands touch a page: `cdp` sends any
 CDP method, `eval` runs JavaScript. There is no `click`, no `snapshot`, no
-`@ref` system — those are all CDP methods you already know, and a wrapper per
+`@ref` system. Navigation and screenshots are single CDP methods; clicking and
+typing are short CDP sequences, documented in the full reference. A wrapper per
 action is one more thing to get wrong.
 
 ## Check first
@@ -25,7 +26,7 @@ extension setup mid-task.
 ```bash
 runbrowser cdp <Method> [params-json]    # the page API
 runbrowser eval '<js>'                   # shorthand for Runtime.evaluate
-runbrowser tab list|new|switch|close      # which target you're bound to
+runbrowser tab list|new|<index>|close     # which target you're bound to
 runbrowser status                        # is a browser attached
 runbrowser session new|list|delete       # isolated state, one per agent
 runbrowser help [command]                # same as --help
@@ -47,7 +48,8 @@ If `runbrowser` is not on PATH, use `npx @jiweiyuan/runbrowser@latest`.
 1. **Read with the accessibility tree, not screenshots.** It's text — filter it
    with `jq` before printing. A full tree is thousands of nodes; never dump it
    into context.
-2. **Poll, don't sleep.** `Page.navigate` returns on commit, not on load.
+2. **Poll, don't sleep.** `Page.navigate` resolves on commit, not on load — and
+   `cdp` delivers no CDP *events*, so waiting means polling for a side effect.
 3. **It's the user's real browser.** Open a new tab rather than navigating away
    from their work, and don't submit anything irreversible.
 

@@ -125,8 +125,9 @@ function loadSkillContent(): string {
 
 server.tool(
   'skill',
-  `Show RunBrowser usage, available CLI commands, and registered site commands.
-Call this first to learn the @ref selector model and what site commands are available.`,
+  `Show the full RunBrowser reference and the site commands registered here.
+Call this first: it covers how to read a page with the accessibility tree, how
+to click and type via CDP, and the \`eval\` wrapping caveat.`,
   {},
   toolHandler(async () => {
     let content = loadSkillContent()

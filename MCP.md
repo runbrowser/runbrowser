@@ -32,8 +32,12 @@ The MCP exposes six tools:
 | `skill` | Full reference plus the site commands installed here |
 | `command` | Run a site command from runbrowser/commands |
 
-There are no `click` / `snapshot` / `fill` tools. Those are all CDP methods,
-and a tool per action is surface area to maintain for no capability gain.
+There are no `click` / `snapshot` / `fill` tools. Navigation and screenshots are
+single CDP methods; clicking and typing are short CDP sequences. A tool per
+action is surface area to maintain for no capability gain.
+
+`cdp` sends commands only — CDP *events* are not delivered, so waiting on loads,
+dialogs or downloads means polling for an observable side effect.
 
 ```
 cdp({ method: "Page.navigate", params: { url: "https://example.com" } })

@@ -86,8 +86,11 @@ being kept half-alive.
   CDP path, with a published `CommandContext` contract. Its `navigate` was
   reimplemented on raw CDP plus a `document.readyState` poll rather than
   dropped.
-- **The Playwright bridge.** Serves Playwright users, not agents; the argument
-  here does not apply to it.
+- **The Playwright bridge**, in the sense that its code was not deleted — the
+  argument here serves Playwright users, not agents. Note it is currently *not
+  registered* in `server.ts` (nor is the extension WS route); that regression
+  came in with the in-flight work this branch was built on, so "kept" means
+  "not removed by this change", not "working".
 - **The MCP server**, reduced to `cdp` / `eval` / `tab` / `status` / `skill` /
   `command`. MCP clients need a tool schema, so a passthrough tool is the right
   shape there too.
@@ -111,4 +114,23 @@ growing. Only the second one benefits from being large.
 | CLI commands | 38 | 11 |
 | HTTP command routes | 28 | 6 (2 page-facing, 4 tab) |
 | MCP tools | 7 | 6 |
-| `skill.md` | 1278 lines | 178 lines |
+| `skill.md` | 1278 lines | 241 lines |
+
+## Known not shippable as merged
+
+Two blockers predate this change and are inherited from the in-flight work in
+`84586e1`, not introduced here:
+
+- `packages/server` does not compile (83 `tsc` errors in `state.ts`,
+  `server-context.ts`, `cdp-discovery.ts`, `playwright-ws.ts`), and the root
+  `typecheck` script does not include the server package, which is why this was
+  invisible.
+- `POST /api/session/new` requires `cdpUrl`, while `RelayApiClient.createSession`
+  sends only `extensionId` — so every first `cdp`, `eval` or `tab` call ends in
+  HTTP 400. Only `status` works end to end.
+
+Defects introduced *by* this change and still open: implicit stdin makes a
+no-param `cdp` hang under a held-open pipe; tab indices are derived from
+`Target.getTargets` order and are not stable across calls; the skill installer's
+ownership marker proves origin but not absence of edits, so it will overwrite an
+edited marked file.

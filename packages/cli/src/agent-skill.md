@@ -7,7 +7,8 @@ description: Drive the user's own Chrome — their tabs, logins and cookies — 
 
 The user's real browser, over CDP. Two commands touch a page: `cdp` sends any
 CDP method, `eval` runs JavaScript. There is no `click`, no `snapshot`, no
-`@ref` system — those are all CDP methods you already know, and a wrapper per
+`@ref` system. Navigation and screenshots are single CDP methods; clicking and
+typing are short CDP sequences, documented in the full reference. A wrapper per
 action is one more thing to get wrong.
 
 ## Check first
