@@ -22,7 +22,6 @@ pnpm run build:all
 
 This runs in order:
 1. `@jiweiyuan/runbrowser-server` (tsc) — WebSocket relay server
-2. `@jiweiyuan/runbrowser-core` (tsc) — shared executor, snapshots, recording
 3. `@jiweiyuan/runbrowser-mcp` + `runbrowser` cli (tsc, parallel) — MCP server + CLI
 4. `mcp-extension` (vite + download-prism) — Chrome extension → `packages/extension/dist/`
 

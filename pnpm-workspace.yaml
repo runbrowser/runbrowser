@@ -1,6 +1,5 @@
 packages:
   - packages/cli
-  - packages/core
   - packages/e2e
   - packages/extension
   - packages/mcp

@@ -224,7 +224,6 @@ server.close()
 ```
 packages/
 ├── cli/          # @jiweiyuan/runbrowser — CLI
-├── core/         # @jiweiyuan/runbrowser-core — shared: a11y, debugger, editor
 ├── server/       # @jiweiyuan/runbrowser-server — WebSocket relay, CDP bridge, site commands
 ├── mcp/          # @jiweiyuan/runbrowser-mcp — MCP server (thin HTTP wrapper)
 ├── extension/    # Chrome extension (chrome.debugger ↔ WebSocket)

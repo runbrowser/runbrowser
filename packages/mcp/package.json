@@ -39,7 +39,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@jiweiyuan/runbrowser-core": "workspace:*",
     "@jiweiyuan/runbrowser-server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "cac": "^6.7.14",

@@ -10,7 +10,6 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "@jiweiyuan/runbrowser-core": "workspace:*",
     "@jiweiyuan/runbrowser-server": "workspace:*",
     "@types/node": "^24.10.1",
     "devtools-protocol": "^0.0.1568893",
