@@ -16,36 +16,17 @@ export type {
 
 // CDP Executor (replaces PlaywrightExecutor)
 export { CDPExecutor } from './cdp-executor.js'
-export type { CDPExecutorOptions, SendToExtension, GetExtensionEntry } from './cdp-executor.js'
+export type { CDPExecutorOptions, SendCDP } from './cdp-executor.js'
 export { CDPExecutorManager } from './cdp-executor-manager.js'
 export type { CDPExecutorManagerOptions } from './cdp-executor-manager.js'
 
 // State management
 export {
   createRelayStore,
-  findExtensionByStableKey,
-  findExtensionIdByCdpSession,
-  addExtension,
-  removeExtension,
   addPlaywrightClient,
   removePlaywrightClient,
-  rebindClientsToExtension,
-  updateExtensionIO,
-  addExtensionPendingRequest,
-  removeExtensionPendingRequest,
-  addTarget,
-  removeTarget,
-  removeTargetByCrash,
-  updateTargetInfo,
-  addFrameId,
-  removeFrameId,
-  updateTargetUrl,
 } from './state.js'
 export type {
-  ConnectedTarget,
-  ExtensionInfo,
-  ExtensionPendingRequest,
-  ExtensionEntry,
   PlaywrightClient,
   RelayState,
   SessionMetadata,
@@ -72,10 +53,6 @@ export type {
   ResetResult,
   SessionInfo,
   SessionListEntry,
-  StartRecordingApiResult,
-  StopRecordingApiResult,
-  RecordingStatusApiResult,
-  CancelRecordingApiResult,
 } from './api-client.js'
 
 // Shared utilities
@@ -136,13 +113,7 @@ export type {
   StopRecordingResult,
   IsRecordingResult,
   CancelRecordingResult,
-  RecordingDataMessage,
-  RecordingCancelledMessage,
 } from './protocol.js'
-
-// Recording relay
-export { RecordingRelay } from './recording.js'
-export type { ActiveRecording } from './recording.js'
 
 // Custom commands
 export { listCustomCommands, loadCommand } from './custom-commands.js'

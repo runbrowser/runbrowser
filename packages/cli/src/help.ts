@@ -23,37 +23,28 @@ export function printMainHelp(
 
   // Group built-in commands by category
   const categories: Record<string, CommandDef[]> = {
-    'Navigation':   [],
-    'Observation':  [],
-    'Interaction':  [],
-    'Execution':    [],
-    'Session':      [],
+    'Browser':      [],
+    'Connection':   [],
     'Config':       [],
     'Command Extensions': [],
     'Server':       [],
   }
 
   // Assign commands to categories based on name
-  const navCmds = new Set(['navigate', 'back', 'forward', 'reload', 'close'])
-  const obsCmds = new Set(['snapshot', 'screenshot', 'get', 'is'])
-  const intCmds = new Set(['click', 'dblclick', 'fill', 'type', 'press', 'select', 'check', 'uncheck', 'scroll', 'hover', 'focus', 'upload', 'drag', 'viewport', 'wait', 'find', 'tab', 'frame'])
-  const execCmds = new Set(['eval', 'cdp'])
-  const sessCmds = new Set(['session'])
+  const browserCmds = new Set(['cdp', 'eval'])
+  const connCmds = new Set(['status', 'tab', 'session'])
   const cfgCmds = new Set(['config'])
   const cmdsCmds = new Set(['commands'])
-  const srvCmds = new Set(['serve', 'logfile', 'skill', 'diff', 'record'])
+  const srvCmds = new Set(['serve', 'logfile', 'skill'])
 
   for (const cmd of builtinCommands) {
     const name = cmd.name.split(' ')[0]
-    if (navCmds.has(name)) categories['Navigation'].push(cmd)
-    else if (obsCmds.has(name)) categories['Observation'].push(cmd)
-    else if (intCmds.has(name)) categories['Interaction'].push(cmd)
-    else if (execCmds.has(name)) categories['Execution'].push(cmd)
-    else if (sessCmds.has(name)) categories['Session'].push(cmd)
+    if (browserCmds.has(name)) categories['Browser'].push(cmd)
+    else if (connCmds.has(name)) categories['Connection'].push(cmd)
     else if (cfgCmds.has(name)) categories['Config'].push(cmd)
     else if (cmdsCmds.has(name)) categories['Command Extensions'].push(cmd)
     else if (srvCmds.has(name)) categories['Server'].push(cmd)
-    else categories['Navigation'].push(cmd) // default
+    else categories['Server'].push(cmd) // default
   }
 
   for (const [category, cmds] of Object.entries(categories)) {
@@ -90,6 +81,11 @@ export function printMainHelp(
 
   console.log(pc.bold('Global Options:'))
   printFlags(GLOBAL_FLAGS)
+  console.log()
+  console.log(pc.bold('Everything else is CDP:'))
+  console.log(`  ${pc.dim('runbrowser cdp Page.navigate \'{"url":"https://example.com"}\'')}`)
+  console.log(`  ${pc.dim("runbrowser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value==\"button\")'")}`)
+  console.log(`  ${pc.dim('runbrowser cdp Page.captureScreenshot | jq -r .data | base64 -d > shot.png')}`)
   console.log()
   console.log(`Run ${pc.cyan('runbrowser <command> --help')} for detailed help on any command.`)
 }

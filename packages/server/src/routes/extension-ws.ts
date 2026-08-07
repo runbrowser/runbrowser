@@ -2,7 +2,7 @@
  * Extension WebSocket endpoint (/extension).
  *
  * Handles the WebSocket connection from the Chrome extension.
- * Processes CDP events, target lifecycle, recording data, and extension messages.
+ * Processes CDP events, target lifecycle, and extension messages.
  */
 
 import type { Hono } from 'hono'
@@ -12,14 +12,11 @@ import type { CDPEventBase, CDPEventFor } from '../cdp-types.js'
 import type {
   ExtensionMessage,
   ExtensionEventMessage,
-  RecordingDataMessage,
-  RecordingCancelledMessage,
 } from '../protocol.js'
 import type { ServerContext } from '../server-context.js'
 import { logCdpMessage } from '../server-context.js'
 import { isRestrictedTarget } from '../target-filter.js'
 import { EXTENSION_IDS } from '../utils.js'
-import { RecordingRelay } from '../recording.js'
 import * as relayState from '../state.js'
 import pc from 'picocolors'
 
@@ -28,33 +25,6 @@ export function registerExtensionWsRoute(
   ctx: ServerContext,
   upgradeWebSocket: ReturnType<typeof import('@hono/node-ws').createNodeWebSocket>['upgradeWebSocket'],
 ) {
-  // Recording relays per extension connection
-  const recordingRelays = new Map<string, RecordingRelay>()
-
-  // Expose getRecordingRelay via context so other routes can use it
-  ctx._recordingRelays = recordingRelays
-
-  const getRecordingRelay = (extensionId?: string | null): RecordingRelay | null => {
-    const allowDefault = !extensionId && ctx.store.getState().extensions.size === 1
-    const conn = ctx.getExtensionConnection(extensionId, { allowFallback: allowDefault })
-    if (!conn) return null
-    const connId = conn.id
-    if (!recordingRelays.has(connId)) {
-      recordingRelays.set(
-        connId,
-        new RecordingRelay(
-          (params) => ctx.sendToExtension({ extensionId: connId, ...params }),
-          () => ctx.store.getState().extensions.has(connId),
-          ctx.logger,
-        ),
-      )
-    }
-    return recordingRelays.get(connId) || null
-  }
-
-  // Wire getRecordingRelay into the context
-  ctx._getRecordingRelay = getRecordingRelay
-
   const getExtensionInfoFromRequest = (c: {
     req: { query: (name: string) => string | undefined }
   }): relayState.ExtensionInfo => {
@@ -142,31 +112,6 @@ export function registerExtensionWsRoute(
             return
           }
 
-          // Handle binary data (recording chunks)
-          const isBinary = event.data instanceof ArrayBuffer
-            || Buffer.isBuffer(event.data)
-            || (typeof Blob !== 'undefined' && event.data instanceof Blob)
-            || (event.data instanceof Uint8Array)
-          if (isBinary) {
-            let buffer: Buffer
-            if (Buffer.isBuffer(event.data)) {
-              buffer = event.data
-            } else if (event.data instanceof ArrayBuffer) {
-              buffer = Buffer.from(event.data)
-            } else if (event.data instanceof Uint8Array) {
-              buffer = Buffer.from(event.data.buffer, event.data.byteOffset, event.data.byteLength)
-            } else {
-              // Blob
-              const arrayBuffer = await (event.data as Blob).arrayBuffer()
-              buffer = Buffer.from(arrayBuffer)
-            }
-            const relay = getRecordingRelay(connectionId)
-            if (relay) {
-              relay.handleBinaryData(buffer)
-            }
-            return
-          }
-
           let message: ExtensionMessage
           try {
             message = JSON.parse(event.data.toString())
@@ -188,12 +133,6 @@ export function registerExtensionWsRoute(
             case 'log':
               handleExtensionLog(ctx, message)
               break
-            case 'recordingData':
-              getRecordingRelay(connectionId)?.handleRecordingData(message as RecordingDataMessage)
-              break
-            case 'recordingCancelled':
-              getRecordingRelay(connectionId)?.handleRecordingCancelled(message as RecordingCancelledMessage)
-              break
             case 'forwardCDPEvent':
               handleCDPEvent(ctx, connectionId, message as ExtensionEventMessage)
               break
@@ -204,13 +143,6 @@ export function registerExtensionWsRoute(
           ctx.logger?.log(
             `Extension disconnected: code=${event.code} reason=${event.reason || 'none'} (${connectionId})`,
           )
-
-          // Cancel recordings BEFORE removing extension state
-          const relay = recordingRelays.get(connectionId)
-          if (relay) {
-            relay.cancelRecording({}).catch(() => {})
-          }
-          recordingRelays.delete(connectionId)
 
           // Reject all pending I/O requests
           const closingExt = ctx.store.getState().extensions.get(connectionId)

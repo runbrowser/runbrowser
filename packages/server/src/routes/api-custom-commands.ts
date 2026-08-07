@@ -7,7 +7,26 @@
 
 import type { Hono } from 'hono'
 import type { ServerContext } from '../server-context.js'
+import type { CDPExecutor } from '../cdp-executor.js'
 import { listCustomCommands, loadCommand, type CommandContext } from '../custom-commands.js'
+
+/**
+ * Poll document.readyState until the page finishes loading.
+ *
+ * Page.navigate resolves as soon as navigation is committed, not when the
+ * document is usable, and site commands assume the latter.
+ */
+async function waitForDocumentReady(executor: CDPExecutor, timeoutMs = 15000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const response = (await executor.rawCDP('Runtime.evaluate', {
+      expression: 'document.readyState',
+      returnByValue: true,
+    })) as { result?: { value?: string } }
+    if (response?.result?.value === 'complete') return
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
 
 export function registerApiCustomCommandRoutes(app: Hono, ctx: ServerContext) {
   app.get('/api/commands', (c) => {
@@ -45,10 +64,17 @@ export function registerApiCustomCommandRoutes(app: Hono, ctx: ServerContext) {
         return c.json({ error: `Command not found: ${site} ${name}` }, 404)
       }
 
-      // Build command context that delegates to the CDP executor
+      // Build command context that delegates to the CDP executor.
+      //
+      // `navigate` stays in the context even though the CLI no longer has a
+      // navigate verb: it is the published contract for site commands in the
+      // runbrowser/commands repo, so it is implemented here on raw CDP rather
+      // than dropped.
       const commandCtx: CommandContext = {
         navigate: async (url: string) => {
-          await executor.navigate(url)
+          await executor.rawCDP('Page.enable')
+          await executor.rawCDP('Page.navigate', { url })
+          await waitForDocumentReady(executor)
         },
         evaluate: async (code: string) => {
           const result = await executor.execute(code, 30000)

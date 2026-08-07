@@ -21,12 +21,32 @@ Add to your MCP client settings:
 2. MCP automatically starts relay server and connects to enabled tabs
 3. Use the tools to control the browser:
 
-The MCP exposes:
+The MCP exposes six tools:
 
-- `execute` tool — run Playwright code snippets
-- `reset` tool — reconnect if connection issues occur
-- `snapshot` tool — take accessibility snapshot of the page
-- `screenshot` tool — take screenshot with accessibility labels
+| Tool | Purpose |
+|---|---|
+| `cdp` | Send any Chrome DevTools Protocol method — this is the page API |
+| `eval` | Run JavaScript in the page (shorthand for `Runtime.evaluate`) |
+| `tab` | List, open, switch and close tabs |
+| `status` | Whether a browser is attached — call this when a browser call fails |
+| `skill` | Full reference plus the site commands installed here |
+| `command` | Run a site command from runbrowser/commands |
+
+There are no `click` / `snapshot` / `fill` tools. Those are all CDP methods,
+and a tool per action is surface area to maintain for no capability gain.
+
+```
+cdp({ method: "Page.navigate", params: { url: "https://example.com" } })
+cdp({ method: "Accessibility.getFullAXTree" })
+cdp({ method: "Input.dispatchMouseEvent", params: { type: "mousePressed", x: 420, y: 310, button: "left", clickCount: 1 } })
+cdp({ method: "Page.captureScreenshot", params: { format: "png" } })
+eval({ code: "document.title" })
+tab({ action: "new", url: "https://example.com" })
+```
+
+Read the page before acting on it: `Accessibility.getFullAXTree` gives roles,
+names and `backendDOMNodeId`s; resolve a node's box with `DOM.getBoxModel` and
+click its centre. Prefer that over screenshots — cheaper and searchable.
 
 ## Environment Variables
 

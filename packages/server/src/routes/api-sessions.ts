@@ -1,5 +1,5 @@
 /**
- * Session management API endpoints.
+ * Session management API endpoints — direct CDP mode.
  *
  * /api/execute, /api/reset, /api/sessions, /api/session/*
  */
@@ -21,7 +21,7 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
       const executor = ctx.executorManager.getSession(sessionId)
       if (!executor) {
         return c.json(
-          { text: `Session ${sessionId} not found. Run 'runbrowser session-new' first.`, images: [], isError: true },
+          { text: `Session ${sessionId} not found. Run 'runbrowser session new' first.`, images: [], isError: true },
           404,
         )
       }
@@ -44,7 +44,7 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
 
       const executor = ctx.executorManager.getSession(sessionId)
       if (!executor) {
-        return c.json({ error: `Session ${sessionId} not found. Run 'runbrowser session-new' first.` }, 404)
+        return c.json({ error: `Session ${sessionId} not found. Run 'runbrowser session new' first.` }, 404)
       }
       const { page, context } = await executor.reset()
 
@@ -68,31 +68,30 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
   })
 
   app.post('/api/session/new', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { extensionId?: string | null; cwd?: string }
-    const sessionId = String(ctx.nextSessionNumber.value++)
-    const extensionId = body.extensionId || null
-    const cwd = body.cwd
-    const allowDefault = !extensionId && ctx.store.getState().extensions.size === 1
-    const conn = ctx.getExtensionConnection(extensionId, { allowFallback: allowDefault })
-    if (!conn) {
-      const error = extensionId
-        ? `Extension not connected: ${extensionId}`
-        : 'Multiple extensions connected. Specify extensionId.'
-      return c.json({ error }, 404)
+    const body = (await c.req.json().catch(() => ({}))) as {
+      cdpUrl?: string
+      cwd?: string
+      browser?: string
+      profile?: { email: string; id: string }
     }
+
+    if (!body.cdpUrl) {
+      return c.json({ error: 'cdpUrl is required. Enable Chrome debugging first.' }, 400)
+    }
+
+    const sessionId = String(ctx.nextSessionNumber.value++)
     const executor = ctx.executorManager.getExecutor({
       sessionId,
-      cwd,
+      cwd: body.cwd,
+      cdpUrl: body.cdpUrl,
       sessionMetadata: {
-        extensionId: conn.stableKey,
-        browser: conn.info.browser || null,
-        profile: conn.info ? { email: conn.info.email || '', id: conn.info.id || '' } : null,
+        browser: body.browser || null,
+        profile: body.profile || null,
       },
     })
     const metadata = executor.getSessionMetadata()
     return c.json({
       id: sessionId,
-      extensionId: metadata.extensionId,
       browser: metadata.browser,
       profile: metadata.profile,
     })
@@ -107,7 +106,6 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
     const metadata = executor.getSessionMetadata()
     return c.json({
       id: sessionId,
-      extensionId: metadata.extensionId,
       browser: metadata.browser,
       profile: metadata.profile,
     })
@@ -122,7 +120,7 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
         return c.json({ error: 'sessionId is required' }, 400)
       }
 
-      const deleted = ctx.executorManager.deleteExecutor(sessionId)
+      const deleted = await ctx.executorManager.deleteExecutor(sessionId)
       if (!deleted) {
         return c.json({ error: `Session ${sessionId} not found` }, 404)
       }

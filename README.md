@@ -1,6 +1,6 @@
 # RunBrowser
 
-> Control your browser via CDP. Uses extension + CLI. No context bloat.
+> Control your browser via CDP. Extension + CLI, no wrapper layer.
 
 Other Browser Automation spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. RunBrowser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
 
@@ -22,19 +22,26 @@ npm i -g @jiweiyuan/runbrowser
 # 3. Click the extension icon on a tab — it turns green
 
 # 4. Use it
-runbrowser session-new
-runbrowser navigate https://example.com -s 1
-runbrowser snapshot -s 1
-runbrowser click @e5 -s 1
+runbrowser status
+runbrowser tab new https://example.com
+runbrowser eval 'document.title'
+runbrowser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value=="button")'
 ```
 
 ### Add the Skill to Your Agent
 
 ```bash
-npx -y skills add runbrowser/runbrowser
+runbrowser skill install              # → ./.claude/skills and ./.agents/skills
+runbrowser skill install --global     # → ~/.claude/skills and ~/.agents/skills
 ```
 
-This teaches your agent how to use RunBrowser — selectors, timeouts, snapshots, and all available utilities.
+Installs into the current project by default, so the skill is committed and
+reviewed alongside the code it is used on; `--global` (`-g`) installs into
+`$HOME` instead. Re-running is safe, and a `SKILL.md` you have edited yourself
+is never overwritten — remove it first if you want ours back. `runbrowser skill
+uninstall` removes only files we installed.
+
+This teaches your agent the CDP patterns that matter: read the accessibility tree before acting, filter it before printing, poll instead of sleeping.
 
 ## How It Works
 
@@ -64,140 +71,71 @@ RunBrowser uses the **Chrome DevTools Protocol (CDP)** directly. The extension b
 
 ## CLI Reference
 
-### Session Management
-
-Each session has **isolated state**. Browser tabs are **shared** across sessions.
+Two commands touch a page. Everything you might expect as a verb — click, type,
+read, screenshot, wait — is a CDP method, so it goes through `cdp`.
 
 ```bash
-runbrowser session new              # create sandbox, outputs id (e.g. 1)
-runbrowser session list             # show sessions + state keys
-runbrowser session delete <id>      # delete a session
-runbrowser session reset <id>       # fix stale connections
+runbrowser cdp <Method> [params-json]    # the page API
+runbrowser eval '<js>'                   # shorthand for Runtime.evaluate
+runbrowser tab list|new|switch|close      # which target you're bound to
+runbrowser status                        # is a browser attached
+runbrowser session new|list|delete       # isolated state, one per agent
 ```
 
-### Navigation
+Why no `click`/`snapshot`/`@ref` layer: every wrapper is an abstraction someone
+decided the model needs, and it becomes a constraint the model has to work
+around. Chrome's protocol is already complete, documented and stable, and LLMs
+were trained on it. The wrapper layer was removed rather than maintained.
+
+### The page API
 
 ```bash
-runbrowser navigate <url> -s 1      # navigate to URL (aliases: open, goto)
-runbrowser back -s 1                # go back
-runbrowser forward -s 1             # go forward
-runbrowser reload -s 1              # reload page
-runbrowser close -s 1               # close current tab
+runbrowser cdp Page.navigate '{"url":"https://example.com"}'
+runbrowser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value=="button")'
+runbrowser cdp Input.dispatchMouseEvent '{"type":"mousePressed","x":420,"y":310,"button":"left","clickCount":1}'
+runbrowser cdp Page.captureScreenshot | jq -r .data | base64 -d > shot.png
 ```
 
-### Observation
+Both `cdp` and `eval` accept their payload on stdin, which is easier than
+quoting multi-line JS in a shell:
 
 ```bash
-runbrowser snapshot -s 1                        # accessibility tree with @refs
-runbrowser snapshot -s 1 -i                     # interactive elements only
-runbrowser snapshot -s 1 -S "main"              # scope to CSS selector
-runbrowser screenshot -s 1 shot.png             # take screenshot
-runbrowser screenshot -s 1 shot.png -F          # full page screenshot
-runbrowser screenshot -s 1 shot.png -a          # annotated with element labels
-runbrowser get url -s 1                         # get current URL
-runbrowser get title -s 1                       # get page title
-runbrowser get text @e5 -s 1                    # get element text
-runbrowser get html @e5 -s 1                    # get element HTML
-runbrowser get attr @e5 --attr-name href -s 1   # get attribute value
-runbrowser get count @e5 -s 1                   # count matching elements
-runbrowser is visible @e5 -s 1                  # check element state
-runbrowser is checked @e5 -s 1
-runbrowser is enabled @e5 -s 1
+runbrowser eval <<'JS'
+Array.from(document.querySelectorAll('a')).map(a => a.href)
+JS
 ```
 
-### Interaction
+### Reading a page
+
+Use the accessibility tree, not screenshots — it is text, so you can filter it
+with `jq`, and it costs a fraction of the tokens. Filter before printing; a real
+page is thousands of nodes.
 
 ```bash
-runbrowser click @e5 -s 1                   # click element
-runbrowser dblclick @e5 -s 1                # double-click
-runbrowser fill @e3 "hello world" -s 1      # clear + fill input
-runbrowser type "search query" -s 1         # type at current focus
-runbrowser press Enter -s 1                 # press key
-runbrowser select @e5 "option-value" -s 1   # select dropdown option
-runbrowser check @e5 -s 1                   # check checkbox
-runbrowser uncheck @e5 -s 1                 # uncheck checkbox
-runbrowser scroll down -s 1                 # scroll direction (up/down/left/right)
-runbrowser scroll down 500 -s 1             # scroll by pixels
-runbrowser hover @e5 -s 1                   # hover element
-runbrowser focus @e5 -s 1                   # focus element
-runbrowser upload @e5 ./file.png -s 1       # upload files
-runbrowser drag @e1 @e2 -s 1               # drag source to target
-runbrowser viewport 1280 720 -s 1           # set viewport size
+runbrowser cdp Accessibility.getFullAXTree \
+  | jq '.nodes[] | select(.role.value=="button") | {name: .name.value, id: .backendDOMNodeId}'
 ```
 
-### Wait Conditions
+### Tabs and sessions
+
+Tabs are shared across sessions; session state is not. Several agents can work
+in one browser without colliding.
 
 ```bash
-runbrowser wait @e5 -s 1                    # wait for element visible
-runbrowser wait 2000 -s 1                   # wait milliseconds
-runbrowser wait --text "Welcome" -s 1       # wait for text
-runbrowser wait --url "**/dashboard" -s 1   # wait for URL pattern
-runbrowser wait --load networkidle -s 1     # wait for load state
-runbrowser wait --fn "document.querySelectorAll('.item').length >= 10" -s 1
-```
-
-### Semantic Locators
-
-```bash
-# Find by role, text, label, placeholder, or testid — then act
-runbrowser find role button click --name "Submit" -s 1
-runbrowser find text "Sign in" click -s 1
-runbrowser find label "Email" fill "user@example.com" -s 1
-runbrowser find placeholder "Search" type "query" -s 1
-runbrowser find testid "submit-btn" click -s 1
-```
-
-### Tab & Frame Management
-
-```bash
-runbrowser tab list -s 1                    # list all tabs
-runbrowser tab new https://example.com -s 1 # open new tab
-runbrowser tab 2 -s 1                       # switch to tab index
-runbrowser tab close -s 1                   # close current tab
-runbrowser frame "iframe#embed" -s 1        # switch to iframe
-runbrowser frame main -s 1                  # return to main frame
-```
-
-### Execution
-
-```bash
-runbrowser eval 'document.title' -s 1                   # run JS in browser context
-runbrowser cdp Page.captureScreenshot '{}' -s 1          # raw CDP command
-runbrowser diff snapshot -s 1                             # compare snapshots
-runbrowser diff screenshot -b baseline.png -s 1           # compare screenshots
-```
-
-### Recording
-
-Record browser tab video (H.264 MP4). Requires `ffmpeg` installed.
-
-```bash
-runbrowser record start -o recording.mp4 -s 1   # start recording
-runbrowser record stop -s 1                       # stop and save (auto-transcodes to H.264)
-runbrowser record status -s 1                     # check if recording
-runbrowser record cancel -s 1                     # cancel without saving
-```
-
-For automated recording without clicking the extension icon, restart Chrome with:
-
-```bash
-# macOS (set your profile name first)
-runbrowser config set profile "Profile 11"
-open -a "Google Chrome" --args --auto-accept-this-tab-capture --profile-directory="Profile 11"
+runbrowser tab new https://example.com   # opens and binds to it
+runbrowser tab list                      # → marks the bound tab
+runbrowser session new                   # → prints an id
+runbrowser -s 3 tab list                 # act inside session 3
 ```
 
 ### Command Extensions
 
-Install community-maintained site commands from the [runbrowser/commands](https://github.com/runbrowser/commands) repo.
+Site commands from the [runbrowser/commands](https://github.com/runbrowser/commands)
+repo are unchanged — they are a different audience from the agent CDP path.
 
 ```bash
-runbrowser commands list              # list available extensions
-runbrowser commands install reddit    # install an extension
-runbrowser commands uninstall reddit  # remove an extension
-
-# Use installed commands immediately
-runbrowser reddit hot --limit 5
-runbrowser reddit search "browser automation"
+runbrowser commands list
+runbrowser commands install reddit
 ```
 
 ### Configuration
@@ -208,29 +146,6 @@ runbrowser config unset <key>         # remove a config value
 runbrowser config show                # show current config
 runbrowser logfile                    # print log file paths
 runbrowser skill                      # print full agent instructions
-```
-
-## Accessibility Snapshots
-
-Snapshots return a text-based accessibility tree with `@ref` labels on interactive elements — **5–20 KB** instead of 100 KB+ for screenshots:
-
-```
-- banner:
-  - link "Home" @e1
-  - navigation:
-    - link "Docs" @e2
-    - link "Blog" @e3
-- main:
-  - heading "Welcome" @e4
-  - button "Get started" @e5
-```
-
-Use refs directly in commands:
-
-```bash
-runbrowser click @e5 -s 1
-runbrowser fill @e3 "search term" -s 1
-runbrowser get text @e4 -s 1
 ```
 
 ## MCP Setup
@@ -248,7 +163,7 @@ The CLI is the recommended way to use RunBrowser. For MCP server integration:
 }
 ```
 
-MCP tools: `navigate`, `snapshot`, `screenshot`, `click`, `fill`, `type`, `press`, `scroll`, `hover`, `evaluate`, `get_url`, `get_title`, `back`, `forward`, `reload`, `reset`.
+MCP tools: `cdp`, `eval`, `tab`, `status`, `skill`, `command`.
 
 For full MCP instructions, see [MCP.md](./MCP.md).
 
@@ -305,7 +220,7 @@ server.close()
 ```
 packages/
 ├── cli/          # @jiweiyuan/runbrowser — CLI
-├── core/         # @jiweiyuan/runbrowser-core — shared: a11y, debugger, editor, recording
+├── core/         # @jiweiyuan/runbrowser-core — shared: a11y, debugger, editor
 ├── server/       # @jiweiyuan/runbrowser-server — WebSocket relay, CDP bridge, site commands
 ├── mcp/          # @jiweiyuan/runbrowser-mcp — MCP server (thin HTTP wrapper)
 ├── extension/    # Chrome extension (chrome.debugger ↔ WebSocket)

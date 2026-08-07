@@ -59,25 +59,46 @@ async function ensureSession(): Promise<string> {
 }
 
 // ============================================================================
-// Helper
+// Result helpers
 // ============================================================================
 
+type ContentItem =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string }
+
+type ToolResult = { content: ContentItem[]; isError?: boolean }
+
+function textResult(text: string): ToolResult {
+  return { content: [{ type: 'text', text }] }
+}
+
+function errorResult(msg: string): ToolResult {
+  return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true }
+}
+
 function toolHandler<T extends Record<string, unknown>>(
-  fn: (args: T) => Promise<{ content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean }>,
-): (args: T) => Promise<{ content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean }> {
+  fn: (args: T) => Promise<ToolResult>,
+): (args: T) => Promise<ToolResult> {
   return async (args) => {
     try {
       return await fn(args)
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error)
       if (msg.includes('404')) sessionId = null
-      return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true }
+      return errorResult(msg)
     }
   }
 }
 
+function requireField<T>(value: T | undefined, name: string, action: string): T {
+  if (value === undefined || value === null || value === '') {
+    throw new Error(`${name} required for action="${action}"`)
+  }
+  return value
+}
+
 // ============================================================================
-// MCP Server — Two Tools: skill + run
+// MCP Server — 7 semantic tools
 // ============================================================================
 
 const server = new McpServer({
@@ -86,12 +107,11 @@ const server = new McpServer({
   version: VERSION,
 })
 
-// ── skill: discover available commands and CLI usage ──
+// ── skill: discover available tools, CLI commands, and site commands ──
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function loadSkillContent(): string {
-  // Try multiple paths (src vs dist)
   const candidates = [
     path.join(__dirname, '..', 'src', 'skill.md'),
     path.join(__dirname, '..', '..', 'src', 'skill.md'),
@@ -105,14 +125,12 @@ function loadSkillContent(): string {
 
 server.tool(
   'skill',
-  `Show RunBrowser CLI usage, available commands, and site commands.
-Call this first to learn how to control the browser and what site commands are available.
-Returns full documentation including command syntax, examples, and options.`,
+  `Show RunBrowser usage, available CLI commands, and registered site commands.
+Call this first to learn the @ref selector model and what site commands are available.`,
   {},
   toolHandler(async () => {
     let content = loadSkillContent()
 
-    // Append site commands from relay if available
     try {
       const c = getClient()
       await c.ensureServer()
@@ -125,247 +143,156 @@ Returns full documentation including command syntax, examples, and options.`,
                 def.required ? ` <${name}>` : ` [--${name}]`
               ).join('')
             : ''
-          return `runbrowser ${cmd.site} ${cmd.name}${argStr}  # ${cmd.description}`
+          return `command({ site: "${cmd.site}", name: "${cmd.name}"${argStr ? `, args: { /* ${argStr.trim()} */ }` : ''} })  # ${cmd.description}`
         }).join('\n')
       }
     } catch {
-      // Relay not running — just return static skill content
+      // Relay not running — return static content
     }
 
-    return { content: [{ type: 'text', text: content }] }
+    return textResult(content)
   }),
 )
 
-// ── run: execute any runbrowser command ──
+// ── status: is a browser attached ──
 
 server.tool(
-  'run',
-  `Execute a RunBrowser CLI command. Translates to the equivalent of running \`runbrowser <command>\` in a terminal.
+  'status',
+  `Report whether the relay is up and a browser extension is attached.
+Call this when a browser call fails — it distinguishes "no browser connected"
+from a genuine page error. It does not start or change anything.`,
+  {},
+  toolHandler(async () => {
+    const c = getClient()
+    const extensions = await c.fetchExtensionsStatus().catch(() => [])
+    const sessions = await c.listSessions().catch(() => [])
+    if (extensions.length === 0) {
+      return textResult(
+        'No browser attached. Ask the user to click the RunBrowser extension icon on a tab.',
+      )
+    }
+    const who = extensions
+      .map((e: any) => `${e.browser || 'Chrome'} ${e.profile?.email || '(not signed in)'}`)
+      .join(', ')
+    return textResult(`Attached: ${who}\nSessions: ${sessions.length}`)
+  }),
+)
 
-Use the \`skill\` tool first to discover available commands and their syntax.
+// ── tab: which target the session is bound to ──
 
-Examples:
-  run({ command: "navigate https://github.com" })
-  run({ command: "snapshot" })
-  run({ command: "click @e1" })
-  run({ command: "eval document.title" })
-  run({ command: "github trending --limit 5" })
+server.tool(
+  'tab',
+  `List, open, switch and close browser tabs.
 
-The command string follows the same syntax as the CLI. Output is returned as JSON when possible.`,
+Tabs are connection state, not page state — everything you do *to* a page goes
+through \`cdp\`. The "action" field selects behavior:
+  • list   — page targets, with the bound one marked
+  • new    — open a tab (optional "url") and bind to it
+  • switch — bind to the tab at "index"
+  • close  — close the tab at "index", or the bound one if omitted`,
   {
-    command: z.string().describe('The runbrowser command to execute (e.g. "navigate https://example.com", "snapshot", "click @e1", "github trending --limit 5")'),
+    action: z.enum(['list', 'new', 'switch', 'close']).describe('Tab action'),
+    url: z.string().optional().describe('URL for action="new"'),
+    index: z.number().optional().describe('Tab index for switch/close'),
   },
-  toolHandler(async ({ command }) => {
+  toolHandler(async ({ action, url, index }) => {
     const sid = await ensureSession()
     const c = getClient()
-
-    // Parse the command string into parts
-    const parts = parseCommandString(command)
-    if (parts.length === 0) {
-      return { content: [{ type: 'text', text: 'Error: empty command' }], isError: true }
-    }
-
-    const cmd = parts[0]
-    const rest = parts.slice(1)
-
-    // ── Built-in browser commands ──
-    switch (cmd) {
-      case 'navigate':
-      case 'open':
-      case 'goto': {
-        const url = rest[0]
-        if (!url) return { content: [{ type: 'text', text: 'Error: URL required' }], isError: true }
-        const result = await c.navigate(sid, url)
-        return { content: [{ type: 'text', text: `Navigated to ${result.url}\nTitle: ${result.title}` }] }
+    switch (action) {
+      case 'list': {
+        const r = await c.listTabs(sid)
+        return textResult(
+          r.tabs
+            .map((t: any) => `${t.active ? '→' : ' '} [${t.index}] ${t.title || '(untitled)'} — ${t.url}`)
+            .join('\n') || '(no tabs)',
+        )
       }
-
-      case 'snapshot': {
-        const interactiveOnly = rest.includes('--interactive') || rest.includes('-i')
-        const result = await c.snapshot(sid, { interactiveOnly })
-        return { content: [{ type: 'text', text: result.snapshot }] }
+      case 'new': {
+        const r = await c.newTab(sid, url)
+        return textResult(`Opened tab ${r.index}${url ? ` at ${url}` : ''}`)
       }
-
-      case 'screenshot': {
-        const result = await c.captureScreenshot(sid)
-        return {
-          content: [
-            { type: 'text', text: 'Screenshot captured.' },
-            { type: 'image', data: result.data, mimeType: result.mimeType },
-          ],
-        }
+      case 'switch': {
+        const i = requireField(index, 'index', 'switch')
+        await c.switchTab(sid, i)
+        return textResult(`Switched to tab ${i}`)
       }
-
-      case 'click': {
-        const ref = rest[0]
-        if (!ref) return { content: [{ type: 'text', text: 'Error: ref required' }], isError: true }
-        await c.click(sid, ref)
-        return { content: [{ type: 'text', text: `Clicked ${ref}` }] }
-      }
-
-      case 'fill': {
-        const ref = rest[0]
-        const value = rest.slice(1).join(' ')
-        if (!ref || !value) return { content: [{ type: 'text', text: 'Error: ref and value required' }], isError: true }
-        await c.fill(sid, ref, value)
-        return { content: [{ type: 'text', text: `Filled ${ref} with "${value}"` }] }
-      }
-
-      case 'type': {
-        const text = rest.join(' ')
-        if (!text) return { content: [{ type: 'text', text: 'Error: text required' }], isError: true }
-        await c.type(sid, text)
-        return { content: [{ type: 'text', text: `Typed "${text}"` }] }
-      }
-
-      case 'press': {
-        const key = rest[0]
-        if (!key) return { content: [{ type: 'text', text: 'Error: key required' }], isError: true }
-        await c.press(sid, key)
-        return { content: [{ type: 'text', text: `Pressed ${key}` }] }
-      }
-
-      case 'scroll': {
-        const direction = (rest[0] || 'down') as 'up' | 'down' | 'left' | 'right'
-        const amount = rest[1] ? Number(rest[1]) : undefined
-        await c.scroll(sid, direction, amount)
-        return { content: [{ type: 'text', text: `Scrolled ${direction}${amount ? ` by ${amount}px` : ''}` }] }
-      }
-
-      case 'hover': {
-        const ref = rest[0]
-        if (!ref) return { content: [{ type: 'text', text: 'Error: ref required' }], isError: true }
-        await c.hover(sid, ref)
-        return { content: [{ type: 'text', text: `Hovered over ${ref}` }] }
-      }
-
-      case 'eval':
-      case 'evaluate': {
-        const code = rest.join(' ')
-        if (!code) return { content: [{ type: 'text', text: 'Error: code required' }], isError: true }
-        const result = await c.evaluate(sid, code)
-        const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
-          { type: 'text', text: result.text },
-        ]
-        for (const img of result.images) {
-          content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
-        }
-        return { content, isError: result.isError }
-      }
-
-      case 'back': {
-        await c.back(sid)
-        return { content: [{ type: 'text', text: 'Navigated back' }] }
-      }
-
-      case 'forward': {
-        await c.forward(sid)
-        return { content: [{ type: 'text', text: 'Navigated forward' }] }
-      }
-
-      case 'reload': {
-        await c.reload(sid)
-        return { content: [{ type: 'text', text: 'Page reloaded' }] }
-      }
-
-      case 'reset': {
-        const result = await c.reset(sid)
-        return { content: [{ type: 'text', text: `Connection reset. Current URL: ${result.pageUrl}` }] }
-      }
-
-      case 'get': {
-        const what = rest[0]
-        if (what === 'url') {
-          const result = await c.getUrl(sid)
-          return { content: [{ type: 'text', text: result.url }] }
-        }
-        if (what === 'title') {
-          const result = await c.getTitle(sid)
-          return { content: [{ type: 'text', text: result.title }] }
-        }
-        return { content: [{ type: 'text', text: `Error: unknown get target: ${what}` }], isError: true }
-      }
-
-      case 'wait': {
-        const target = rest[0]
-        if (!target) return { content: [{ type: 'text', text: 'Error: wait target required' }], isError: true }
-        const n = Number(target)
-        if (!isNaN(n) && !target.startsWith('@')) {
-          await c.waitFor(sid, { ms: n })
-        } else {
-          await c.waitFor(sid, { ref: target })
-        }
-        return { content: [{ type: 'text', text: 'Wait completed' }] }
-      }
-
-      default: {
-        // ── Site command: `<site> <name> [--args]` ──
-        const subcommand = rest[0]
-        if (subcommand) {
-          const args = parseFlags(rest.slice(1))
-          const result = await c.runCommand(sid, cmd, subcommand, args)
-          return { content: [{ type: 'text', text: JSON.stringify(result.data, null, 2) }] }
-        }
-
-        return { content: [{ type: 'text', text: `Unknown command: ${cmd}. Use the skill tool to see available commands.` }], isError: true }
+      case 'close': {
+        await c.closeTab(sid, index)
+        return textResult(`Closed tab${index != null ? ` ${index}` : ''}`)
       }
     }
   }),
 )
 
-// ============================================================================
-// Helpers
-// ============================================================================
+// ── eval: JS in page context ──
 
-/** Parse a command string into parts, respecting quotes */
-function parseCommandString(input: string): string[] {
-  const parts: string[] = []
-  let current = ''
-  let inQuote: string | null = null
-
-  for (const ch of input) {
-    if (inQuote) {
-      if (ch === inQuote) {
-        inQuote = null
-      } else {
-        current += ch
-      }
-    } else if (ch === '"' || ch === "'") {
-      inQuote = ch
-    } else if (ch === ' ') {
-      if (current) {
-        parts.push(current)
-        current = ''
-      }
-    } else {
-      current += ch
+server.tool(
+  'eval',
+  `Run JavaScript in the browser page context. Returns the result as text plus any images logged via console.image / runbrowser.image.
+The code runs inside the page — \`document\`, \`window\`, \`fetch\` are available; Playwright APIs are not.`,
+  {
+    code: z.string().describe('JavaScript code to evaluate'),
+    timeout: z.number().optional().describe('Timeout in ms (default 10000)'),
+  },
+  toolHandler(async ({ code, timeout }) => {
+    const sid = await ensureSession()
+    const c = getClient()
+    const result = await c.evaluate(sid, code, timeout)
+    const content: ContentItem[] = [{ type: 'text', text: result.text }]
+    for (const img of result.images) {
+      content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
     }
-  }
-  if (current) parts.push(current)
-  return parts
-}
+    return { content, isError: result.isError }
+  }),
+)
 
-/** Parse --flag value pairs into a record */
-function parseFlags(parts: string[]): Record<string, any> {
-  const flags: Record<string, any> = {}
-  let i = 0
-  while (i < parts.length) {
-    if (parts[i].startsWith('--')) {
-      const key = parts[i].slice(2)
-      const next = parts[i + 1]
-      if (next && !next.startsWith('--')) {
-        const n = Number(next)
-        flags[key] = isNaN(n) ? next : n
-        i += 2
-      } else {
-        flags[key] = true
-        i++
-      }
-    } else {
-      i++
-    }
-  }
-  return flags
-}
+// ── cdp: raw Chrome DevTools Protocol ──
+
+server.tool(
+  'cdp',
+  `Send a Chrome DevTools Protocol command. This is the page API — there are no
+click/type/read tools, because those are all CDP methods you already know.
+
+  cdp({ method: "Page.navigate", params: { url: "https://example.com" } })
+  cdp({ method: "Accessibility.getFullAXTree" })   // find elements; filter the result yourself
+  cdp({ method: "Input.dispatchMouseEvent", params: { type: "mousePressed", x, y, button: "left", clickCount: 1 } })
+  cdp({ method: "Page.captureScreenshot", params: { format: "png" } })
+
+Read the page before acting on it: getFullAXTree returns roles, names and
+backendNodeIds; resolve a node's box with DOM.getBoxModel and click its centre.
+Prefer that over screenshots — it is cheaper and searchable.`,
+  {
+    method: z.string().describe('CDP method (e.g. "Page.captureScreenshot")'),
+    params: z.record(z.string(), z.unknown()).optional().describe('CDP params object'),
+  },
+  toolHandler(async ({ method, params }) => {
+    const sid = await ensureSession()
+    const c = getClient()
+    const result = await c.cdp(sid, method, params)
+    return textResult(JSON.stringify(result.result, null, 2))
+  }),
+)
+
+// ── command: extension-defined site commands ──
+
+server.tool(
+  'command',
+  `Run an extension-defined site command. Use \`skill\` to discover what's available.
+
+Example:
+  command({ site: "github", name: "trending", args: { limit: 5 } })`,
+  {
+    site: z.string().describe('Site name (e.g. "github")'),
+    name: z.string().describe('Command name (e.g. "trending")'),
+    args: z.record(z.string(), z.unknown()).optional().describe('Command arguments'),
+  },
+  toolHandler(async ({ site, name, args }) => {
+    const sid = await ensureSession()
+    const c = getClient()
+    const result = await c.runCommand(sid, site, name, args ?? {})
+    return textResult(JSON.stringify(result.data, null, 2))
+  }),
+)
 
 // ============================================================================
 export { server }
