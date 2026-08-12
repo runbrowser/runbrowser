@@ -37,7 +37,7 @@ npm install @termio/browser-server
 import { startRunBrowserCDPRelayServer } from '@termio/browser-server'
 
 const server = await startRunBrowserCDPRelayServer({
-  port: 19988,
+  port: 8790,
   host: '127.0.0.1',
   logger: console,
 })
@@ -54,7 +54,7 @@ To enable `/cli/*` endpoints, provide an executor manager factory:
 import { startRunBrowserCDPRelayServer } from '@termio/browser-server'
 
 const server = await startRunBrowserCDPRelayServer({
-  port: 19988,
+  port: 8790,
   executorManagerFactory: async ({ cdpConfig, logger }) => {
     const { ExecutorManager } = await import('runbrowser/executor')
     return new ExecutorManager({ cdpConfig, logger })
@@ -121,7 +121,7 @@ interface RelayState { extensions, playwrightClients }
 
 | Variable | Description |
 |----------|-------------|
-| `TERMIO_BROWSER_PORT` | Relay server port (default: 19988) |
+| `TERMIO_BROWSER_PORT` | Relay server port (default: 8790) |
 | `TERMIO_BROWSER_AUTO_ENABLE` | Auto-create initial tab for Playwright |
 | `TERMIO_BROWSER_LOG_FILE_PATH` | Custom relay server log path |
 | `TERMIO_BROWSER_CDP_LOG_FILE_PATH` | Custom CDP log path |

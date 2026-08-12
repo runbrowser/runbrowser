@@ -3,7 +3,7 @@
  *
  * CORS alone does NOT prevent cross-origin POST attacks. Browsers skip the
  * preflight for "simple" requests (POST + Content-Type: text/plain), so a
- * malicious website can fire-and-forget a POST to localhost:19988/api/execute
+ * malicious website can fire-and-forget a POST to localhost:8790/api/execute
  * and the code executes before CORS even enters the picture.
  *
  * Two layers of defense:

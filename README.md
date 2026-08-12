@@ -52,7 +52,7 @@ termio browser uses the **Chrome DevTools Protocol (CDP)** directly. The extensi
 │   BROWSER           │     │   LOCALHOST          │     │   CLIENT        │
 │                     │     │                      │     │                 │
 │  ┌───────────────┐  │     │ WebSocket Server     │     │  ┌───────────┐  │
-│  │   Extension   │<───────┬───>  :19988          │     │  │ CLI / MCP │  │
+│  │   Extension   │<───────┬───>  :8790          │     │  │ CLI / MCP │  │
 │  └───────┬───────┘  │ WS  │                      │     │  └───────────┘  │
 │          │          │     │  /extension          │     │        │        │
 │    chrome.debugger  │     │       │              │     │        v        │
@@ -213,7 +213,7 @@ server.close()
 |---|---|
 | `TERMIO_BROWSER_HOST` | Remote relay server host |
 | `TERMIO_BROWSER_TOKEN` | Authentication token |
-| `TERMIO_BROWSER_PORT` | Relay server port (default: 19988) |
+| `TERMIO_BROWSER_PORT` | Relay server port (default: 8790) |
 | `TERMIO_BROWSER_SESSION` | Default session ID (avoids `-s` flag) |
 | `TERMIO_BROWSER_AUTO_ENABLE` | Auto-create tab on connect |
 | `TERMIO_BROWSER_LOG_FILE_PATH` | Custom path for relay server log file |
@@ -243,7 +243,7 @@ packages/
 
 ## Security
 
-- **Local only** — WebSocket server binds to `localhost:19988`
+- **Local only** — WebSocket server binds to `localhost:8790`
 - **Origin validation** — only the termio browser extension origin is accepted
 - **Explicit consent** — only tabs where you clicked the extension icon
 - **Visible automation** — Chrome shows an automation banner on controlled tabs
@@ -261,7 +261,7 @@ termio-browser logfile  # prints log file paths
 | Extension icon stays gray | Click it again. Check `chrome://extensions/` for errors. |
 | "Extension not connected" | Click extension icon on at least one tab. |
 | All pages return `about:blank` | Restart Chrome (known Chrome bug). |
-| Port 19988 in use | `lsof -ti :19988 \| xargs kill` |
+| Port 8790 in use | `lsof -ti :8790 \| xargs kill` |
 
 ## Acknowledgements
 

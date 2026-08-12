@@ -44,7 +44,7 @@ Site commands let users write `.ts` files that encapsulate this: `termio-browser
 │            └───────────┬───────────────┘               │
 │                        ▼                                │
 │   ┌────────────────────────────────────────────────┐    │
-│   │       Relay Server (Node.js, port 19988)        │    │
+│   │       Relay Server (Node.js, port 8790)        │    │
 │   │       Auto-started by CLI on first use          │    │
 │   │                                                 │    │
 │   │  ┌─────────────┐  ┌──────────────────────────┐ │    │
@@ -70,7 +70,7 @@ Site commands let users write `.ts` files that encapsulate this: `termio-browser
 ```
 termio-browser serve              ← Relay daemon (long-running, auto-started)
   ├── WebSocket ↔ Extension   (persistent connection)
-  ├── HTTP API :19988         (serves CLI and MCP)
+  ├── HTTP API :8790         (serves CLI and MCP)
   ├── CDPExecutor sessions    (persists across CLI calls)
   └── Site command executor   (jiti + command registry)
 

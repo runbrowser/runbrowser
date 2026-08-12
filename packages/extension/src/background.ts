@@ -18,7 +18,7 @@ import {
 } from './recording'
 
 const RELAY_HOST = '127.0.0.1'
-const RELAY_PORT = Number(process.env.TERMIO_BROWSER_PORT) || 19988
+const RELAY_PORT = Number(process.env.TERMIO_BROWSER_PORT) || 8790
 
 type NavigatorWithUaData = Navigator & {
   userAgentData?: {

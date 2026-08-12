@@ -82,7 +82,7 @@ export interface ExecutorLike {
 // ============================================================================
 
 export async function startRunBrowserCDPRelayServer({
-  port = 19988,
+  port = 8790,
   host = '127.0.0.1',
   token,
   logger,

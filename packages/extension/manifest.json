@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "RunBrowser",
+  "name": "Termio Browser",
   "version": "0.0.72",
-  "description": "Automate your Browser using Cursor, Claude, VS Code. More capable and context efficient than Playwright MCP.",
+  "description": "Let your coding agent drive this browser \u2014 your tabs, logins and cookies, over the Chrome DevTools Protocol.",
   "permissions": [
     "debugger",
     "tabGroups",
@@ -13,7 +13,9 @@
     "identity",
     "identity.email"
   ],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

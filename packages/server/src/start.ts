@@ -21,7 +21,7 @@ process.on('exit', async (code) => {
 })
 
 export async function startServer({
-  port = Number(process.env.TERMIO_BROWSER_PORT) || 19988,
+  port = Number(process.env.TERMIO_BROWSER_PORT) || 8790,
   host = '127.0.0.1',
   token,
 }: {

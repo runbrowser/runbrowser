@@ -1041,7 +1041,7 @@ packages/
 {
   // Existing config
   "host": "127.0.0.1",
-  "port": 19988,
+  "port": 8790,
   "token": null,
   
   // NEW: Credential broker config

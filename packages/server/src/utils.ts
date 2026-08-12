@@ -5,9 +5,24 @@ import { fileURLToPath } from 'node:url'
 
 // RunBrowser extension IDs - used for validation and Chrome flag commands
 // NOTE: These are the same extension IDs as the original playwriter project since we share the extension.
+/**
+ * Extension IDs the relay will accept a connection from.
+ *
+ * The previous "production" entry here was playwriter's Chrome Web Store ID,
+ * inherited when this project forked from it. Accepting it meant another
+ * product's extension could drive this relay — and since both defaulted to the
+ * same port, that was not hypothetical. It is removed; this project has no
+ * published extension yet.
+ *
+ * Loading the extension unpacked gives it a random ID unless manifest.json
+ * carries a `key`, so TERMIO_BROWSER_EXTENSION_ID lets a developer allow the
+ * ID Chrome assigned them without editing source.
+ */
 export const EXTENSION_IDS = [
-  'jfeammnjpkecdekppnclgkkffahnhfhe', // Production (Chrome Web Store)
-  'pebbngnfojnignonigcnkdilknapkgid', // Dev extension (stable ID from manifest key)
+  'pebbngnfojnignonigcnkdilknapkgid', // Dev build
+  ...(process.env.TERMIO_BROWSER_EXTENSION_ID
+    ? [process.env.TERMIO_BROWSER_EXTENSION_ID]
+    : []),
 ]
 
 /**
@@ -15,10 +30,10 @@ export const EXTENSION_IDS = [
  * Supports both plain hostnames (appends port) and full URLs (uses as-is).
  *
  * Examples:
- *   "192.168.1.10"                        → http://192.168.1.10:19988, ws://192.168.1.10:19988
+ *   "192.168.1.10"                        → http://192.168.1.10:8790, ws://192.168.1.10:8790
  *   "https://my-machine-tunnel.traforo.dev" → https://my-machine-tunnel.traforo.dev, wss://my-machine-tunnel.traforo.dev
  */
-export function parseRelayHost(host: string, port: number = 19988): { httpBaseUrl: string; wsBaseUrl: string } {
+export function parseRelayHost(host: string, port: number = 8790): { httpBaseUrl: string; wsBaseUrl: string } {
   if (host.startsWith('https://') || host.startsWith('http://')) {
     const url = new URL(host)
     const httpBaseUrl = url.origin
@@ -33,7 +48,7 @@ export function parseRelayHost(host: string, port: number = 19988): { httpBaseUr
 }
 
 export function getCdpUrl({
-  port = 19988,
+  port = 8790,
   host = '127.0.0.1',
   token,
   extensionId,
