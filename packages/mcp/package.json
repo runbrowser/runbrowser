@@ -1,7 +1,7 @@
 {
   "name": "@termio/browser-mcp",
-  "version": "0.0.5",
-  "description": "MCP server for RunBrowser — control your running Chrome browser via Playwright",
+  "version": "0.1.0",
+  "description": "MCP server for RunBrowser \u2014 control your running Chrome browser via Playwright",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

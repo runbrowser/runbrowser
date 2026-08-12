@@ -1,7 +1,7 @@
 {
   "name": "@termio/browser",
-  "version": "0.0.8",
-  "description": "Control your running Chrome browser via Playwright — your logins, extensions, cookies already there",
+  "version": "0.1.0",
+  "description": "Control your running Chrome browser via Playwright \u2014 your logins, extensions, cookies already there",
   "type": "module",
   "exports": {
     "./package.json": "./package.json"

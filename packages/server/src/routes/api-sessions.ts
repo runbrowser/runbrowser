@@ -75,9 +75,15 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
     const allowDefault = !extensionId && ctx.store.getState().extensions.size === 1
     const conn = ctx.getExtensionConnection(extensionId, { allowFallback: allowDefault })
     if (!conn) {
+      // Three different situations reach here, and telling a user with no
+      // extension installed that "multiple extensions" are connected sends
+      // them looking for the wrong problem.
+      const connected = ctx.store.getState().extensions.size
       const error = extensionId
         ? `Extension not connected: ${extensionId}`
-        : 'Multiple extensions connected. Specify extensionId.'
+        : connected === 0
+          ? 'No browser connected. Install the termio browser extension and click its icon on a tab.'
+          : 'Multiple browsers connected. Pass extensionId to choose one.'
       return c.json({ error }, 404)
     }
     const executor = ctx.executorManager.getExecutor({
