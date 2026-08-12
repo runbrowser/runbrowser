@@ -1,5 +1,5 @@
 {
-  "name": "@jiweiyuan/runbrowser-server",
+  "name": "@termio/browser-server",
   "version": "0.0.7",
   "description": "RunBrowser server — bridges Chrome extension WebSocket to CDP clients",
   "type": "module",

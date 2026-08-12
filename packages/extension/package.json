@@ -31,7 +31,7 @@
     "vite-plugin-static-copy": "^3.1.1"
   },
   "dependencies": {
-    "@jiweiyuan/runbrowser-server": "workspace:*",
+    "@termio/browser-server": "workspace:*",
     "zustand": "^5.0.8"
   }
 }

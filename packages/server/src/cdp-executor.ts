@@ -1,31 +1,48 @@
 /**
- * CDPExecutor - Executes browser commands directly through a CDP WebSocket.
- *
- * Connects directly to Chrome's debugging WebSocket (ws://host:9222/devtools/browser/...)
- * without needing a Chrome extension.
+ * CDPExecutor - Executes browser commands directly through the Extension via CDP.
+ * Replaces PlaywrightExecutor by sending CDP commands through the existing
+ * Extension WebSocket instead of routing through Playwright.
  */
 
-import WebSocket from 'ws'
 import type { ExecutorLike } from './server.js'
-import type { SessionMetadata } from './state.js'
-
-// ============================================================================
-// Types
-// ============================================================================
+import type { ExtensionEntry, SessionMetadata } from './state.js'
 
 /**
  * Sends one CDP command and resolves with its raw result.
  *
- * Everything the executor exposes to callers is this shape or built from it —
+ * Everything this executor exposes to callers is this shape or built from it —
  * there is deliberately no layer of named page actions on top. Chrome's
  * protocol is the API.
  */
 export type SendCDP = (method: string, params?: unknown) => Promise<unknown>
 
+// ============================================================================
+// Types
+// ============================================================================
+
+export type SendToExtension = (params: {
+  extensionId?: string | null
+  method: string
+  params?: unknown
+  timeout?: number
+}) => Promise<unknown>
+
+export type GetExtensionEntry = (stableKeyOrId: string | null) => ExtensionEntry | null
+
+export type RegisterTarget = (params: {
+  extensionId: string
+  sessionId: string
+  targetId: string
+  targetInfo: any
+}) => void
+
 export interface CDPExecutorOptions {
-  /** Direct CDP WebSocket URL (e.g. ws://127.0.0.1:9222/devtools/browser/...) */
-  cdpUrl: string
+  /** The stableKey of the extension to send commands to (stored in session metadata) */
+  extensionStableKey: string | null
   sessionMetadata: SessionMetadata
+  sendToExtension: SendToExtension
+  getExtensionEntry: GetExtensionEntry
+  registerTarget?: RegisterTarget
   logger?: { log(...args: any[]): void; error(...args: any[]): void }
 }
 
@@ -34,243 +51,143 @@ export interface CDPExecutorOptions {
 // ============================================================================
 
 export class CDPExecutor implements ExecutorLike {
-  private cdpUrl: string
+  private extensionStableKey: string | null
   private metadata: SessionMetadata
+  private sendToExtension: SendToExtension
+  private getExtensionEntry: GetExtensionEntry
+  private registerTarget?: RegisterTarget
   private logger?: { log(...args: any[]): void; error(...args: any[]): void }
 
   /** Bound sendCDP — avoids creating a new closure in every method call. */
   private readonly boundSendCDP: SendCDP
 
-  /** WebSocket connection to Chrome's browser-level CDP endpoint */
-  private browserWs: WebSocket | null = null
+  /** True while a cross-origin navigation is in progress — prevents autoCreateTab during target re-attachment. */
+  private waitForReattach = false
 
-  /** Per-page WebSocket connections, keyed by targetId */
-  private pageWsMap: Map<string, WebSocket> = new Map()
-
-  /** Current active target (page) session ID and WebSocket */
-  private activeTargetId: string | null = null
-
-  /** Message ID counter for CDP commands */
-  private nextId = 1
-
-  /** Pending CDP responses keyed by message ID */
-  private pending: Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }> = new Map()
+  /**
+   * The target this session is bound to, if the caller chose one.
+   *
+   * Null means "whichever page target the extension attached first", which is
+   * the right default for a fresh session. Once a caller switches tabs the
+   * choice must stick, or every subsequent command silently drifts back to the
+   * first tab.
+   */
+  private boundTargetId: string | null = null
 
   constructor(options: CDPExecutorOptions) {
-    this.cdpUrl = options.cdpUrl
+    this.extensionStableKey = options.extensionStableKey
     this.metadata = options.sessionMetadata
+    this.sendToExtension = options.sendToExtension
+    this.getExtensionEntry = options.getExtensionEntry
+    this.registerTarget = options.registerTarget
     this.logger = options.logger
     this.boundSendCDP = (method, params) => this.sendCDP(method, params)
   }
 
-  // --------------------------------------------------------------------------
-  // Connection management
-  // --------------------------------------------------------------------------
-
-  /** Connect to Chrome's browser-level CDP WebSocket and discover a page target. */
-  private async ensureBrowserConnection(): Promise<WebSocket> {
-    if (this.browserWs && this.browserWs.readyState === WebSocket.OPEN) {
-      return this.browserWs
+  /** Get the Chrome CDP session ID of the active tab for this executor's extension. */
+  getActiveCdpSession(): { extensionId: string | null; cdpSessionId: string | null } {
+    const entry = this.getExtensionEntry(this.extensionStableKey)
+    if (!entry) {
+      return { extensionId: null, cdpSessionId: null }
     }
-
-    this.browserWs = await this.connectWs(this.cdpUrl)
-    return this.browserWs
-  }
-
-  /** Connect a WebSocket and wait for it to open. */
-  private connectWs(url: string): Promise<WebSocket> {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(url)
-      const timeout = setTimeout(() => {
-        ws.close()
-        reject(new Error(`WebSocket connection timeout: ${url}`))
-      }, 10000)
-
-      ws.on('open', () => {
-        clearTimeout(timeout)
-        resolve(ws)
-      })
-      ws.on('error', (err) => {
-        clearTimeout(timeout)
-        reject(err)
-      })
-    })
-  }
-
-  /** Get (or create) a page-level CDP WebSocket for the active target. */
-  private async ensurePageConnection(): Promise<{ ws: WebSocket; targetId: string }> {
-    // If we already have an active page WS, use it
-    if (this.activeTargetId) {
-      const existing = this.pageWsMap.get(this.activeTargetId)
-      if (existing && existing.readyState === WebSocket.OPEN) {
-        return { ws: existing, targetId: this.activeTargetId }
-      }
-      // Stale connection — clean up
-      this.pageWsMap.delete(this.activeTargetId)
-      this.activeTargetId = null
-    }
-
-    // Discover page targets via the browser WS
-    const browserWs = await this.ensureBrowserConnection()
-    const targets = await this.sendViaBrowserWs(browserWs, 'Target.getTargets', {}) as {
-      targetInfos: Array<{ targetId: string; type: string; url: string; title: string }>
-    }
-
-    // Find a suitable page target (not about:blank if possible)
-    const pages = targets.targetInfos.filter((t) => t.type === 'page')
-    if (pages.length === 0) {
-      // Create a new tab
-      const created = await this.sendViaBrowserWs(browserWs, 'Target.createTarget', { url: 'about:blank' }) as {
-        targetId: string
-      }
-      return this.attachToTarget(browserWs, created.targetId)
-    }
-
-    // Prefer non-blank pages
-    const preferred = pages.find((p) => p.url !== 'about:blank') || pages[0]
-    return this.attachToTarget(browserWs, preferred.targetId)
-  }
-
-  /** Attach to a target and set up a page-level WebSocket. */
-  private async attachToTarget(browserWs: WebSocket, targetId: string): Promise<{ ws: WebSocket; targetId: string }> {
-    // Get the WS URL for this specific target
-    const wsUrlBase = this.cdpUrl.replace(/\/devtools\/browser\/.*/, '')
-    const pageWsUrl = `${wsUrlBase}/devtools/page/${targetId}`
-
-    const ws = await this.connectWs(pageWsUrl)
-
-    // Set up message handling
-    ws.on('message', (data) => {
-      try {
-        const msg = JSON.parse(data.toString())
-        if (msg.id !== undefined) {
-          const p = this.pending.get(msg.id)
-          if (p) {
-            this.pending.delete(msg.id)
-            if (msg.error) {
-              p.reject(new Error(msg.error.message || JSON.stringify(msg.error)))
-            } else {
-              p.resolve(msg.result)
-            }
-          }
-        }
-        // CDP events — could be used for navigation tracking etc.
-      } catch {
-        // ignore parse errors
-      }
-    })
-
-    ws.on('close', () => {
-      this.pageWsMap.delete(targetId)
-      if (this.activeTargetId === targetId) {
-        this.activeTargetId = null
-      }
-    })
-
-    ws.on('error', (err) => {
-      this.logger?.error('Page WebSocket error:', err)
-    })
-
-    this.pageWsMap.set(targetId, ws)
-    this.activeTargetId = targetId
-    return { ws, targetId }
-  }
-
-  /** Send a CDP command via the browser-level WebSocket and wait for response. */
-  private sendViaBrowserWs(ws: WebSocket, method: string, params?: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const id = this.nextId++
-      const timeout = setTimeout(() => {
-        this.pending.delete(id)
-        reject(new Error(`CDP timeout: ${method}`))
-      }, 30000)
-
-      const handler = (data: WebSocket.Data) => {
-        try {
-          const msg = JSON.parse(data.toString())
-          if (msg.id === id) {
-            clearTimeout(timeout)
-            ws.off('message', handler)
-            if (msg.error) {
-              reject(new Error(msg.error.message || JSON.stringify(msg.error)))
-            } else {
-              resolve(msg.result)
-            }
-          }
-        } catch {
-          // ignore
+    // An explicitly bound target wins, so a tab switch survives the next call.
+    if (this.boundTargetId) {
+      for (const target of entry.connectedTargets.values()) {
+        if (target.targetId === this.boundTargetId) {
+          return { extensionId: entry.id, cdpSessionId: target.sessionId }
         }
       }
-
-      ws.on('message', handler)
-      ws.send(JSON.stringify({ id, method, params: params || {} }))
-    })
+      // The bound tab is gone (closed, or crashed). Fall through to the default
+      // rather than failing every command until the caller notices.
+      this.boundTargetId = null
+    }
+    // Find first connected page target
+    for (const target of entry.connectedTargets.values()) {
+      if (target.targetInfo.type === 'page') {
+        return { extensionId: entry.id, cdpSessionId: target.sessionId }
+      }
+    }
+    // Fallback: return any connected target
+    const first = entry.connectedTargets.values().next().value
+    return { extensionId: entry.id, cdpSessionId: first?.sessionId ?? null }
   }
 
-  // --------------------------------------------------------------------------
-  // CDP command interface
-  // --------------------------------------------------------------------------
+  /** The target this session is bound to, for `status` to report. */
+  getBoundTargetId(): string | null {
+    return this.boundTargetId
+  }
 
-  /** Send a CDP command to the active page target. */
+  /** Send a CDP command to the browser via the Extension WebSocket. Public for use in server endpoints. */
   async sendCDP(method: string, params?: unknown, timeout?: number): Promise<unknown> {
-    const { ws } = await this.ensurePageConnection()
-
-    return new Promise((resolve, reject) => {
-      const id = this.nextId++
-      const timeoutMs = timeout || 30000
-      const timer = setTimeout(() => {
-        this.pending.delete(id)
-        reject(new Error(`CDP timeout after ${timeoutMs}ms: ${method}`))
-      }, timeoutMs)
-
-      this.pending.set(id, {
-        resolve: (v) => { clearTimeout(timer); resolve(v) },
-        reject: (e) => { clearTimeout(timer); reject(e) },
-      })
-
-      ws.send(JSON.stringify({ id, method, params: params || {} }))
+    let { extensionId, cdpSessionId } = this.getActiveCdpSession()
+    if (!extensionId) {
+      throw new Error('Extension not connected')
+    }
+    if (!cdpSessionId) {
+      if (this.waitForReattach) {
+        // During cross-origin navigation, wait for the target to re-attach instead
+        // of creating a new tab. Chrome detaches the old target and re-attaches
+        // with a new session ID after the navigation commits.
+        cdpSessionId = await this.waitForTarget(10000)
+        if (!cdpSessionId) {
+          throw new Error('Navigation target lost — no CDP session re-attached within timeout')
+        }
+      } else {
+        // Auto-create a tab instead of failing
+        cdpSessionId = await this.autoCreateTab(extensionId)
+      }
+    }
+    return this.sendToExtension({
+      extensionId,
+      method: 'forwardCDPCommand',
+      params: { method, params, sessionId: cdpSessionId },
+      timeout,
     })
   }
 
-  /** Switch to a different page target by targetId. */
-  async switchTarget(targetId: string): Promise<void> {
-    const existing = this.pageWsMap.get(targetId)
-    if (existing && existing.readyState === WebSocket.OPEN) {
-      this.activeTargetId = targetId
-      return
+  /**
+   * Poll for a CDP target to (re-)appear on this extension.
+   * Used during cross-origin navigations where Chrome detaches the old target
+   * and re-attaches a new one after a brief gap.
+   */
+  private async waitForTarget(maxWaitMs: number): Promise<string | null> {
+    const start = Date.now()
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      const { cdpSessionId } = this.getActiveCdpSession()
+      if (cdpSessionId) return cdpSessionId
     }
-
-    const browserWs = await this.ensureBrowserConnection()
-    await this.attachToTarget(browserWs, targetId)
+    return null
   }
 
-  /** List all page targets. */
-  async listTargets(): Promise<Array<{ targetId: string; url: string; title: string }>> {
-    const browserWs = await this.ensureBrowserConnection()
-    const result = await this.sendViaBrowserWs(browserWs, 'Target.getTargets', {}) as {
-      targetInfos: Array<{ targetId: string; type: string; url: string; title: string }>
-    }
-    return result.targetInfos.filter((t) => t.type === 'page')
-  }
+  /** Auto-create a browser tab when none are attached */
+  private async autoCreateTab(extensionId: string): Promise<string> {
+    const result = (await this.sendToExtension({
+      extensionId,
+      method: 'createInitialTab',
+      timeout: 10000,
+    })) as { success: boolean; sessionId: string; targetInfo: any }
 
-  /** Clean up all WebSocket connections. */
-  async dispose(): Promise<void> {
-    for (const ws of this.pageWsMap.values()) {
-      ws.close()
-    }
-    this.pageWsMap.clear()
-    this.activeTargetId = null
-
-    if (this.browserWs) {
-      this.browserWs.close()
-      this.browserWs = null
+    if (!result?.success || !result.sessionId) {
+      throw new Error('No connected browser tab found and failed to auto-create one. Click the termio browser extension icon on a tab.')
     }
 
-    // Reject all pending
-    for (const [id, p] of this.pending) {
-      p.reject(new Error('Executor disposed'))
+    // Register the target in relay state ourselves.
+    // The extension uses skipAttachedEvent: true for createInitialTab (to avoid
+    // duplicates with Playwright's Target.setAutoAttach), so the normal
+    // Target.attachedToTarget → handleTargetAttached registration path is skipped.
+    // Without this, connectedTargets stays empty and every subsequent sendCDP
+    // call creates another blank tab.
+    if (this.registerTarget && result.targetInfo) {
+      this.registerTarget({
+        extensionId,
+        sessionId: result.sessionId,
+        targetId: result.targetInfo.targetId,
+        targetInfo: result.targetInfo,
+      })
     }
-    this.pending.clear()
+
+    return result.sessionId
   }
 
   // --------------------------------------------------------------------------
@@ -282,9 +199,8 @@ export class CDPExecutor implements ExecutorLike {
     timeout: number,
   ): Promise<{ text: string; images: Array<{ data: string; mimeType: string }>; isError: boolean }> {
     try {
-      // Ensure we have a page connection
-      await this.ensurePageConnection()
-
+      // Try direct expression evaluation first (handles `document.title`, `1+1`, etc.)
+      // Fall back to async IIFE wrapper only for multi-statement code (has semicolons or explicit return)
       const trimmed = code.trim()
       const isMultiStatement = trimmed.includes(';') || trimmed.startsWith('return ')
       const expression = isMultiStatement
@@ -327,7 +243,6 @@ export class CDPExecutor implements ExecutorLike {
 
   async reset(): Promise<{ page: { url(): string }; context: { pages(): any[] } }> {
     try {
-      await this.ensurePageConnection()
       await this.sendCDP('Runtime.enable', {})
       const urlResult = (await this.sendCDP('Runtime.evaluate', {
         expression: 'window.location.href',
@@ -351,76 +266,82 @@ export class CDPExecutor implements ExecutorLike {
   }
 
   // --------------------------------------------------------------------------
+  // High-level browser actions (not in ExecutorLike)
+  // --------------------------------------------------------------------------
+
+  /** Last snapshot's ref map — used for click/fill ref resolution. */
+
+  // --------------------------------------------------------------------------
   // The API
   // --------------------------------------------------------------------------
 
   /**
-   * Send an arbitrary CDP method to the active page target.
+   * Send an arbitrary CDP method to the session's active tab.
    *
    * This is the entire page-facing surface. Clicking, typing, reading the DOM
    * and capturing screenshots are all CDP methods, so none of them needs a
    * wrapper here.
    */
   async rawCDP(method: string, params?: unknown): Promise<unknown> {
-    await this.ensurePageConnection()
     return this.boundSendCDP(method, params)
   }
 
   // --------------------------------------------------------------------------
   // Tabs
   //
-  // Tabs are about the connection, not the page: which target this session is
-  // bound to is state the caller cannot derive from a CDP result. Everything
-  // here runs on the browser-level socket.
+  // Tabs are about the connection, not the page: which target a session is
+  // bound to is state the caller cannot derive from a CDP result. Addressed by
+  // target id — Target.getTargets makes no ordering guarantee, so an index
+  // captured in one call can name a different tab in the next.
   // --------------------------------------------------------------------------
 
-  /** Page targets, in a stable order, with the session's active one marked. */
   async listTabs(): Promise<Array<{ index: number; targetId: string; url: string; title: string; active: boolean }>> {
-    const targets = await this.listTargets()
-    return targets.map((t, index) => ({
+    const result = (await this.sendCDP('Target.getTargets')) as {
+      targetInfos: Array<{ targetId: string; type: string; url: string; title: string }>
+    }
+    const pages = (result?.targetInfos ?? []).filter((t) => t.type === 'page')
+    const { cdpSessionId } = this.getActiveCdpSession()
+    const entry = this.getExtensionEntry(this.extensionStableKey)
+    const activeTargetId = entry
+      ? [...entry.connectedTargets.values()].find((t) => t.sessionId === cdpSessionId)?.targetId ?? null
+      : null
+    return pages.map((t, index) => ({
       index,
       targetId: t.targetId,
       url: t.url,
       title: t.title,
-      active: t.targetId === this.activeTargetId,
+      active: t.targetId === activeTargetId,
     }))
   }
 
-  /** Open a tab and bind the session to it. */
-  async newTab(url?: string): Promise<{ index: number; targetId: string }> {
-    const browserWs = await this.ensureBrowserConnection()
-    const created = (await this.sendViaBrowserWs(browserWs, 'Target.createTarget', {
+  async newTab(url?: string): Promise<{ targetId: string; url: string }> {
+    const created = (await this.sendCDP('Target.createTarget', {
       url: url || 'about:blank',
     })) as { targetId: string }
-    await this.switchTarget(created.targetId)
-    const tabs = await this.listTabs()
-    const index = tabs.findIndex((t) => t.targetId === created.targetId)
-    return { index: index === -1 ? tabs.length - 1 : index, targetId: created.targetId }
+    // Opening a tab and then acting on the previous one is never what a caller
+    // meant, so binding follows creation.
+    this.boundTargetId = created.targetId
+    return { targetId: created.targetId, url: url || 'about:blank' }
   }
 
-  /** Bind the session to the tab at `index` (as reported by listTabs). */
-  async switchTab(index: number): Promise<void> {
+  /** Bind this session to `targetId`, and bring that tab to the front. */
+  async switchTab(targetId: string): Promise<void> {
     const tabs = await this.listTabs()
-    const target = tabs[index]
-    if (!target) throw new Error(`No tab at index ${index} (${tabs.length} open)`)
-    await this.switchTarget(target.targetId)
+    if (!tabs.some((t) => t.targetId === targetId)) {
+      throw new Error(`No tab with target id ${targetId}`)
+    }
+    await this.sendCDP('Target.activateTarget', { targetId })
+    this.boundTargetId = targetId
   }
 
-  /** Close the tab at `index`, defaulting to the session's active tab. */
-  async closeTab(index?: number): Promise<void> {
-    const tabs = await this.listTabs()
-    const target = index == null ? tabs.find((t) => t.active) : tabs[index]
-    if (!target) {
-      throw new Error(index == null ? 'No active tab to close' : `No tab at index ${index}`)
+  async closeTab(targetId?: string): Promise<void> {
+    let id = targetId
+    if (!id) {
+      const active = (await this.listTabs()).find((t) => t.active)
+      if (!active) throw new Error('No active tab to close')
+      id = active.targetId
     }
-    const browserWs = await this.ensureBrowserConnection()
-    await this.sendViaBrowserWs(browserWs, 'Target.closeTarget', { targetId: target.targetId })
-
-    const ws = this.pageWsMap.get(target.targetId)
-    if (ws) {
-      ws.close()
-      this.pageWsMap.delete(target.targetId)
-    }
-    if (this.activeTargetId === target.targetId) this.activeTargetId = null
+    await this.sendCDP('Target.closeTarget', { targetId: id })
+    if (this.boundTargetId === id) this.boundTargetId = null
   }
 }

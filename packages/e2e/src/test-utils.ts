@@ -7,7 +7,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { startRunBrowserCDPRelayServer, createFileLogger, killPortProcess, type RelayServer } from '@jiweiyuan/runbrowser-server'
+import { startRunBrowserCDPRelayServer, createFileLogger, killPortProcess, type RelayServer } from '@termio/browser-server'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -23,7 +23,7 @@ async function buildExtension({ port, distDir }: { port: number; distDir: string
     })
     .then(async () => {
       // Build into a per-port dist to avoid parallel test runs overwriting each other.
-      await execAsync(`TESTING=1 RUNBROWSER_PORT=${port} RUNBROWSER_EXTENSION_DIST=${distDir} pnpm build`, {
+      await execAsync(`TESTING=1 TERMIO_BROWSER_PORT=${port} TERMIO_BROWSER_EXTENSION_DIST=${distDir} pnpm build`, {
         cwd: path.resolve(__dirname, '../../extension'),
       })
     })

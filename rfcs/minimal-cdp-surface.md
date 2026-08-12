@@ -46,7 +46,7 @@ next to the code it is used on gets committed, reviewed and versioned with that
 repo, and installing it never silently changes agent behaviour in every other
 checkout on the machine. `--global` is the opt-in.
 
-`help` exists because agents type `runbrowser help` before `runbrowser --help`,
+`help` exists because agents type `termio-browser help` before `termio-browser --help`,
 and answering that guess with "Unknown command" costs a turn.
 
 ## Why

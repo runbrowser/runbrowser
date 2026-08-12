@@ -5,8 +5,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { VERSION } from '@jiweiyuan/runbrowser-server'
-import { RelayApiClient } from '@jiweiyuan/runbrowser-server/api'
+import { VERSION } from '@termio/browser-server'
+import { RelayApiClient } from '@termio/browser-server/api'
 
 // ============================================================================
 // Relay API Client
@@ -18,8 +18,8 @@ let sessionId: string | null = null
 function getClient(): RelayApiClient {
   if (!client) {
     client = new RelayApiClient({
-      host: process.env.RUNBROWSER_HOST,
-      token: process.env.RUNBROWSER_TOKEN,
+      host: process.env.TERMIO_BROWSER_HOST,
+      token: process.env.TERMIO_BROWSER_TOKEN,
       logger: mcpLogger,
     })
   }
@@ -102,7 +102,7 @@ function requireField<T>(value: T | undefined, name: string, action: string): T 
 // ============================================================================
 
 const server = new McpServer({
-  name: 'runbrowser',
+  name: 'termio-browser',
   title: 'Control your running Chrome browser — your logins, extensions, cookies already there.',
   version: VERSION,
 })
@@ -120,7 +120,7 @@ function loadSkillContent(): string {
   for (const p of candidates) {
     if (fs.existsSync(p)) return fs.readFileSync(p, 'utf-8')
   }
-  return 'RunBrowser skill file not found. Use `runbrowser --help` for available commands.'
+  return 'Skill file not found. Use `termio-browser --help` for available commands.'
 }
 
 server.tool(
@@ -210,16 +210,26 @@ through \`cdp\`. The "action" field selects behavior:
       }
       case 'new': {
         const r = await c.newTab(sid, url)
-        return textResult(`Opened tab ${r.index}${url ? ` at ${url}` : ''}`)
+        return textResult(`Opened and bound to a new tab${url ? ` at ${url}` : ''} (${r.targetId})`)
       }
       case 'switch': {
         const i = requireField(index, 'index', 'switch')
-        await c.switchTab(sid, i)
+        const { tabs } = await c.listTabs(sid)
+        const tab = tabs[i]
+        if (!tab) throw new Error(`No tab at index ${i} (${tabs.length} open)`)
+        await c.switchTab(sid, tab.targetId)
         return textResult(`Switched to tab ${i}`)
       }
       case 'close': {
-        await c.closeTab(sid, index)
-        return textResult(`Closed tab${index != null ? ` ${index}` : ''}`)
+        let targetId: string | undefined
+        if (index != null) {
+          const { tabs } = await c.listTabs(sid)
+          const tab = tabs[index]
+          if (!tab) throw new Error(`No tab at index ${index} (${tabs.length} open)`)
+          targetId = tab.targetId
+        }
+        await c.closeTab(sid, targetId)
+        return textResult('Closed tab')
       }
     }
   }),
@@ -300,10 +310,10 @@ export { server }
 
 export async function startMcp(options: { host?: string; token?: string } = {}) {
   if (options.host) {
-    process.env.RUNBROWSER_HOST = options.host
+    process.env.TERMIO_BROWSER_HOST = options.host
   }
   if (options.token) {
-    process.env.RUNBROWSER_TOKEN = options.token
+    process.env.TERMIO_BROWSER_TOKEN = options.token
   }
 
   const c = getClient()

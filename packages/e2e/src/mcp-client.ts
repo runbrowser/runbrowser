@@ -23,8 +23,7 @@ export async function createTransport({ args = [], port }: { args?: string[]; po
     DEBUG_HIDE_DATE: '1',
   }
   if (port) {
-    env.RUNBROWSER_PORT = String(port)
-    env.RUNBROWSER_PORT = String(port) // backward compat
+    env.TERMIO_BROWSER_PORT = String(port)
   }
   const transport = new StdioClientTransport({
     command: 'pnpm',

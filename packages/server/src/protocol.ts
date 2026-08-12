@@ -10,7 +10,7 @@ type ForwardCDPCommand = {
       method: K
       sessionId?: string
       params?: ProtocolMapping.Commands[K]['paramsType'][0]
-      source?: 'runbrowser'
+      source?: 'termio-browser'
     }
   }
 }[keyof ProtocolMapping.Commands]

@@ -127,7 +127,7 @@ If you want to expose the server to Docker or other machines:
 node packages/cli/bin.js serve --host 0.0.0.0 --token mysecret
 
 # From Docker, connect via:
-# RUNBROWSER_HOST=host.docker.internal RUNBROWSER_TOKEN=mysecret
+# TERMIO_BROWSER_HOST=host.docker.internal TERMIO_BROWSER_TOKEN=mysecret
 ```
 
 ## Verify Everything Works
@@ -162,15 +162,15 @@ Default port is `19988`. To change:
 
 ```bash
 # Server
-RUNBROWSER_PORT=19999 node packages/relay/dist/start.js
+TERMIO_BROWSER_PORT=19999 node packages/relay/dist/start.js
 
 # Extension (must rebuild with matching port)
 cd packages/extension
-RUNBROWSER_PORT=19999 pnpm build
+TERMIO_BROWSER_PORT=19999 pnpm build
 # Then reload extension in Chrome
 
 # CLI
-RUNBROWSER_PORT=19999 node packages/cli/bin.js session new
+TERMIO_BROWSER_PORT=19999 node packages/cli/bin.js session new
 ```
 
 ## Log Files

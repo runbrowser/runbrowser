@@ -1,7 +1,7 @@
 import { createMCPClient } from './mcp-client.js'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { chromium } from 'playwright-core'
-import { getCdpUrl } from '@jiweiyuan/runbrowser-server/utils'
+import { getCdpUrl } from '@termio/browser-server/utils'
 import { setupTestContext, cleanupTestContext, getExtensionServiceWorker, type TestContext, js } from './test-utils.js'
 import './test-declarations.js'
 

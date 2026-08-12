@@ -1,5 +1,5 @@
 {
-  "name": "@jiweiyuan/e2e",
+  "name": "@termio/browser-e2e",
   "version": "0.0.1",
   "private": true,
   "description": "End-to-end integration tests for RunBrowser — browser + extension + relay + MCP",
@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "@jiweiyuan/runbrowser-server": "workspace:*",
+    "@termio/browser-server": "workspace:*",
     "@types/node": "^24.10.1",
     "devtools-protocol": "^0.0.1568893",
     "image-size": "^2.0.2",

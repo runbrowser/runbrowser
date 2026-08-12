@@ -10,9 +10,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createJiti } from 'jiti'
-import { RUNBROWSER_DIR } from './utils.js'
+import { TERMIO_BROWSER_DIR } from './utils.js'
 
-const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
+const COMMANDS_DIR = path.join(TERMIO_BROWSER_DIR, 'commands')
 
 export interface CommandArg {
   type: 'string' | 'number' | 'boolean'

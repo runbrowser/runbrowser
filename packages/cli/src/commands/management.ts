@@ -2,6 +2,7 @@
  * Management commands: session, config, serve, logfile, skill
  */
 
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -19,10 +20,11 @@ import {
   CONFIG_FILE_PATH,
   isPortInUse,
   killPortProcess,
+  TERMIO_BROWSER_DIR,
   readConfig,
   writeConfig,
   RelayApiClient,
-} from '@jiweiyuan/runbrowser-server'
+} from '@termio/browser-server'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -44,15 +46,15 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const cmd = args.subcommand
-    if (!cmd) throw new Error('Usage: runbrowser session <new|list|delete> [id]')
+    if (!cmd) throw new Error('Usage: termio-browser session <new|list|delete> [id]')
 
     const config = readConfig()
     const client = new RelayApiClient({
-      host: (args.host || process.env.RUNBROWSER_HOST || config.host) as string | undefined,
-      token: (args.token || process.env.RUNBROWSER_TOKEN || config.token) as string | undefined,
+      host: (args.host || process.env.TERMIO_BROWSER_HOST || config.host) as string | undefined,
+      token: (args.token || process.env.TERMIO_BROWSER_TOKEN || config.token) as string | undefined,
       logger: console,
     })
-    const cliRelayEnv = { RUNBROWSER_AUTO_ENABLE: '1' }
+    const cliRelayEnv = { TERMIO_BROWSER_AUTO_ENABLE: '1' }
 
     switch (cmd) {
       case 'new': {
@@ -62,7 +64,7 @@ registerBuiltinCommand({
           console.error(pc.dim('Waiting for extension...'))
           extensions = await client.waitForExtensions({ timeoutMs: 10000, pollIntervalMs: 250 })
         }
-        if (extensions.length === 0) throw new Error('No connected browsers. Click the RunBrowser extension icon.')
+        if (extensions.length === 0) throw new Error('No connected browsers. Click the termio browser extension icon.')
 
         let ext = extensions[0]
         const browserKey = args.flags.get('browser') as string | undefined
@@ -185,9 +187,9 @@ registerBuiltinCommand({
   },
   async execute(args) {
     const host = (args.flags.get('host') as string) ?? '127.0.0.1'
-    const token = args.token || process.env.RUNBROWSER_TOKEN
+    const token = args.token || process.env.TERMIO_BROWSER_TOKEN
     if ((host === '0.0.0.0' || host === '::') && !token) {
-      throw new Error('Auth token required for public host. Use --token or RUNBROWSER_TOKEN.')
+      throw new Error('Auth token required for public host. Use --token or TERMIO_BROWSER_TOKEN.')
     }
     const portInUse = await isPortInUse(RELAY_PORT)
     if (portInUse) {
@@ -195,13 +197,13 @@ registerBuiltinCommand({
       console.log(`Killing existing server on port ${RELAY_PORT}...`)
       await killPortProcess({ port: RELAY_PORT })
     }
-    const { createFileLogger, startRunBrowserCDPRelayServer } = await import('@jiweiyuan/runbrowser-server')
+    const { createFileLogger, startRunBrowserCDPRelayServer } = await import('@termio/browser-server')
     const logger = createFileLogger()
-    process.title = 'runbrowser-serve'
+    process.title = 'termio-browser-serve'
     process.on('uncaughtException', async (err) => { await logger.error('Uncaught:', err); process.exit(1) })
     process.on('unhandledRejection', async (reason) => { await logger.error('Unhandled:', reason); process.exit(1) })
     const server = await startRunBrowserCDPRelayServer({ port: RELAY_PORT, host, token, logger })
-    console.log(`RunBrowser relay server started on ${host}:${RELAY_PORT}`)
+    console.log(`termio browser relay server started on ${host}:${RELAY_PORT}`)
     console.log(`Logs: ${logger.logFilePath}`)
     const shutdown = () => { console.log('\nShutting down...'); server.close(); process.exit(0) }
     process.on('SIGINT', shutdown)
@@ -244,11 +246,46 @@ function packageFile(name: string): string | null {
 }
 
 /**
- * Marks a SKILL.md as one we wrote. A file without this line belongs to the
- * user — an edited copy, or a symlink to a checkout they are working on — and
- * is never overwritten or removed.
+ * Where we remember what we installed and exactly what we wrote.
+ *
+ * A marker line inside the file proves *origin* but not *absence of edits*: a
+ * file we wrote and the user then edited still carries the marker, so marker
+ * checking alone will happily overwrite their work on the next install and
+ * delete it on uninstall. Recording a content hash is what makes "ours and
+ * untouched" a question we can actually answer.
  */
-const OWNERSHIP_MARKER = '<!-- installed by runbrowser -->'
+const INSTALL_STATE_PATH = path.join(TERMIO_BROWSER_DIR, 'skill-install.json')
+
+function sha256(text: string): string {
+  return createHash('sha256').update(text, 'utf-8').digest('hex')
+}
+
+function readInstallState(): Record<string, string> {
+  try {
+    return JSON.parse(fs.readFileSync(INSTALL_STATE_PATH, 'utf-8')) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+
+function writeInstallState(state: Record<string, string>) {
+  fs.mkdirSync(path.dirname(INSTALL_STATE_PATH), { recursive: true })
+  fs.writeFileSync(INSTALL_STATE_PATH, JSON.stringify(state, null, 2), 'utf-8')
+}
+
+/**
+ * Ours and unmodified since we wrote it — the only state in which replacing or
+ * removing a file is safe.
+ */
+function isOursAndUnmodified(target: string, state: Record<string, string>): boolean {
+  const recorded = state[target]
+  if (!recorded) return false
+  try {
+    return sha256(fs.readFileSync(target, 'utf-8')) === recorded
+  } catch {
+    return false
+  }
+}
 
 /**
  * Skill directories every agent we know about reads.
@@ -261,8 +298,8 @@ const OWNERSHIP_MARKER = '<!-- installed by runbrowser -->'
 function skillTargets(global: boolean): string[] {
   const base = global ? os.homedir() : process.cwd()
   return [
-    path.join(base, '.claude', 'skills', 'runbrowser'),
-    path.join(base, '.agents', 'skills', 'runbrowser'),
+    path.join(base, '.claude', 'skills', 'termio-browser'),
+    path.join(base, '.agents', 'skills', 'termio-browser'),
   ]
 }
 
@@ -298,50 +335,54 @@ registerBuiltinCommand({
     if (action === 'install') {
       const source = packageFile('agent-skill.md')
       if (!source) throw new Error('agent-skill.md is missing from this install')
-      const body = fs.readFileSync(source, 'utf-8').trimEnd() + `\n\n${OWNERSHIP_MARKER}\n`
+      const body = fs.readFileSync(source, 'utf-8')
+      const hash = sha256(body)
+      const state = readInstallState()
 
       const installed: string[] = []
       for (const dir of skillTargets(global)) {
         const target = path.join(dir, 'SKILL.md')
         if (fs.existsSync(target)) {
-          const existing = fs.readFileSync(target, 'utf-8')
-          if (!existing.includes(OWNERSHIP_MARKER)) {
-            console.error(
-              pc.yellow(`skipped ${target} — not ours, leaving it alone. Remove it to reinstall.`),
-            )
+          if (!isOursAndUnmodified(target, state)) {
+            const why = state[target] ? 'you have edited it' : 'we did not write it'
+            console.error(pc.yellow(`skipped ${target} — ${why}. Remove it to reinstall.`))
             continue
           }
-          if (existing === body) {
+          if (state[target] === hash) {
             console.log(pc.dim(`unchanged ${target}`))
             continue
           }
         }
         fs.mkdirSync(dir, { recursive: true })
         fs.writeFileSync(target, body, 'utf-8')
+        state[target] = hash
         installed.push(target)
       }
 
+      writeInstallState(state)
       for (const p of installed) console.log(pc.green(`✓ ${p}`))
       if (installed.length === 0) console.log('Already up to date.')
       return
     }
 
     if (action === 'uninstall') {
+      const state = readInstallState()
       let removed = 0
       for (const dir of skillTargets(global)) {
         const target = path.join(dir, 'SKILL.md')
         if (!fs.existsSync(target)) continue
-        if (!fs.readFileSync(target, 'utf-8').includes(OWNERSHIP_MARKER)) {
-          console.error(pc.yellow(`skipped ${target} — not ours, leaving it alone.`))
+        if (!isOursAndUnmodified(target, state)) {
+          const why = state[target] ? 'you have edited it' : 'we did not write it'
+          console.error(pc.yellow(`skipped ${target} — ${why}.`))
           continue
         }
         fs.rmSync(target)
-        // Only remove the directory if installing it is all that ever put
-        // anything there.
+        delete state[target]
         if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
         console.log(pc.green(`✓ removed ${target}`))
         removed++
       }
+      writeInstallState(state)
       if (removed === 0) console.log('Nothing installed.')
       return
     }

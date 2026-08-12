@@ -1,16 +1,16 @@
 {
-  "name": "runbrowser-root",
+  "name": "termio-browser-root",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @jiweiyuan/runbrowser-server build && pnpm --filter @jiweiyuan/runbrowser-mcp --filter @jiweiyuan/runbrowser build",
+    "build": "pnpm --filter @termio/browser-server build && pnpm --filter @termio/browser-mcp --filter @termio/browser build",
     "build:extension": "pnpm --filter mcp-extension build",
     "dev:extension": "pnpm --filter mcp-extension dev",
     "build:all": "pnpm run build && pnpm run build:extension",
-    "typecheck": "pnpm --filter @jiweiyuan/runbrowser-server typecheck && pnpm --filter @jiweiyuan/runbrowser-mcp typecheck && pnpm --filter @jiweiyuan/runbrowser typecheck",
-    "test": "pnpm --filter @jiweiyuan/runbrowser test",
-    "publish:all": "pnpm run build && pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks && pnpm --filter @jiweiyuan/runbrowser-mcp publish --no-git-checks && pnpm --filter @jiweiyuan/runbrowser publish --no-git-checks"
+    "typecheck": "pnpm --filter @termio/browser-server typecheck && pnpm --filter @termio/browser-mcp typecheck && pnpm --filter @termio/browser typecheck",
+    "test": "pnpm --filter @termio/browser test",
+    "publish:all": "pnpm run build && pnpm --filter @termio/browser-server publish --no-git-checks && pnpm --filter @termio/browser-mcp publish --no-git-checks && pnpm --filter @termio/browser publish --no-git-checks"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

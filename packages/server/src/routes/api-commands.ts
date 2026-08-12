@@ -81,12 +81,15 @@ export function registerApiCommandRoutes(app: Hono, ctx: ServerContext) {
     handler: async (exec, { url }) => exec.newTab(url),
   })
 
+  // Addressed by target id, not list position: Target.getTargets makes no
+  // ordering guarantee, so an index captured in one call can name a different
+  // tab in the next. The CLI resolves index -> targetId for humans.
   commandRoute(app, ctx, '/api/tab/switch', {
-    required: ['index'],
-    handler: async (exec, { index }) => exec.switchTab(index).then(() => ({ success: true })),
+    required: ['targetId'],
+    handler: async (exec, { targetId }) => exec.switchTab(targetId).then(() => ({ success: true })),
   })
 
   commandRoute(app, ctx, '/api/tab/close', {
-    handler: async (exec, { index }) => exec.closeTab(index).then(() => ({ success: true })),
+    handler: async (exec, { targetId }) => exec.closeTab(targetId).then(() => ({ success: true })),
   })
 }

@@ -11,9 +11,8 @@ name: Publish to npm
 #
 # once `pnpm run typecheck` passes and `runbrowser cdp` works against a browser.
 #
-# The packages also still carry the @jiweiyuan scope while the project moves to
-# @termio; rename them and this file together, in one release, rather than
-# leaving the two scopes half-migrated.
+# Packages are now @termio/*; the pre-rename @jiweiyuan/runbrowser* packages on
+# npm are stale and should be deprecated pointing here once this publishes.
 on:
   workflow_dispatch:
 
@@ -56,17 +55,17 @@ jobs:
       - name: Run tests
         run: pnpm run test
 
-      - name: Publish @jiweiyuan/runbrowser-server
-        run: pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks --access public
+      - name: Publish @termio/browser-server
+        run: pnpm --filter @termio/browser-server publish --no-git-checks --access public
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      - name: Publish @jiweiyuan/runbrowser-mcp
-        run: pnpm --filter @jiweiyuan/runbrowser-mcp publish --no-git-checks --access public
+      - name: Publish @termio/browser-mcp
+        run: pnpm --filter @termio/browser-mcp publish --no-git-checks --access public
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      - name: Publish @jiweiyuan/runbrowser
-        run: pnpm --filter @jiweiyuan/runbrowser publish --no-git-checks --access public
+      - name: Publish @termio/browser
+        run: pnpm --filter @termio/browser publish --no-git-checks --access public
         env:
           NPM_CONFIG_PROVENANCE: true

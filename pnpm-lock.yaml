@@ -14,7 +14,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@jiweiyuan/runbrowser-server':
+      '@termio/browser-server':
         specifier: workspace:*
         version: link:../server
       picocolors:
@@ -30,12 +30,12 @@ importers:
 
   packages/e2e:
     devDependencies:
-      '@jiweiyuan/runbrowser-server':
-        specifier: workspace:*
-        version: link:../server
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.2
         version: 1.27.1(zod@4.3.6)
+      '@termio/browser-server':
+        specifier: workspace:*
+        version: link:../server
       '@types/node':
         specifier: ^24.10.1
         version: 24.11.0
@@ -60,7 +60,7 @@ importers:
 
   packages/extension:
     dependencies:
-      '@jiweiyuan/runbrowser-server':
+      '@termio/browser-server':
         specifier: workspace:*
         version: link:../server
       zustand:
@@ -88,12 +88,12 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@jiweiyuan/runbrowser-server':
-        specifier: workspace:*
-        version: link:../server
       '@modelcontextprotocol/sdk':
         specifier: ^1.25.2
         version: 1.27.1(zod@4.3.6)
+      '@termio/browser-server':
+        specifier: workspace:*
+        version: link:../server
       cac:
         specifier: ^6.7.14
         version: 6.7.14

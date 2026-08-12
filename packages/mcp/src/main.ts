@@ -15,8 +15,8 @@ const cli = cac('runbrowser-mcp')
 
 cli
   .command('', 'Start the RunBrowser MCP server')
-  .option('--host <host>', 'Remote relay server host to connect to (or use RUNBROWSER_HOST env var)')
-  .option('--token <token>', 'Authentication token (or use RUNBROWSER_TOKEN env var)')
+  .option('--host <host>', 'Remote relay server host to connect to (or use TERMIO_BROWSER_HOST env var)')
+  .option('--token <token>', 'Authentication token (or use TERMIO_BROWSER_TOKEN env var)')
   .action(async (options: { host?: string; token?: string }) => {
     await startMcp({
       host: options.host,

@@ -16,9 +16,9 @@ export function printMainHelp(
   builtinCommands: CommandDef[],
   siteCommands: CommandDef[],
 ) {
-  console.log(`${pc.bold('runbrowser')} v${version} — Control your running Chrome browser`)
+  console.log(`${pc.bold('termio-browser')} v${version} — Control your running Chrome browser`)
   console.log()
-  console.log(`${pc.bold('Usage:')} runbrowser <command> [options]`)
+  console.log(`${pc.bold('Usage:')} termio-browser <command> [options]`)
   console.log()
 
   // Group built-in commands by category
@@ -83,11 +83,11 @@ export function printMainHelp(
   printFlags(GLOBAL_FLAGS)
   console.log()
   console.log(pc.bold('Everything else is CDP:'))
-  console.log(`  ${pc.dim('runbrowser cdp Page.navigate \'{"url":"https://example.com"}\'')}`)
-  console.log(`  ${pc.dim("runbrowser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value==\"button\")'")}`)
-  console.log(`  ${pc.dim('runbrowser cdp Page.captureScreenshot | jq -r .data | base64 -d > shot.png')}`)
+  console.log(`  ${pc.dim('termio-browser cdp Page.navigate \'{"url":"https://example.com"}\'')}`)
+  console.log(`  ${pc.dim("termio-browser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value==\"button\")'")}`)
+  console.log(`  ${pc.dim('termio-browser cdp Page.captureScreenshot | jq -r .data | base64 -d > shot.png')}`)
   console.log()
-  console.log(`Run ${pc.cyan('runbrowser <command> --help')} for detailed help on any command.`)
+  console.log(`Run ${pc.cyan('termio-browser <command> --help')} for detailed help on any command.`)
 }
 
 // ============================================================================
@@ -152,7 +152,7 @@ export function printCommandHelp(
 // ============================================================================
 
 function buildUsageLine(cmd: CommandDef): string {
-  let line = `runbrowser ${cmd.name}`
+  let line = `termio-browser ${cmd.name}`
   if (cmd.positionals?.length) {
     for (const p of cmd.positionals) {
       const label = p.variadic ? `${p.name}..` : p.name

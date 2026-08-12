@@ -13,7 +13,7 @@ import { VERSION, sleep, LOG_FILE_PATH } from './utils.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-export const RELAY_PORT = Number(process.env.RUNBROWSER_PORT) || 19988
+export const RELAY_PORT = Number(process.env.TERMIO_BROWSER_PORT) || 19988
 
 export type ExtensionStatus = {
   extensionId: string
@@ -173,8 +173,8 @@ export function compareVersions(v1: string, v2: string): number {
 }
 
 /**
- * Check if the running runbrowser package is older than the version the extension was built with.
- * The extension bundles the runbrowser version at build time. If the extension reports a newer
+ * Check if the running termio-browser package is older than the version the extension was built with.
+ * The extension bundles the termio-browser version at build time. If the extension reports a newer
  * version, it means the user's CLI/MCP needs updating.
  * Returns a warning message if outdated, null otherwise.
  */
@@ -183,7 +183,7 @@ export function getExtensionOutdatedWarning(extensionRunbrowserVersion: string |
     return null
   }
   if (compareVersions(extensionRunbrowserVersion, VERSION) > 0) {
-    return `RunBrowser ${VERSION} is outdated (extension requires ${extensionRunbrowserVersion}). Run \`npm install -g runbrowser@latest\` or update the runbrowser package in your project.`
+    return `RunBrowser ${VERSION} is outdated (extension requires ${extensionRunbrowserVersion}). Run \`npm install -g runbrowser@latest\` or update the termio-browser package in your project.`
   }
   return null
 }

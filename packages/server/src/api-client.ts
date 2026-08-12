@@ -67,8 +67,8 @@ export class RelayApiClient {
   private logger?: { log: (...args: any[]) => void; error: (...args: any[]) => void }
 
   constructor(options: RelayClientOptions = {}) {
-    this.host = options.host || process.env.RUNBROWSER_HOST || ''
-    this.token = options.token || process.env.RUNBROWSER_TOKEN
+    this.host = options.host || process.env.TERMIO_BROWSER_HOST || ''
+    this.token = options.token || process.env.TERMIO_BROWSER_TOKEN
     this.logger = options.logger
   }
 
@@ -122,7 +122,7 @@ export class RelayApiClient {
       if (isConnectionError) {
         throw new Error(
           `Cannot connect to remote relay server at ${this.host}. ` +
-            `Make sure 'npx -y runbrowser serve' is running on the host machine.`,
+            `Make sure 'npx -y termio-browser serve' is running on the host machine.`,
         )
       }
       throw new Error(`Failed to connect to remote relay server: ${error.message}`)
@@ -382,16 +382,16 @@ export class RelayApiClient {
     return this.post('/api/tab/list', { sessionId })
   }
 
-  async newTab(sessionId: string, url?: string): Promise<{ index: number; targetId: string }> {
+  async newTab(sessionId: string, url?: string): Promise<{ targetId: string; url: string }> {
     return this.post('/api/tab/new', { sessionId, url })
   }
 
-  async switchTab(sessionId: string, index: number): Promise<void> {
-    await this.post('/api/tab/switch', { sessionId, index })
+  async switchTab(sessionId: string, targetId: string): Promise<void> {
+    await this.post('/api/tab/switch', { sessionId, targetId })
   }
 
-  async closeTab(sessionId: string, index?: number): Promise<void> {
-    await this.post('/api/tab/close', { sessionId, index })
+  async closeTab(sessionId: string, targetId?: string): Promise<void> {
+    await this.post('/api/tab/close', { sessionId, targetId })
   }
 
   // --------------------------------------------------------------------------

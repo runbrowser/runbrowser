@@ -8,7 +8,7 @@
  *
  * Supports:
  * - Built-in commands: cdp, eval, tab, status, session, ...
- * - Site commands: runbrowser github trending, runbrowser bilibili hot
+ * - Site commands: termio-browser github trending, termio-browser bilibili hot
  * - Extension-registered flags
  */
 
@@ -24,7 +24,7 @@ import {
   RELAY_PORT,
   RelayApiClient,
   readConfig,
-} from '@jiweiyuan/runbrowser-server'
+} from '@termio/browser-server'
 
 import { parseArgs, resolveUnknownFlags, type ParsedArgs, type FlagDef } from './args.js'
 import { printMainHelp, printCommandHelp } from './help.js'
@@ -43,13 +43,13 @@ import { getBuiltinCommand, getAllBuiltinCommands, type SessionResolver } from '
 // Session resolver (shared across commands)
 // ============================================================================
 
-const cliRelayEnv = { RUNBROWSER_AUTO_ENABLE: '1' }
+const cliRelayEnv = { TERMIO_BROWSER_AUTO_ENABLE: '1' }
 
 function createClient(args: ParsedArgs): RelayApiClient {
   const config = readConfig()
   return new RelayApiClient({
-    host: args.host || process.env.RUNBROWSER_HOST || config.host,
-    token: args.token || process.env.RUNBROWSER_TOKEN || config.token,
+    host: args.host || process.env.TERMIO_BROWSER_HOST || config.host,
+    token: args.token || process.env.TERMIO_BROWSER_TOKEN || config.token,
     logger: console,
   })
 }
@@ -63,8 +63,8 @@ const resolveSession: SessionResolver = async (args) => {
     return { sessionId: String(args.session), client }
   }
   // Env var
-  if (process.env.RUNBROWSER_SESSION) {
-    return { sessionId: process.env.RUNBROWSER_SESSION, client }
+  if (process.env.TERMIO_BROWSER_SESSION) {
+    return { sessionId: process.env.TERMIO_BROWSER_SESSION, client }
   }
 
   // Auto-session: try to reuse existing, or create new
@@ -80,7 +80,7 @@ const resolveSession: SessionResolver = async (args) => {
     extensions = await client.waitForExtensions({ timeoutMs: 10000, pollIntervalMs: 250 })
   }
   if (extensions.length === 0) {
-    console.error('No connected browsers. Click the RunBrowser extension icon.')
+    console.error('No connected browsers. Click the termio browser extension icon.')
     process.exit(1)
   }
   const ext = extensions[0]
@@ -111,8 +111,8 @@ async function main() {
     if (args.help) {
       printMainHelp(VERSION, getAllBuiltinCommands(), [])
     } else {
-      console.log(`runbrowser v${VERSION}`)
-      console.log(`Run ${pc.cyan('runbrowser --help')} to see available commands.`)
+      console.log(`termio-browser v${VERSION}`)
+      console.log(`Run ${pc.cyan('termio-browser --help')} to see available commands.`)
     }
     process.exit(0)
   }
@@ -156,7 +156,7 @@ async function main() {
     return
   }
 
-  // ── Try custom command: `runbrowser <site> <name>` ──
+  // ── Try custom command: `termio-browser <site> <name>` ──
   if (args.subcommand) {
     const site = args.command!
     const name = args.subcommand
@@ -187,7 +187,7 @@ async function main() {
 
   // ── Unknown command ──
   console.error(`Unknown command: ${args.command}`)
-  console.error(`Run ${pc.cyan('runbrowser --help')} to see available commands.`)
+  console.error(`Run ${pc.cyan('termio-browser --help')} to see available commands.`)
   process.exit(1)
 }
 

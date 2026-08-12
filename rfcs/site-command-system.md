@@ -9,9 +9,9 @@
 
 ## 1. Motivation
 
-RunBrowser controls browsers. But agents often need **structured data** from websites — trending repos, hot posts, search results. Today they must: navigate → snapshot → parse text → extract data. This is slow, fragile, and wastes tokens.
+termio browser controls browsers. But agents often need **structured data** from websites — trending repos, hot posts, search results. Today they must: navigate → snapshot → parse text → extract data. This is slow, fragile, and wastes tokens.
 
-Site commands let users write `.ts` files that encapsulate this: `runbrowser github trending --limit 5` returns clean JSON.
+Site commands let users write `.ts` files that encapsulate this: `termio-browser github trending --limit 5` returns clean JSON.
 
 ---
 
@@ -60,7 +60,7 @@ Site commands let users write `.ts` files that encapsulate this: `runbrowser git
 │   └────────────────────────────────────────────────┘    │
 │                        ▲ WebSocket                      │
 │   ┌────────────────────┴───────────────────────────┐    │
-│   │          Chrome + RunBrowser Extension          │    │
+│   │          Chrome + termio browser Extension          │    │
 │   └────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -68,16 +68,16 @@ Site commands let users write `.ts` files that encapsulate this: `runbrowser git
 ### Process Model
 
 ```
-runbrowser serve              ← Relay daemon (long-running, auto-started)
+termio-browser serve              ← Relay daemon (long-running, auto-started)
   ├── WebSocket ↔ Extension   (persistent connection)
   ├── HTTP API :19988         (serves CLI and MCP)
   ├── CDPExecutor sessions    (persists across CLI calls)
   └── Site command executor   (jiti + command registry)
 
-runbrowser navigate <url>     ← CLI (short-lived, exits after result)
+termio-browser navigate <url>     ← CLI (short-lived, exits after result)
   └── HTTP POST → relay → result → stdout → exit
 
-runbrowser github trending    ← CLI (short-lived)
+termio-browser github trending    ← CLI (short-lived)
   └── HTTP POST /api/command/run → relay executes .ts → result → stdout → exit
 ```
 
@@ -126,7 +126,7 @@ The relay server loads commands on demand using [jiti](https://github.com/unjs/j
 
 ```typescript
 // Scans ~/.runbrowser/commands/<site>/<name>.ts
-const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
+const COMMANDS_DIR = path.join(TERMIO_BROWSER_DIR, 'commands')
 
 // List all available commands (for --help, /api/commands)
 function listCustomCommands(): CommandDef[]
@@ -181,7 +181,7 @@ The `run` MCP tool handles site commands as a fallback:
 ## 5. Command Management & Discovery: Full Flow
 
 ```
-$ runbrowser commands list
+$ termio-browser commands list
 Available command packages:
 
   reddit
@@ -190,14 +190,14 @@ Available command packages:
   hackernews
   producthunt
 
-Run runbrowser commands install <package> to install.
+Run termio-browser commands install <package> to install.
 
-$ runbrowser commands install github
+$ termio-browser commands install github
 Installing github...
 ✓ Installed github/
   → ~/.runbrowser/commands/github/trending.ts
 
-$ runbrowser github trending --limit 3
+$ termio-browser github trending --limit 3
 
 RANK  NAME                 STARS   LANGUAGE
 ---   ----                 -----   --------
@@ -205,7 +205,7 @@ RANK  NAME                 STARS   LANGUAGE
 2     tauri-apps/tauri     3.8k    Rust
 3     nickel-org/nickel    2.1k    Rust
 
-$ runbrowser github trending --limit 3 --json
+$ termio-browser github trending --limit 3 --json
 
 [
   { "rank": 1, "name": "denoland/deno", "stars": "5.2k", "language": "Rust" },

@@ -21,9 +21,18 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf-8')
 }
 
-/** True when stdin is a pipe or a file rather than a terminal. */
-function stdinIsPiped(): boolean {
-  return !process.stdin.isTTY
+/**
+ * Read the payload from stdin only when the caller asked for it with `-`.
+ *
+ * Treating "stdin is not a TTY" as "a payload is coming" hangs forever when a
+ * parent process holds an idle pipe open — which is the normal shape of a
+ * command spawned by an agent harness. `cdp Page.captureScreenshot` takes no
+ * params, so it would block waiting for input nobody is going to send.
+ */
+async function payloadFromStdinIfRequested(raw: string | undefined): Promise<string | undefined> {
+  if (raw !== '-') return raw
+  const piped = (await readStdin()).trim()
+  return piped || undefined
 }
 
 // ============================================================================
@@ -34,21 +43,17 @@ registerBuiltinCommand({
   def: {
     name: 'cdp',
     description: 'Send a raw CDP command — the full Chrome DevTools Protocol',
-    usage: "runbrowser cdp <method> [params-json]   (params may also be piped on stdin)",
+    usage: "termio-browser cdp <method> [params-json | -]   (- reads params from stdin)",
     positionals: [
       { name: 'method', description: 'CDP method, e.g. Page.navigate', required: true },
-      { name: 'params', description: 'JSON params object' },
+      { name: 'params', description: "JSON params object, or - to read from stdin" },
     ],
   },
   async execute(args, resolveSession) {
     const method = args.subcommand
-    if (!method) throw new Error('Usage: runbrowser cdp <method> [params-json]')
+    if (!method) throw new Error('Usage: termio-browser cdp <method> [params-json]')
 
-    let raw = args.positionals[0]
-    if (raw == null && stdinIsPiped()) {
-      const piped = (await readStdin()).trim()
-      if (piped) raw = piped
-    }
+    const raw = await payloadFromStdinIfRequested(args.positionals[0])
 
     let params: unknown
     if (raw != null && raw !== '') {
@@ -73,7 +78,7 @@ registerBuiltinCommand({
   def: {
     name: 'eval',
     description: 'Run JavaScript in the page — shorthand for Runtime.evaluate',
-    usage: "runbrowser eval '<js>'   (code may also be piped on stdin)",
+    usage: "termio-browser eval '<js>'   (code may also be piped on stdin)",
     positionals: [
       { name: 'code', description: 'JavaScript to execute', required: true },
     ],
@@ -82,12 +87,14 @@ registerBuiltinCommand({
     },
   },
   async execute(args, resolveSession) {
-    let code = args.subcommand
-    if (!code && stdinIsPiped()) {
+    // `eval` always needs a payload, so bare `termio-browser eval` with something
+    // piped in is unambiguous and reading it is safe. `-` also works.
+    let code = args.subcommand === '-' ? undefined : args.subcommand
+    if (!code && !process.stdin.isTTY) {
       const piped = (await readStdin()).trim()
       if (piped) code = piped
     }
-    if (!code) throw new Error('Usage: runbrowser eval <code>')
+    if (!code) throw new Error("Usage: termio-browser eval <code>   (or pipe it in)")
 
     const timeout = (args.flags.get('timeout') as number) ?? 10000
     const { sessionId, client } = await resolveSession(args)

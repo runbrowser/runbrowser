@@ -4,8 +4,8 @@
  */
 import { describe, test, expect } from 'vitest'
 import type { WSContext } from 'hono/ws'
-import type { Protocol } from '@jiweiyuan/runbrowser-server/types'
-import * as relayState from '@jiweiyuan/runbrowser-server'
+import type { Protocol } from '@termio/browser-server/types'
+import * as relayState from '@termio/browser-server'
 
 // ---------------------------------------------------------------------------
 // Helpers

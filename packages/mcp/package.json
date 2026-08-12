@@ -1,5 +1,5 @@
 {
-  "name": "@jiweiyuan/runbrowser-mcp",
+  "name": "@termio/browser-mcp",
   "version": "0.0.5",
   "description": "MCP server for RunBrowser — control your running Chrome browser via Playwright",
   "type": "module",
@@ -39,7 +39,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@jiweiyuan/runbrowser-server": "workspace:*",
+    "@termio/browser-server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "cac": "^6.7.14",
     "zod": "^4.3.5"

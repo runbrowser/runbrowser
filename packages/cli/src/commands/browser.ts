@@ -14,7 +14,7 @@ import {
   RelayApiClient,
   isPortInUse,
   readConfig,
-} from '@jiweiyuan/runbrowser-server'
+} from '@termio/browser-server'
 
 // ============================================================================
 // status
@@ -27,10 +27,10 @@ registerBuiltinCommand({
   },
   async execute(args) {
     const config = readConfig()
-    const host = (args.host || process.env.RUNBROWSER_HOST || config.host) as string | undefined
+    const host = (args.host || process.env.TERMIO_BROWSER_HOST || config.host) as string | undefined
     const client = new RelayApiClient({
       host,
-      token: (args.token || process.env.RUNBROWSER_TOKEN || config.token) as string | undefined,
+      token: (args.token || process.env.TERMIO_BROWSER_TOKEN || config.token) as string | undefined,
       logger: console,
     })
 
@@ -40,7 +40,7 @@ registerBuiltinCommand({
     if (!serverUp) {
       const state = { server: false, extensions: [], sessions: [] }
       if (args.json) { console.log(JSON.stringify(state)); process.exit(1) }
-      console.log(`server:     ${pc.red('not running')} (start it with \`runbrowser serve\`)`)
+      console.log(`server:     ${pc.red('not running')} (start it with \`termio-browser serve\`)`)
       process.exit(1)
     }
 
@@ -55,7 +55,7 @@ registerBuiltinCommand({
 
     console.log(`server:     ${pc.green('running')} on port ${RELAY_PORT}`)
     if (extensions.length === 0) {
-      console.log(`extension:  ${pc.red('not connected')} — click the RunBrowser icon on a tab`)
+      console.log(`extension:  ${pc.red('not connected')} — click the termio browser icon on a tab`)
     } else {
       for (const e of extensions) {
         const who = e.profile?.email || '(not signed in)'
@@ -93,11 +93,13 @@ registerBuiltinCommand({
     const { sessionId, client } = await resolveSession(args)
     const cmd = args.subcommand || 'list'
 
-    // A bare number switches to that tab: `runbrowser tab 2`.
-    const index = Number(cmd)
-    if (!Number.isNaN(index)) {
-      await client.switchTab(sessionId, index)
-      ok(`Switched to tab ${index}`, args.json)
+    // A bare number switches to that tab: `termio-browser tab 2`. Indexes are a
+    // convenience for humans only — they are resolved to a target id here,
+    // because Target.getTargets guarantees no ordering and the number could
+    // name a different tab by the time the server saw it.
+    const asIndex = Number(cmd)
+    if (!Number.isNaN(asIndex)) {
+      await switchToIndex(client, sessionId, asIndex, args.json)
       return
     }
 
@@ -114,14 +116,30 @@ registerBuiltinCommand({
       case 'new': {
         const url = args.positionals[0]
         const result = await client.newTab(sessionId, url)
-        if (args.json) output({ index: result.index }, true)
-        else console.log(`Opened tab ${result.index}${url ? ` at ${url}` : ''}`)
+        if (args.json) output({ targetId: result.targetId }, true)
+        else console.log(`Opened and bound to a new tab${url ? ` at ${url}` : ''}`)
+        break
+      }
+      case 'switch': {
+        const target = args.positionals[0]
+        if (!target) throw new Error('Usage: termio-browser tab switch <index|targetId>')
+        const asNum = Number(target)
+        if (!Number.isNaN(asNum)) await switchToIndex(client, sessionId, asNum, args.json)
+        else {
+          await client.switchTab(sessionId, target)
+          ok(`Switched to ${target}`, args.json)
+        }
         break
       }
       case 'close': {
-        const target = args.positionals[0] ? Number(args.positionals[0]) : undefined
-        await client.closeTab(sessionId, target)
-        ok(`Closed tab${target != null ? ` ${target}` : ''}`, args.json)
+        const target = args.positionals[0]
+        let targetId: string | undefined
+        if (target) {
+          const asNum = Number(target)
+          targetId = Number.isNaN(asNum) ? target : await resolveIndex(client, sessionId, asNum)
+        }
+        await client.closeTab(sessionId, targetId)
+        ok('Closed tab', args.json)
         break
       }
       default:
@@ -129,3 +147,26 @@ registerBuiltinCommand({
     }
   },
 })
+
+/** Resolve a human-facing tab index to the stable target id behind it. */
+async function resolveIndex(
+  client: RelayApiClient,
+  sessionId: string,
+  index: number,
+): Promise<string> {
+  const { tabs } = await client.listTabs(sessionId)
+  const tab = tabs[index]
+  if (!tab) throw new Error(`No tab at index ${index} (${tabs.length} open)`)
+  return tab.targetId
+}
+
+async function switchToIndex(
+  client: RelayApiClient,
+  sessionId: string,
+  index: number,
+  json?: boolean,
+): Promise<void> {
+  const targetId = await resolveIndex(client, sessionId, index)
+  await client.switchTab(sessionId, targetId)
+  ok(`Switched to tab ${index}`, json)
+}

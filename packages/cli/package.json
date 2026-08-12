@@ -1,5 +1,5 @@
 {
-  "name": "@jiweiyuan/runbrowser",
+  "name": "@termio/browser",
   "version": "0.0.8",
   "description": "Control your running Chrome browser via Playwright — your logins, extensions, cookies already there",
   "type": "module",
@@ -7,7 +7,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "runbrowser": "./bin.js"
+    "termio-browser": "./bin.js"
   },
   "scripts": {
     "build": "tsc",
@@ -41,7 +41,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@jiweiyuan/runbrowser-server": "workspace:*",
+    "@termio/browser-server": "workspace:*",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
