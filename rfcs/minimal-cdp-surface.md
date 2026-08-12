@@ -74,6 +74,34 @@ serve them.
 @e5` to consume them, so the snapshot layer went with the verbs rather than
 being kept half-alive.
 
+## The pole this does not occupy
+
+`remorses/playwriter` — which this project began as a fork of — is neither a
+verb layer nor raw CDP. It runs **real Playwright** in a stateful sandbox, so
+the agent writes `await page.locator('aria-ref=e5').click()`.
+
+The argument above does not dispose of that, and it is worth being explicit
+rather than quietly claiming the minimal design wins on every axis:
+
+- Playwright is **not a vocabulary we invented.** It is a de facto standard with
+  more training-data presence than raw CDP calls.
+- `page.click()` is not a naive wrapper around `Input.dispatchMouseEvent` — it
+  is auto-waiting plus actionability checks (visible, stable, enabled, receives
+  events) refined over years. `skill.md` now describes those steps in prose,
+  which is a hand-written, unverified reimplementation of them.
+- `aria-ref` handles are real grounding, and `waitForResponse` / `Promise.all`
+  are the event-driven waiting this design does not have at all.
+
+So on ergonomics, playwriter is ahead. What this design buys instead is
+dependency-freedom: no Node runtime, and no dependency on
+`@xmorse/playwright-core` — a **fork** of playwright-core, because driving a
+browser through an extension relay needs patches upstream does not carry.
+
+That trade is right for a host that ships no JavaScript runtime. It is not
+obviously right for a standalone CLI, where Node is already present. If this
+ever ships as a portable tool for non-termio agents, revisit it — the honest
+comparison is against playwriter, not against the verb layer that was removed.
+
 ## What was deliberately kept
 
 - **`eval`.** It is `Runtime.evaluate` with the result marshalled to text.
