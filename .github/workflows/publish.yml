@@ -1,9 +1,20 @@
 name: Publish to npm
 
+# Publishing is manual for now.
+#
+# The tag trigger is deliberately absent: `packages/server` does not compile and
+# session creation returns HTTP 400, so a `v*` tag would publish a CLI whose
+# main verbs cannot work. Re-add
+#
+#   push:
+#     tags: ['v*']
+#
+# once `pnpm run typecheck` passes and `runbrowser cdp` works against a browser.
+#
+# The packages also still carry the @jiweiyuan scope while the project moves to
+# @termio; rename them and this file together, in one release, rather than
+# leaving the two scopes half-migrated.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -33,6 +44,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Typecheck before build so a compile failure stops the run here, with a
+      # readable error, rather than surfacing as a broken artifact on npm. tsc
+      # emits output even when it reports errors, so `build` alone is not a gate.
+      - name: Typecheck
+        run: pnpm run typecheck
+
       - name: Build all packages
         run: pnpm run build
 
@@ -41,11 +58,6 @@ jobs:
 
       - name: Publish @jiweiyuan/runbrowser-server
         run: pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks --access public
-        env:
-          NPM_CONFIG_PROVENANCE: true
-
-      - name: Publish @jiweiyuan/runbrowser-core
-        run: pnpm --filter @jiweiyuan/runbrowser-core publish --no-git-checks --access public
         env:
           NPM_CONFIG_PROVENANCE: true
 
