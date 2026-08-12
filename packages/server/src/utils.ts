@@ -57,10 +57,11 @@ export function getCdpUrl({
   return `${wsBaseUrl}/cdp/${id}${suffix}`
 }
 
-// State directory. Each OS user gets their own, which avoids permission errors
-// on shared machines.
+// State directory, nested under termio's own so the browser layer does not
+// claim a second top-level dotfolder. Per-OS-user, which avoids permission
+// errors on shared machines.
 export const TERMIO_BROWSER_DIR =
-  process.env.TERMIO_BROWSER_DIR || path.join(os.homedir(), '.termio-browser')
+  process.env.TERMIO_BROWSER_DIR || path.join(os.homedir(), '.termio', 'browser')
 
 
 const LOG_BASE_DIR = TERMIO_BROWSER_DIR

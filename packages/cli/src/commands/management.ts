@@ -298,8 +298,8 @@ function isOursAndUnmodified(target: string, state: Record<string, string>): boo
 function skillTargets(global: boolean): string[] {
   const base = global ? os.homedir() : process.cwd()
   return [
-    path.join(base, '.claude', 'skills', 'termio-browser'),
-    path.join(base, '.agents', 'skills', 'termio-browser'),
+    path.join(base, '.claude', 'skills', 'browser'),
+    path.join(base, '.agents', 'skills', 'browser'),
   ]
 }
 

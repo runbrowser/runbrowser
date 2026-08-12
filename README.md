@@ -252,8 +252,8 @@ packages/
 
 ```bash
 termio-browser logfile  # prints log file paths
-# relay: ~/.termio-browser/relay-server.log
-# cdp:   ~/.termio-browser/cdp.jsonl
+# relay: ~/.termio/browser/relay-server.log
+# cdp:   ~/.termio/browser/cdp.jsonl
 ```
 
 | Problem | Fix |

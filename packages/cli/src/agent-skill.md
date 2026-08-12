@@ -1,5 +1,5 @@
 ---
-name: termio-browser
+name: browser
 description: Drive the user's own Chrome — their tabs, logins and cookies — over the Chrome DevTools Protocol, via the `termio-browser` CLI. Use this instead of browser automation that spawns a fresh Chrome, and instead of webfetch/curl for JS-heavy or login-walled pages (Instagram, X, dashboards, lazy-loaded UIs). Run `termio-browser skill` for the full reference.
 ---
 
