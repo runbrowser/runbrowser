@@ -1,17 +1,15 @@
 {
   "name": "@termio/browser-mcp",
   "version": "0.1.0",
-  "description": "MCP server for RunBrowser \u2014 control your running Chrome browser via Playwright",
+  "description": "MCP server for RunBrowser — control your running Chrome browser via Playwright",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "bin": "./bin.js",
   "scripts": {
-    "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist",
     "src",
     "bin.js",
     "README.md"
@@ -36,15 +34,16 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18"
+    "bun": ">=1.3.0"
   },
   "dependencies": {
-    "@termio/browser-server": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
+    "@termio/browser-server": "workspace:*",
     "cac": "^6.7.14",
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.14",
     "@types/node": "^24.10.1",
     "typescript": "^5.9.3"
   }

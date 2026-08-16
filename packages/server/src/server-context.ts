@@ -7,7 +7,6 @@
 
 import type { EventEmitter } from 'node:events'
 import type { StoreApi } from 'zustand/vanilla'
-import type { WSContext } from 'hono/ws'
 import type { Protocol } from './cdp-types.js'
 import type { CDPCommand, CDPResponseBase, CDPEventBase, RelayServerEvents } from './cdp-types.js'
 import type { CdpLogEntry, CdpLogger } from './cdp-log.js'

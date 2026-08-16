@@ -2,14 +2,15 @@
  * Custom command loader.
  *
  * Loads user-defined commands from ~/.runbrowser/commands/<site>/<name>.ts
- * Uses jiti to support TypeScript files directly — no build step needed.
+ * TypeScript is imported directly — the runtime transpiles it, no build step
+ * and no loader dependency.
  *
  * Example: ~/.runbrowser/commands/reddit/hot.ts
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { createJiti } from 'jiti'
+import { pathToFileURL } from 'node:url'
 import { TERMIO_BROWSER_DIR } from './utils.js'
 
 const COMMANDS_DIR = path.join(TERMIO_BROWSER_DIR, 'commands')
@@ -44,14 +45,27 @@ export interface CommandContext {
   wait: (ms: number) => Promise<void>
 }
 
-const jiti = createJiti(import.meta.url, {
-  interopDefault: true,
-})
+/**
+ * Import a command module.
+ *
+ * The URL carries the file's mtime because ESM caches a specifier for the life
+ * of the process. Without it, a command the user just edited keeps running its
+ * previous version until the server restarts — which is the whole point of
+ * keeping these as loose files.
+ */
+async function importCommand(filePath: string): Promise<CommandModule> {
+  const { mtimeMs } = fs.statSync(filePath)
+  const specifier = `${pathToFileURL(filePath).href}?v=${mtimeMs}`
+  const namespace = (await import(specifier)) as CommandModule & { default?: CommandModule }
+
+  // A command may export its members individually or as a default object.
+  return typeof namespace.run === 'function' ? namespace : (namespace.default ?? namespace)
+}
 
 /**
  * List all available custom commands by scanning ~/.runbrowser/commands/.
  */
-export function listCustomCommands(): CommandDef[] {
+export async function listCustomCommands(): Promise<CommandDef[]> {
   const commands: CommandDef[] = []
 
   if (!fs.existsSync(COMMANDS_DIR)) {
@@ -70,7 +84,7 @@ export function listCustomCommands(): CommandDef[] {
     for (const file of files) {
       const name = path.basename(file, path.extname(file))
       try {
-        const mod = jiti(path.join(siteDir, file)) as CommandModule
+        const mod = await importCommand(path.join(siteDir, file))
         commands.push({
           site,
           name,
@@ -90,7 +104,7 @@ export function listCustomCommands(): CommandDef[] {
 /**
  * Load a command module by site and name.
  */
-export function loadCommand(site: string, name: string): CommandModule | null {
+export async function loadCommand(site: string, name: string): Promise<CommandModule | null> {
   const candidates = [
     path.join(COMMANDS_DIR, site, `${name}.ts`),
     path.join(COMMANDS_DIR, site, `${name}.js`),
@@ -99,7 +113,7 @@ export function loadCommand(site: string, name: string): CommandModule | null {
 
   for (const filePath of candidates) {
     if (fs.existsSync(filePath)) {
-      const mod = jiti(filePath) as CommandModule
+      const mod = await importCommand(filePath)
       if (typeof mod.run !== 'function') {
         throw new Error(`Command ${site}/${name} must export a run() function`)
       }

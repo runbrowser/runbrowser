@@ -1,2 +1,2 @@
-#!/usr/bin/env node
-import './dist/start.js'
+#!/usr/bin/env bun
+import "./src/start.ts"

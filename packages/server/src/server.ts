@@ -1,40 +1,31 @@
 /**
  * CDP Relay Server — composition root.
  *
- * Creates the ServerContext and assembles all route handlers.
+ * Creates the ServerContext and assembles the route table.
  * No business logic lives here — only wiring.
  */
 
-import { Hono } from 'hono'
-import { cors } from 'hono/cors'
-import { serve } from '@hono/node-server'
-
-import { createNodeWebSocket } from '@hono/node-ws'
 import { EventEmitter } from 'node:events'
 import util from 'node:util'
 import pc from 'picocolors'
 
 import type { Protocol } from './cdp-types.js'
-import type { CDPCommand, CDPResponseBase, CDPEventBase } from './cdp-types.js'
+import type { CDPEventBase } from './cdp-types.js'
 import type { ServerContext, Logger } from './server-context.js'
 import { logCdpMessage } from './server-context.js'
 import { isRestrictedTarget } from './target-filter.js'
 import { createCdpLogger, type CdpLogEntry, type CdpLogger } from './cdp-log.js'
 import { CDPExecutorManager } from './cdp-executor-manager.js'
-import { CDPExecutor } from './cdp-executor.js'
 import * as relayState from './state.js'
-import { VERSION, EXTENSION_IDS } from './utils.js'
+import { createPrivilegedGuard, withCorsRoutes, wrapRoutes, type Routes } from './http.js'
 
 // Routes
-import { registerCdpDiscoveryRoutes } from './routes/cdp-discovery.js'
-import { registerApiCommandRoutes } from './routes/api-commands.js'
-import { registerApiSessionRoutes } from './routes/api-sessions.js'
-import { registerApiCustomCommandRoutes } from './routes/api-custom-commands.js'
-import { registerExtensionWsRoute } from './routes/extension-ws.js'
-import { registerPlaywrightWsRoute } from './routes/playwright-ws.js'
-import { createPrivilegedMiddleware } from './middleware/privileged.js'
-
-
+import { cdpDiscoveryRoutes } from './routes/cdp-discovery.js'
+import { apiCommandRoutes } from './routes/api-commands.js'
+import { apiSessionRoutes } from './routes/api-sessions.js'
+import { apiCustomCommandRoutes } from './routes/api-custom-commands.js'
+import { extensionSocketHandlers, extensionUpgradeRoute } from './routes/extension-ws.js'
+import { playwrightSocketHandlers, playwrightUpgradeRoute } from './routes/playwright-ws.js'
 
 // Prevent Buffers from dumping hex bytes in util.inspect output.
 Buffer.prototype[util.inspect.custom] = function () {
@@ -446,9 +437,7 @@ export async function startRunBrowserCDPRelayServer({
       const ext = store.getState().extensions.get(extensionId)
       if (!ext?.pingInterval) return
       clearInterval(ext.pingInterval)
-      store.setState((s) =>
-        relayState.updateExtensionIO(s, { extensionId, pingInterval: null }),
-      )
+      store.setState((s) => relayState.updateExtensionIO(s, { extensionId, pingInterval: null }))
     },
 
     getPageTargetForFrameId({ extensionState, frameId }) {
@@ -460,7 +449,6 @@ export async function startRunBrowserCDPRelayServer({
     // Executor manager (initialized immediately after ctx creation)
     executorManager: undefined!,
     getCDPExecutor: undefined!,
-
   }
 
   // ========================================================================
@@ -486,49 +474,61 @@ export async function startRunBrowserCDPRelayServer({
   }
 
   // ========================================================================
-  // Hono app
+  // Route table
   // ========================================================================
 
-  const app = new Hono()
+  const guard = createPrivilegedGuard({ token, logger })
 
-  // CORS middleware — only allows our specific extension IDs
-  app.use(
-    '*',
-    cors({
-      origin: (origin) => {
-        if (!origin.startsWith('chrome-extension://')) return null
-        const extensionId = origin.replace('chrome-extension://', '')
-        if (!EXTENSION_IDS.includes(extensionId)) return null
-        return origin
-      },
-      allowMethods: ['GET', 'POST', 'HEAD', 'OPTIONS'],
-    }),
-  )
+  const publicRoutes: Routes = {
+    ...cdpDiscoveryRoutes(ctx),
+    // /cdp carries no client id in the discovery URL, so both shapes are
+    // registered: Bun has no optional path parameter.
+    '/cdp': playwrightUpgradeRoute(ctx),
+    '/cdp/:clientId': playwrightUpgradeRoute(ctx),
+    '/extension': extensionUpgradeRoute(ctx),
+  }
 
-  const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app })
+  const privilegedRoutes: Routes = {
+    ...apiSessionRoutes(ctx),
+    ...apiCommandRoutes(ctx),
+    ...apiCustomCommandRoutes(ctx),
+  }
 
-  // Security middleware for privileged routes
-  const privilegedMiddleware = createPrivilegedMiddleware({ token, logger })
-  app.use('/api/*', privilegedMiddleware)
-  app.use('/recording/*', privilegedMiddleware)
-
-  // ========================================================================
-  // Register all routes
-  // ========================================================================
-
-  registerCdpDiscoveryRoutes(app, ctx)
-  registerPlaywrightWsRoute(app, ctx, upgradeWebSocket)
-  registerExtensionWsRoute(app, ctx, upgradeWebSocket)
-  registerApiSessionRoutes(app, ctx)
-  registerApiCommandRoutes(app, ctx)
-  registerApiCustomCommandRoutes(app, ctx)
+  const routes = withCorsRoutes({ ...publicRoutes, ...wrapRoutes(privilegedRoutes, guard) })
 
   // ========================================================================
   // Start server
   // ========================================================================
 
-  const server = serve({ fetch: app.fetch, port, hostname: host })
-  injectWebSocket(server)
+  const extensionSocket = extensionSocketHandlers(ctx)
+  const playwrightSocket = playwrightSocketHandlers(ctx)
+
+  const server = Bun.serve<relayState.SocketData>({
+    port,
+    hostname: host,
+    routes: routes as never,
+    fetch: () => new Response('Not Found', { status: 404 }),
+    websocket: {
+      open(ws) {
+        if (ws.data.kind === 'extension') extensionSocket.open(ws as relayState.ExtensionSocket)
+        else playwrightSocket.open(ws as relayState.PlaywrightSocket)
+      },
+      message(ws, message) {
+        if (ws.data.kind === 'extension') {
+          extensionSocket.message(ws as relayState.ExtensionSocket, message)
+        } else {
+          void playwrightSocket.message(ws as relayState.PlaywrightSocket, message)
+        }
+      },
+      close(ws, code, reason) {
+        if (ws.data.kind === 'extension') {
+          extensionSocket.close(ws as relayState.ExtensionSocket, code, reason)
+        } else {
+          playwrightSocket.close(ws as relayState.PlaywrightSocket)
+        }
+      },
+    },
+  })
 
   const wsHost = `ws://${host}:${port}`
   logger?.log('CDP relay server started')
@@ -548,7 +548,7 @@ export async function startRunBrowserCDPRelayServer({
         ext.ws?.close(1000, 'Server stopped')
       }
       store.setState({ extensions: new Map(), playwrightClients: new Map() })
-      server.close()
+      server.stop(true)
       emitter.removeAllListeners()
     },
     on(event, listener) {

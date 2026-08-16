@@ -238,14 +238,12 @@ export async function ensureRelayServer(options: EnsureRelayServerOptions = {}):
     logger?.log(pc.dim('CDP relay server not running, starting it...'))
   }
 
-  // Detect if we're running from source (.ts) or compiled (.js)
-  // This handles: tsx, vite-node, ts-node, or direct node on compiled output
-  const isRunningFromSource = __filename.endsWith('.ts')
-  const scriptPath = isRunningFromSource
-    ? path.resolve(__dirname, './start.ts')
-    : path.resolve(__dirname, './start.js')
+  // There is one entrypoint and one interpreter: the runtime executes
+  // TypeScript directly, so there is no build output to detect and no separate
+  // loader to shell out to.
+  const scriptPath = path.resolve(__dirname, './start.ts')
 
-  const serverProcess = spawn(isRunningFromSource ? 'tsx' : process.execPath, [scriptPath], {
+  const serverProcess = spawn(process.execPath, [scriptPath], {
     detached: true,
     stdio: 'ignore',
     env: { ...process.env, ...additionalEnv },

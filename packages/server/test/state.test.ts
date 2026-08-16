@@ -3,9 +3,9 @@
  * Data-in / data-out transitions for the unified extension map.
  */
 import { describe, test, expect } from 'vitest'
-import type { WSContext } from 'hono/ws'
 import type { Protocol } from '@termio/browser-server/types'
-import * as relayState from '@termio/browser-server'
+import * as relayState from '../src/state.js'
+import type { RelaySocket } from '../src/state.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -18,8 +18,8 @@ function emptyState(): relayState.RelayState {
   }
 }
 
-function fakeWs(): WSContext {
-  return {} as WSContext
+function fakeWs(): RelaySocket {
+  return {} as RelaySocket
 }
 
 function makeTargetInfo(overrides: Partial<Protocol.Target.TargetInfo> = {}): Protocol.Target.TargetInfo {
