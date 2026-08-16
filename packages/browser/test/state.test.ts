@@ -2,10 +2,10 @@
  * Unit tests for relay state transitions.
  * Data-in / data-out transitions for the unified extension map.
  */
-import { describe, test, expect } from 'vitest'
-import type { Protocol } from '@termio/browser-server/types'
-import * as relayState from '../src/state.js'
-import type { RelaySocket } from '../src/state.js'
+import { describe, test, expect } from 'bun:test'
+import type { Protocol } from '../src/server/cdp-types.js'
+import * as relayState from '../src/server/state.js'
+import type { RelaySocket } from '../src/server/state.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -541,7 +541,7 @@ describe('store.setState with transitions', () => {
   test('setState updates store atomically', () => {
     const store = relayState.createRelayStore()
 
-    store.setState((s) => {
+    store.setState((s: relayState.RelayState) => {
       return relayState.addExtension(s, { id: 'ext-1', info: { browser: 'Chrome' }, stableKey: 'profile:1', ws: fakeWs() })
     })
 
@@ -551,7 +551,7 @@ describe('store.setState with transitions', () => {
   test('chained transitions compose correctly', () => {
     const store = relayState.createRelayStore()
 
-    store.setState((s) => {
+    store.setState((s: relayState.RelayState) => {
       let next = relayState.addExtension(s, { id: 'ext-1', info: {}, stableKey: 'k1', ws: fakeWs() })
       next = relayState.addTarget(next, {
         extensionId: 'ext-1',

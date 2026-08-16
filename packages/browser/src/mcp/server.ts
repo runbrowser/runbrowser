@@ -5,8 +5,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { VERSION } from '@termio/browser-server'
-import { RelayApiClient } from '@termio/browser-server/api'
+import { VERSION } from '../server/index.js'
+import { RelayApiClient } from '../server/api-client.js'
 
 // ============================================================================
 // Relay API Client
@@ -112,14 +112,8 @@ const server = new McpServer({
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function loadSkillContent(): string {
-  const candidates = [
-    path.join(__dirname, '..', 'src', 'skill.md'),
-    path.join(__dirname, '..', '..', 'src', 'skill.md'),
-    path.join(__dirname, 'skill.md'),
-  ]
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return fs.readFileSync(p, 'utf-8')
-  }
+  const skillPath = path.join(__dirname, 'skill.md')
+  if (fs.existsSync(skillPath)) return fs.readFileSync(skillPath, 'utf-8')
   return 'Skill file not found. Use `termio-browser --help` for available commands.'
 }
 

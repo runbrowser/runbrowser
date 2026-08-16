@@ -6,7 +6,7 @@
  */
 
 import type { CommandDef, ParsedArgs } from '../args.js'
-import type { RelayApiClient } from '@termio/browser-server'
+import type { RelayApiClient } from '../../server/index.js'
 
 // ============================================================================
 // Types

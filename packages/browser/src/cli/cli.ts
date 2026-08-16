@@ -24,7 +24,7 @@ import {
   RELAY_PORT,
   RelayApiClient,
   readConfig,
-} from '@termio/browser-server'
+} from '../server/index.js'
 
 import { parseArgs, resolveUnknownFlags, type ParsedArgs, type FlagDef } from './args.js'
 import { printMainHelp, printCommandHelp } from './help.js'
@@ -36,6 +36,7 @@ import './commands/execution.js'
 import './commands/browser.js'
 import './commands/management.js'
 import './commands/install.js'
+import './commands/mcp.js'
 
 import { getBuiltinCommand, getAllBuiltinCommands, type SessionResolver } from './commands/index.js'
 

@@ -107,7 +107,12 @@ export function writeConfig(config: RunBrowserConfig): void {
   fs.writeFileSync(CONFIG_FILE_PATH, JSON.stringify(config, null, 2) + '\n', 'utf-8')
 }
 
-const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json')
+const packageJsonPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'package.json',
+)
 export const VERSION = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version as string
 
 export function sleep(ms: number): Promise<void> {

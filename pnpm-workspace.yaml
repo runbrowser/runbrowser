@@ -1,9 +1,7 @@
 packages:
-  - packages/cli
+  - packages/browser
   - packages/e2e
   - packages/extension
-  - packages/mcp
-  - packages/server
   - packages/vite-plugin-extension-reload
   - packages/website
 allowBuilds:

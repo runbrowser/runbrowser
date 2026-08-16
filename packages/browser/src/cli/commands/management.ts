@@ -24,7 +24,7 @@ import {
   readConfig,
   writeConfig,
   RelayApiClient,
-} from '@termio/browser-server'
+} from '../../server/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -197,7 +197,7 @@ registerBuiltinCommand({
       console.log(`Killing existing server on port ${RELAY_PORT}...`)
       await killPortProcess({ port: RELAY_PORT })
     }
-    const { createFileLogger, startRunBrowserCDPRelayServer } = await import('@termio/browser-server')
+    const { createFileLogger, startRunBrowserCDPRelayServer } = await import('../../server/index.js')
     const logger = createFileLogger()
     process.title = 'termio-browser-serve'
     process.on('uncaughtException', async (err) => { await logger.error('Uncaught:', err); process.exit(1) })
@@ -230,19 +230,10 @@ registerBuiltinCommand({
 // skill
 // ============================================================================
 
-/**
- * Locate a markdown file shipped inside the published package.
- *
- * `dist/commands/` at runtime, `src/commands/` when run from source, so the
- * package root is two or three levels up depending on which one it is.
- */
+/** Locate a markdown file shipped alongside the CLI sources. */
 function packageFile(name: string): string | null {
-  const candidates = [
-    path.join(__dirname, '..', '..', 'src', name),
-    path.join(__dirname, '..', 'src', name),
-    path.join(__dirname, name),
-  ]
-  return candidates.find((p) => fs.existsSync(p)) ?? null
+  const candidate = path.join(__dirname, '..', name)
+  return fs.existsSync(candidate) ? candidate : null
 }
 
 /**

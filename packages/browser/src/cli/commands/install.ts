@@ -10,7 +10,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import pc from 'picocolors'
-import { TERMIO_BROWSER_DIR } from '@termio/browser-server'
+import { TERMIO_BROWSER_DIR } from '../../server/index.js'
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
 

@@ -13,7 +13,7 @@ import type {
   ExtensionStopRecordingResult,
   IsRecordingResult,
   CancelRecordingResult,
-} from '@termio/browser-server/protocol'
+} from '@termio/browser/protocol'
 import type {
   OffscreenStartRecordingResult,
   OffscreenStopRecordingResult,

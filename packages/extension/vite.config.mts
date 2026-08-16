@@ -11,7 +11,7 @@ const __dirname = dirname(__filename)
 // Bundle the runbrowser package version into the extension so it can report
 // which runbrowser version it was built against. CLI/MCP use this to warn
 // when the extension is outdated.
-const runbrowserPkg = JSON.parse(readFileSync(resolve(__dirname, '../cli/package.json'), 'utf-8'))
+const runbrowserPkg = JSON.parse(readFileSync(resolve(__dirname, '../browser/package.json'), 'utf-8'))
 
 const defineEnv: Record<string, string> = {
   'process.env.TERMIO_BROWSER_PORT': JSON.stringify(process.env.TERMIO_BROWSER_PORT || '19988'),

@@ -14,7 +14,7 @@ import {
   RelayApiClient,
   isPortInUse,
   readConfig,
-} from '@termio/browser-server'
+} from '../../server/index.js'
 
 // ============================================================================
 // status
