@@ -2,17 +2,19 @@ name: Publish to npm
 
 # Publishing is manual for now.
 #
-# The tag trigger is deliberately absent: `packages/server` does not compile and
-# session creation returns HTTP 400, so a `v*` tag would publish a CLI whose
-# main verbs cannot work. Re-add
+# The tag trigger is deliberately absent. `pnpm run typecheck` passes and the
+# unit suite is green, but nothing here has driven a real Chrome through the
+# relay since the Bun port. Re-add
 #
 #   push:
 #     tags: ['v*']
 #
-# once `pnpm run typecheck` passes and `runbrowser cdp` works against a browser.
+# once `packages/e2e` runs green against a real browser, which is the only
+# check that proves the relay still relays.
 #
-# Packages are now @termio/*; the pre-rename @jiweiyuan/runbrowser* packages on
-# npm are stale and should be deprecated pointing here once this publishes.
+# One package ships: @termio/browser, carrying the CLI, the relay server and
+# the MCP server. The pre-rename @jiweiyuan/runbrowser* packages on npm are
+# stale and should be deprecated pointing here once this publishes.
 on:
   workflow_dispatch:
 
@@ -33,6 +35,8 @@ jobs:
         with:
           version: 9
 
+      # Node is here for pnpm and for the extension's Vite build. Nothing in
+      # the published package runs on it.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -40,30 +44,26 @@ jobs:
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Typecheck before build so a compile failure stops the run here, with a
-      # readable error, rather than surfacing as a broken artifact on npm. tsc
-      # emits output even when it reports errors, so `build` alone is not a gate.
+      # Typecheck first so a compile failure stops the run here, with a
+      # readable error, rather than surfacing as a broken artifact on npm.
       - name: Typecheck
         run: pnpm run typecheck
-
-      - name: Build all packages
-        run: pnpm run build
 
       - name: Run tests
         run: pnpm run test
 
-      - name: Publish @termio/browser-server
-        run: pnpm --filter @termio/browser-server publish --no-git-checks --access public
-        env:
-          NPM_CONFIG_PROVENANCE: true
-
-      - name: Publish @termio/browser-mcp
-        run: pnpm --filter @termio/browser-mcp publish --no-git-checks --access public
-        env:
-          NPM_CONFIG_PROVENANCE: true
+      # The extension is not published, but building it catches drift between
+      # it and the package it imports protocol types from.
+      - name: Build extension
+        run: pnpm run build
 
       - name: Publish @termio/browser
         run: pnpm --filter @termio/browser publish --no-git-checks --access public

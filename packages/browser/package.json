@@ -40,10 +40,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/runbrowser/runbrowser.git",
+    "url": "git+https://github.com/termio-sh/browser.git",
     "directory": "packages/browser"
   },
-  "homepage": "https://github.com/runbrowser/runbrowser",
+  "homepage": "https://github.com/termio-sh/browser",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
