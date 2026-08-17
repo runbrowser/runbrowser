@@ -494,22 +494,28 @@ export async function startRunBrowserCDPRelayServer({
 
   const guard = createPrivilegedGuard({ token, logger })
 
-  const publicRoutes: Routes = {
+  const httpRoutes: Routes = {
     ...cdpDiscoveryRoutes(ctx),
+    ...wrapRoutes(
+      { ...apiSessionRoutes(ctx), ...apiCommandRoutes(ctx), ...apiCustomCommandRoutes(ctx) },
+      guard,
+    ),
+  }
+
+  // The upgrade routes are registered raw, outside the CORS wrapper. That
+  // wrapper is async, so it hands Bun a promise where an upgrade needs a
+  // synchronous answer, and the 101 goes out late enough that a strict client
+  // reads the first frames as part of the handshake response. CORS has nothing
+  // to say about a WebSocket upgrade anyway — the browser does not preflight
+  // one, and both routes do their own origin check.
+  const routes: Routes = {
+    ...withCorsRoutes(httpRoutes),
     // /cdp carries no client id in the discovery URL, so both shapes are
     // registered: Bun has no optional path parameter.
     '/cdp': playwrightUpgradeRoute(ctx),
     '/cdp/:clientId': playwrightUpgradeRoute(ctx),
     '/extension': extensionUpgradeRoute(ctx),
   }
-
-  const privilegedRoutes: Routes = {
-    ...apiSessionRoutes(ctx),
-    ...apiCommandRoutes(ctx),
-    ...apiCustomCommandRoutes(ctx),
-  }
-
-  const routes = withCorsRoutes({ ...publicRoutes, ...wrapRoutes(privilegedRoutes, guard) })
 
   // ========================================================================
   // Start server
