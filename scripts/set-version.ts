@@ -43,7 +43,7 @@ manifest.optionalDependencies = optionalDependenciesFor(version)
 
 await Bun.write(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
 
-console.log(`@termio/browser -> ${version}`)
+console.log(`runbrowser -> ${version}`)
 for (const name of Object.keys(manifest.optionalDependencies)) {
   console.log(`  ${name} -> ${version}`)
 }

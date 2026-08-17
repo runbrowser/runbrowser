@@ -28,7 +28,7 @@ export type ExtensionInfo = {
   browser?: string
   email?: string
   id?: string
-  /** termio-browser package version the extension was built with (sent as ?v= query param) */
+  /** runbrowser package version the extension was built with (sent as ?v= query param) */
   version?: string
 }
 

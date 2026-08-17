@@ -53,6 +53,6 @@ jobs:
 
       - name: Smoke-test the binary
         run: |
-          ./dist-npm/browser-linux-x64/termio-browser --version
-          ./dist-npm/browser-linux-x64/termio-browser --help > /dev/null
-          ./dist-npm/browser-linux-x64/termio-browser skill > /dev/null
+          ./dist-npm/browser-linux-x64/runbrowser --version
+          ./dist-npm/browser-linux-x64/runbrowser --help > /dev/null
+          ./dist-npm/browser-linux-x64/runbrowser skill > /dev/null

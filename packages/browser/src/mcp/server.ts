@@ -103,7 +103,7 @@ function requireField<T>(value: T | undefined, name: string, action: string): T 
 // ============================================================================
 
 const server = new McpServer({
-  name: 'termio-browser',
+  name: 'runbrowser',
   title: 'Control your running Chrome browser — your logins, extensions, cookies already there.',
   version: VERSION,
 })

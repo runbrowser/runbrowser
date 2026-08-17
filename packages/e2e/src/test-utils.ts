@@ -7,7 +7,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { startRunBrowserCDPRelayServer, createFileLogger, killPortProcess, type RelayServer } from '@termio/browser'
+import { startRunBrowserCDPRelayServer, createFileLogger, killPortProcess, type RelayServer } from 'runbrowser'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

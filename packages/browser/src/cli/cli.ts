@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * termio-browser CLI — hand-written argument parser.
+ * runbrowser CLI — hand-written argument parser.
  *
  * Dispatches, in order:
  * - built-in commands: cdp, eval, tab, status, session, mcp, …
- * - site commands: `termio-browser github trending`, whose flags are not known
+ * - site commands: `runbrowser github trending`, whose flags are not known
  *   until the relay reports them, so unrecognised flags are collected rather
  *   than rejected and handed to the command as its arguments.
  *
@@ -84,7 +84,7 @@ const resolveSession: SessionResolver = async (args) => {
     extensions = await client.waitForExtensions({ timeoutMs: 10000, pollIntervalMs: 250 })
   }
   if (extensions.length === 0) {
-    console.error('No connected browsers. Click the termio browser extension icon.')
+    console.error('No connected browsers. Click the runbrowser extension icon.')
     process.exit(1)
   }
   const ext = extensions[0]
@@ -115,8 +115,8 @@ async function main() {
     if (args.help) {
       printMainHelp(VERSION, getAllBuiltinCommands(), [])
     } else {
-      console.log(`termio-browser v${VERSION}`)
-      console.log(`Run ${pc.cyan('termio-browser --help')} to see available commands.`)
+      console.log(`runbrowser v${VERSION}`)
+      console.log(`Run ${pc.cyan('runbrowser --help')} to see available commands.`)
     }
     process.exit(0)
   }
@@ -155,7 +155,7 @@ async function main() {
     return
   }
 
-  // ── Try custom command: `termio-browser <site> <name>` ──
+  // ── Try custom command: `runbrowser <site> <name>` ──
   if (args.subcommand) {
     const site = args.command!
     const name = args.subcommand
@@ -186,7 +186,7 @@ async function main() {
 
   // ── Unknown command ──
   console.error(`Unknown command: ${args.command}`)
-  console.error(`Run ${pc.cyan('termio-browser --help')} to see available commands.`)
+  console.error(`Run ${pc.cyan('runbrowser --help')} to see available commands.`)
   process.exit(1)
 }
 

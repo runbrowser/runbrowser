@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Launcher for termio-browser.
+ * Launcher for runbrowser.
  *
  * Runs under Node because that is the one runtime `npm i -g` guarantees. It
  * does no work itself: it finds the compiled binary for this platform —
@@ -21,8 +21,8 @@ const require = createRequire(import.meta.url)
 const here = path.dirname(fileURLToPath(import.meta.url))
 const argv = process.argv.slice(2)
 
-const exe = process.platform === 'win32' ? 'termio-browser.exe' : 'termio-browser'
-const platformPackage = `@termio/browser-${process.platform}-${process.arch}`
+const exe = process.platform === 'win32' ? 'runbrowser.exe' : 'runbrowser'
+const platformPackage = `runbrowser-${process.platform}-${process.arch}`
 
 function run(command, args) {
   const result = spawnSync(command, args, { stdio: 'inherit' })
@@ -39,7 +39,7 @@ try {
 
 if (resolved) {
   const error = run(resolved, argv)
-  console.error(`termio-browser: could not run ${resolved}: ${error.message}`)
+  console.error(`runbrowser: could not run ${resolved}: ${error.message}`)
   process.exit(1)
 }
 
@@ -48,15 +48,15 @@ if (existsSync(sourceEntry)) {
   const error = run('bun', [sourceEntry, ...argv])
   console.error(
     error.code === 'ENOENT'
-      ? 'termio-browser: running from source requires bun (https://bun.sh).'
-      : `termio-browser: could not run bun: ${error.message}`,
+      ? 'runbrowser: running from source requires bun (https://bun.sh).'
+      : `runbrowser: could not run bun: ${error.message}`,
   )
   process.exit(1)
 }
 
 console.error(
-  `termio-browser: no prebuilt binary for ${process.platform}-${process.arch}.\n` +
+  `runbrowser: no prebuilt binary for ${process.platform}-${process.arch}.\n` +
     `Expected the optional dependency ${platformPackage}. If your platform is\n` +
-    `supported, reinstalling usually fixes it: npm i -g @termio/browser`,
+    `supported, reinstalling usually fixes it: npm i -g runbrowser`,
 )
 process.exit(1)

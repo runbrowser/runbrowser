@@ -43,7 +43,7 @@ registerBuiltinCommand({
   def: {
     name: 'cdp',
     description: 'Send a raw CDP command — the full Chrome DevTools Protocol',
-    usage: "termio-browser cdp <method> [params-json | -]   (- reads params from stdin)",
+    usage: "runbrowser cdp <method> [params-json | -]   (- reads params from stdin)",
     positionals: [
       { name: 'method', description: 'CDP method, e.g. Page.navigate', required: true },
       { name: 'params', description: "JSON params object, or - to read from stdin" },
@@ -51,7 +51,7 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const method = args.subcommand
-    if (!method) throw new Error('Usage: termio-browser cdp <method> [params-json]')
+    if (!method) throw new Error('Usage: runbrowser cdp <method> [params-json]')
 
     const raw = await payloadFromStdinIfRequested(args.positionals[0])
 
@@ -78,7 +78,7 @@ registerBuiltinCommand({
   def: {
     name: 'eval',
     description: 'Run JavaScript in the page — shorthand for Runtime.evaluate',
-    usage: "termio-browser eval '<js>'   (code may also be piped on stdin)",
+    usage: "runbrowser eval '<js>'   (code may also be piped on stdin)",
     positionals: [
       { name: 'code', description: 'JavaScript to execute', required: true },
     ],
@@ -87,14 +87,14 @@ registerBuiltinCommand({
     },
   },
   async execute(args, resolveSession) {
-    // `eval` always needs a payload, so bare `termio-browser eval` with something
+    // `eval` always needs a payload, so bare `runbrowser eval` with something
     // piped in is unambiguous and reading it is safe. `-` also works.
     let code = args.subcommand === '-' ? undefined : args.subcommand
     if (!code && !process.stdin.isTTY) {
       const piped = (await readStdin()).trim()
       if (piped) code = piped
     }
-    if (!code) throw new Error("Usage: termio-browser eval <code>   (or pipe it in)")
+    if (!code) throw new Error("Usage: runbrowser eval <code>   (or pipe it in)")
 
     const timeout = (args.flags.get('timeout') as number) ?? 10000
     const { sessionId, client } = await resolveSession(args)

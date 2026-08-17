@@ -1,6 +1,6 @@
 # MCP Setup
 
-> **Note:** CLI is the recommended way to use termio browser. See [README.md](./README.md) for CLI usage.
+> **Note:** CLI is the recommended way to use runbrowser. See [README.md](./README.md) for CLI usage.
 
 Add to your MCP client settings:
 
@@ -9,7 +9,7 @@ Add to your MCP client settings:
   "mcpServers": {
     "browser": {
       "command": "npx",
-      "args": ["-y", "@termio/browser-mcp@latest"]
+      "args": ["-y", "runbrowser@latest"]
     }
   }
 }
@@ -65,7 +65,7 @@ Auto-create a tab when Playwright connects (no manual extension click needed).
   "mcpServers": {
     "browser": {
       "command": "npx",
-      "args": ["-y", "@termio/browser-mcp@latest"],
+      "args": ["-y", "runbrowser@latest"],
       "env": {
         "TERMIO_BROWSER_AUTO_ENABLE": "1"
       }
@@ -83,7 +83,7 @@ Run agents in isolated environments while controlling Chrome on your host.
 **On host (where Chrome runs):**
 
 ```bash
-npx -y @termio/browser serve --token <secret>
+npx -y runbrowser serve --token <secret>
 ```
 
 **In container/VM (where agent runs):**
@@ -93,7 +93,7 @@ npx -y @termio/browser serve --token <secret>
   "mcpServers": {
     "browser": {
       "command": "npx",
-      "args": ["-y", "@termio/browser-mcp@latest", "--host", "host.docker.internal", "--token", "<secret>"]
+      "args": ["-y", "runbrowser@latest", "--host", "host.docker.internal", "--token", "<secret>"]
     }
   }
 }
@@ -106,7 +106,7 @@ Or with environment variables:
   "mcpServers": {
     "browser": {
       "command": "npx",
-      "args": ["-y", "@termio/browser-mcp@latest"],
+      "args": ["-y", "runbrowser@latest"],
       "env": {
         "TERMIO_BROWSER_HOST": "host.docker.internal",
         "TERMIO_BROWSER_TOKEN": "<secret>"

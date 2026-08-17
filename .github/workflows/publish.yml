@@ -75,8 +75,8 @@ jobs:
       - name: Check the version is unpublished
         run: |
           version="${{ steps.version.outputs.version }}"
-          if npm view "@termio/browser@$version" version >/dev/null 2>&1; then
-            echo "@termio/browser@$version is already on npm. Versions cannot be reused."
+          if npm view "runbrowser@$version" version >/dev/null 2>&1; then
+            echo "runbrowser@$version is already on npm. Versions cannot be reused."
             exit 1
           fi
 
@@ -102,9 +102,9 @@ jobs:
       # on a user's first command.
       - name: Smoke-test the binary
         run: |
-          ./dist-npm/browser-linux-x64/termio-browser --version
-          ./dist-npm/browser-linux-x64/termio-browser --help > /dev/null
-          ./dist-npm/browser-linux-x64/termio-browser skill > /dev/null
+          ./dist-npm/browser-linux-x64/runbrowser --version
+          ./dist-npm/browser-linux-x64/runbrowser --help > /dev/null
+          ./dist-npm/browser-linux-x64/runbrowser skill > /dev/null
 
       # Platform packages first: they are optional dependencies of the main
       # package, so the other order leaves a window in which installing it
@@ -117,7 +117,7 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      - name: Publish @termio/browser
+      - name: Publish runbrowser
         run: npm publish packages/browser --access public
         env:
           NPM_CONFIG_PROVENANCE: true

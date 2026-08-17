@@ -1,10 +1,10 @@
-# termio browser
+# runbrowser
 
 > Control your browser via CDP. Extension + CLI, no wrapper layer.
 
-Other Browser Automation spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. termio browser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
+Other Browser Automation spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. runbrowser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
 
-|               | Playwright MCP    | termio browser                        |
+|               | Playwright MCP    | runbrowser                        |
 | ------------- | ----------------- | --------------------------------- |
 | Browser       | Spawns new Chrome | **Uses your Chrome**              |
 | Extensions    | None              | Your existing ones                |
@@ -16,36 +16,36 @@ Other Browser Automation spawn a fresh Chrome — no logins, no extensions, inst
 
 ```bash
 # 1. Install the CLI
-npm i -g @termio/browser
+npm i -g runbrowser
 
 # 2. Load extension: chrome://extensions/ → Developer mode → Load unpacked → packages/extension/dist
 # 3. Click the extension icon on a tab — it turns green
 
 # 4. Use it
-termio-browser status
-termio-browser tab new https://example.com
-termio-browser eval 'document.title'
-termio-browser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value=="button")'
+runbrowser status
+runbrowser tab new https://example.com
+runbrowser eval 'document.title'
+runbrowser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value=="button")'
 ```
 
 ### Add the Skill to Your Agent
 
 ```bash
-termio-browser skill install              # → ./.claude/skills and ./.agents/skills
-termio-browser skill install --global     # → ~/.claude/skills and ~/.agents/skills
+runbrowser skill install              # → ./.claude/skills and ./.agents/skills
+runbrowser skill install --global     # → ~/.claude/skills and ~/.agents/skills
 ```
 
 Installs into the current project by default, so the skill is committed and
 reviewed alongside the code it is used on; `--global` (`-g`) installs into
 `$HOME` instead. Re-running is safe, and a `SKILL.md` you have edited yourself
-is never overwritten — remove it first if you want ours back. `termio-browser skill
+is never overwritten — remove it first if you want ours back. `runbrowser skill
 uninstall` removes only files we installed.
 
 This teaches your agent the CDP patterns that matter: read the accessibility tree before acting, filter it before printing, poll instead of sleeping.
 
 ## How It Works
 
-termio browser uses the **Chrome DevTools Protocol (CDP)** directly. The extension bridges CDP commands over WebSocket to your running browser.
+runbrowser uses the **Chrome DevTools Protocol (CDP)** directly. The extension bridges CDP commands over WebSocket to your running browser.
 
 ```
 ┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
@@ -75,11 +75,11 @@ Two commands touch a page. Everything you might expect as a verb — click, type
 read, screenshot, wait — is a CDP method, so it goes through `cdp`.
 
 ```bash
-termio-browser cdp <Method> [params-json]    # the page API
-termio-browser eval '<js>'                   # shorthand for Runtime.evaluate
-termio-browser tab list|new|switch|close      # which target you're bound to
-termio-browser status                        # is a browser attached
-termio-browser session new|list|delete       # isolated state, one per agent
+runbrowser cdp <Method> [params-json]    # the page API
+runbrowser eval '<js>'                   # shorthand for Runtime.evaluate
+runbrowser tab list|new|switch|close      # which target you're bound to
+runbrowser status                        # is a browser attached
+runbrowser session new|list|delete       # isolated state, one per agent
 ```
 
 Why no `click`/`snapshot`/`@ref` layer: every wrapper is an abstraction someone
@@ -88,23 +88,23 @@ around. Chrome's protocol is complete and documented, and LLMs were trained on
 it. The wrapper layer was removed rather than maintained.
 
 Navigation and screenshots are single CDP methods. Clicking and typing are short
-CDP sequences — `termio-browser skill` documents them, including the parts a `click`
+CDP sequences — `runbrowser skill` documents them, including the parts a `click`
 verb used to hide (scroll into view, no actionability check, `keyUp` pairing).
 
 ### The page API
 
 ```bash
-termio-browser cdp Page.navigate '{"url":"https://example.com"}'
-termio-browser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value=="button")'
-termio-browser cdp Input.dispatchMouseEvent '{"type":"mousePressed","x":420,"y":310,"button":"left","clickCount":1}'
-termio-browser cdp Page.captureScreenshot | jq -r .data | base64 -d > shot.png
+runbrowser cdp Page.navigate '{"url":"https://example.com"}'
+runbrowser cdp Accessibility.getFullAXTree | jq '.nodes[] | select(.role.value=="button")'
+runbrowser cdp Input.dispatchMouseEvent '{"type":"mousePressed","x":420,"y":310,"button":"left","clickCount":1}'
+runbrowser cdp Page.captureScreenshot | jq -r .data | base64 -d > shot.png
 ```
 
 Both `cdp` and `eval` accept their payload on stdin, which is easier than
 quoting multi-line JS in a shell:
 
 ```bash
-termio-browser eval <<'JS'
+runbrowser eval <<'JS'
 Array.from(document.querySelectorAll('a')).map(a => a.href)
 JS
 ```
@@ -116,7 +116,7 @@ with `jq`, and it costs a fraction of the tokens. Filter before printing; a real
 page is thousands of nodes.
 
 ```bash
-termio-browser cdp Accessibility.getFullAXTree \
+runbrowser cdp Accessibility.getFullAXTree \
   | jq '.nodes[] | select(.role.value=="button") | {name: .name.value, id: .backendDOMNodeId}'
 ```
 
@@ -126,10 +126,10 @@ Tabs are shared across sessions; session state is not. Several agents can work
 in one browser without colliding.
 
 ```bash
-termio-browser tab new https://example.com   # opens and binds to it
-termio-browser tab list                      # → marks the bound tab
-termio-browser session new                   # → prints an id
-termio-browser -s 3 tab list                 # act inside session 3
+runbrowser tab new https://example.com   # opens and binds to it
+runbrowser tab list                      # → marks the bound tab
+runbrowser session new                   # → prints an id
+runbrowser -s 3 tab list                 # act inside session 3
 ```
 
 ### Command Extensions
@@ -138,30 +138,30 @@ Site commands from the [runbrowser/commands](https://github.com/runbrowser/comma
 repo are unchanged — they are a different audience from the agent CDP path.
 
 ```bash
-termio-browser commands list
-termio-browser commands install reddit
+runbrowser commands list
+runbrowser commands install reddit
 ```
 
 ### Configuration
 
 ```bash
-termio-browser config set <key> <value>   # set token, host, etc.
-termio-browser config unset <key>         # remove a config value
-termio-browser config show                # show current config
-termio-browser logfile                    # print log file paths
-termio-browser skill                      # print full agent instructions
+runbrowser config set <key> <value>   # set token, host, etc.
+runbrowser config unset <key>         # remove a config value
+runbrowser config show                # show current config
+runbrowser logfile                    # print log file paths
+runbrowser skill                      # print full agent instructions
 ```
 
 ## MCP Setup
 
-The CLI is the recommended way to use termio browser. For MCP server integration:
+The CLI is the recommended way to use runbrowser. For MCP server integration:
 
 ```json
 {
   "mcpServers": {
     "browser": {
       "command": "npx",
-      "args": ["-y", "@termio/browser-mcp@latest"]
+      "args": ["-y", "runbrowser@latest"]
     }
   }
 }
@@ -177,12 +177,12 @@ Control Chrome on a remote machine — headless Mac mini, cloud VM, devcontainer
 
 ```bash
 # On the host machine
-termio-browser serve --host 0.0.0.0 --token <secret>
+runbrowser serve --host 0.0.0.0 --token <secret>
 
 # From anywhere
 export TERMIO_BROWSER_HOST=192.168.1.10
 export TERMIO_BROWSER_TOKEN=<secret>
-termio-browser navigate https://example.com -s 1
+runbrowser navigate https://example.com -s 1
 ```
 
 For Docker/devcontainers, use `TERMIO_BROWSER_HOST=host.docker.internal`.
@@ -193,9 +193,9 @@ The relay exposes a standard CDP WebSocket endpoint for Playwright:
 
 ```typescript
 import { chromium } from 'playwright-core'
-import { starttermio browserCDPRelayServer, getCdpUrl } from '@termio/browser-server'
+import { startRunBrowserCDPRelayServer, getCdpUrl } from 'runbrowser'
 
-const server = await starttermio browserCDPRelayServer()
+const server = await startRunBrowserCDPRelayServer()
 const browser = await chromium.connectOverCDP(getCdpUrl())
 const page = browser.contexts()[0].pages()[0]
 
@@ -223,9 +223,9 @@ server.close()
 
 ```
 packages/
-├── cli/          # @termio/browser — CLI
-├── server/       # @termio/browser-server — WebSocket relay, CDP bridge, site commands
-├── mcp/          # @termio/browser-mcp — MCP server (thin HTTP wrapper)
+├── cli/          # runbrowser — CLI
+├── server/       # runbrowser — WebSocket relay, CDP bridge, site commands
+├── mcp/          # runbrowser — MCP server (thin HTTP wrapper)
 ├── extension/    # Chrome extension (chrome.debugger ↔ WebSocket)
 ├── e2e/          # End-to-end tests
 ├── website/      # Next.js + next-intl marketing site (en/zh/ja/fr/es)
@@ -244,14 +244,14 @@ packages/
 ## Security
 
 - **Local only** — WebSocket server binds to `localhost:8790`
-- **Origin validation** — only the termio browser extension origin is accepted
+- **Origin validation** — only the runbrowser extension origin is accepted
 - **Explicit consent** — only tabs where you clicked the extension icon
 - **Visible automation** — Chrome shows an automation banner on controlled tabs
 
 ## Troubleshooting
 
 ```bash
-termio-browser logfile  # prints log file paths
+runbrowser logfile  # prints log file paths
 # relay: ~/.termio/browser/relay-server.log
 # cdp:   ~/.termio/browser/cdp.jsonl
 ```
@@ -265,12 +265,12 @@ termio-browser logfile  # prints log file paths
 
 ## Acknowledgements
 
-termio browser wouldn't exist without the work of these projects and their maintainers.
+runbrowser wouldn't exist without the work of these projects and their maintainers.
 
-- [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. termio browser began as a fork of playwriter and owes its Chrome extension architecture to Tommaso's original design.
+- [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. runbrowser began as a fork of playwriter and owes its Chrome extension architecture to Tommaso's original design.
 - [bb-browser](https://github.com/epiral/bb-browser) & [bb-sites](https://github.com/epiral/bb-sites) — A beautifully designed browser automation tool with an impressive collection of 45+ community site adapters. The bb-sites ecosystem is a constant source of inspiration.
 - [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Pioneered many ideas around comprehensive browser CLIs for AI agents.
-- [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — The command extensions system (`termio-browser commands install/list/uninstall`) was inspired by pi's elegant approach to extensibility and package management.
+- [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — The command extensions system (`runbrowser commands install/list/uninstall`) was inspired by pi's elegant approach to extensibility and package management.
 
 Thank you to all these maintainers for pushing the ecosystem forward.
 

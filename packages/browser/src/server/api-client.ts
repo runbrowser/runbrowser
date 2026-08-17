@@ -122,7 +122,7 @@ export class RelayApiClient {
       if (isConnectionError) {
         throw new Error(
           `Cannot connect to remote relay server at ${this.host}. ` +
-            `Make sure 'npx -y termio-browser serve' is running on the host machine.`,
+            `Make sure 'npx -y runbrowser serve' is running on the host machine.`,
         )
       }
       throw new Error(`Failed to connect to remote relay server: ${error.message}`)

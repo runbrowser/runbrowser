@@ -40,7 +40,7 @@ registerBuiltinCommand({
     if (!serverUp) {
       const state = { server: false, extensions: [], sessions: [] }
       if (args.json) { console.log(JSON.stringify(state)); process.exit(1) }
-      console.log(`server:     ${pc.red('not running')} (start it with \`termio-browser serve\`)`)
+      console.log(`server:     ${pc.red('not running')} (start it with \`runbrowser serve\`)`)
       process.exit(1)
     }
 
@@ -55,7 +55,7 @@ registerBuiltinCommand({
 
     console.log(`server:     ${pc.green('running')} on port ${RELAY_PORT}`)
     if (extensions.length === 0) {
-      console.log(`extension:  ${pc.red('not connected')} — click the termio browser icon on a tab`)
+      console.log(`extension:  ${pc.red('not connected')} — click the runbrowser icon on a tab`)
     } else {
       for (const e of extensions) {
         const who = e.profile?.email || '(not signed in)'
@@ -93,7 +93,7 @@ registerBuiltinCommand({
     const { sessionId, client } = await resolveSession(args)
     const cmd = args.subcommand || 'list'
 
-    // A bare number switches to that tab: `termio-browser tab 2`. Indexes are a
+    // A bare number switches to that tab: `runbrowser tab 2`. Indexes are a
     // convenience for humans only — they are resolved to a target id here,
     // because Target.getTargets guarantees no ordering and the number could
     // name a different tab by the time the server saw it.
@@ -122,7 +122,7 @@ registerBuiltinCommand({
       }
       case 'switch': {
         const target = args.positionals[0]
-        if (!target) throw new Error('Usage: termio-browser tab switch <index|targetId>')
+        if (!target) throw new Error('Usage: runbrowser tab switch <index|targetId>')
         const asNum = Number(target)
         if (!Number.isNaN(asNum)) await switchToIndex(client, sessionId, asNum, args.json)
         else {

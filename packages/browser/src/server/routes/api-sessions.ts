@@ -21,7 +21,7 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
       const executor = ctx.executorManager.getSession(sessionId)
       if (!executor) {
         return c.json(
-          { text: `Session ${sessionId} not found. Run 'termio-browser session-new' first.`, images: [], isError: true },
+          { text: `Session ${sessionId} not found. Run 'runbrowser session-new' first.`, images: [], isError: true },
           404,
         )
       }
@@ -44,7 +44,7 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
 
       const executor = ctx.executorManager.getSession(sessionId)
       if (!executor) {
-        return c.json({ error: `Session ${sessionId} not found. Run 'termio-browser session-new' first.` }, 404)
+        return c.json({ error: `Session ${sessionId} not found. Run 'runbrowser session-new' first.` }, 404)
       }
       const { page, context } = await executor.reset()
 
@@ -82,7 +82,7 @@ export function registerApiSessionRoutes(app: Hono, ctx: ServerContext) {
       const error = extensionId
         ? `Extension not connected: ${extensionId}`
         : connected === 0
-          ? 'No browser connected. Install the termio browser extension and click its icon on a tab.'
+          ? 'No browser connected. Install the runbrowser extension and click its icon on a tab.'
           : 'Multiple browsers connected. Pass extensionId to choose one.'
       return c.json({ error }, 404)
     }

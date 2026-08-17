@@ -26,7 +26,7 @@ export async function createTransport({ args = [], port }: { args?: string[]; po
     env.TERMIO_BROWSER_PORT = String(port)
   }
   // The MCP server is a verb on the CLI, not a separate package with its own
-  // entrypoint. Driving it the way a real client does — `termio-browser mcp`
+  // entrypoint. Driving it the way a real client does — `runbrowser mcp`
   // over stdio — is also what keeps this honest about the shipped surface.
   const browserPackage = path.resolve(path.dirname(__filename), '../../browser')
   const transport = new StdioClientTransport({

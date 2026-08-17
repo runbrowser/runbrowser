@@ -5,7 +5,7 @@
  * Phase 2: Re-parse with extension-registered flags
  *
  * Supports:
- * - Subcommands: `termio-browser navigate <url>`, `termio-browser github trending`
+ * - Subcommands: `runbrowser navigate <url>`, `runbrowser github trending`
  * - Global flags: --session, --host, --token, --json, --help, --version
  * - Command-specific flags: --limit, --format, --interactive, etc.
  * - Extension flags: dynamically registered, unknown on first pass

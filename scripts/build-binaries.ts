@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Compile termio-browser for every supported platform and lay out one npm
+ * Compile runbrowser for every supported platform and lay out one npm
  * package per platform.
  *
  * Bun cross-compiles all targets from a single machine, so this is one CI job
@@ -50,9 +50,9 @@ await mkdir(outputRoot, { recursive: true })
 const built: string[] = []
 
 for (const target of TARGETS) {
-  const name = `@termio/browser-${target.os === 'win32' ? 'win32' : target.os}-${target.cpu}`
+  const name = `runbrowser-${target.os === 'win32' ? 'win32' : target.os}-${target.cpu}`
   const directory = path.join(outputRoot, name.replace('@termio/', ''))
-  const exe = target.os === 'win32' ? 'termio-browser.exe' : 'termio-browser'
+  const exe = target.os === 'win32' ? 'runbrowser.exe' : 'runbrowser'
   const outfile = path.join(directory, exe)
 
   await mkdir(directory, { recursive: true })
@@ -80,7 +80,7 @@ for (const target of TARGETS) {
       {
         name,
         version: packageJson.version,
-        description: `termio-browser binary for ${target.os}-${target.cpu}`,
+        description: `runbrowser binary for ${target.os}-${target.cpu}`,
         license: packageJson.license,
         repository: packageJson.repository,
         homepage: packageJson.homepage,

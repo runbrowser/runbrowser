@@ -32,6 +32,6 @@
   },
   "dependencies": {
     "zustand": "^5.0.8",
-    "@termio/browser": "workspace:*"
+    "runbrowser": "workspace:*"
   }
 }

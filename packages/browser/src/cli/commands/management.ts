@@ -49,7 +49,7 @@ registerBuiltinCommand({
   },
   async execute(args, resolveSession) {
     const cmd = args.subcommand
-    if (!cmd) throw new Error('Usage: termio-browser session <new|list|delete> [id]')
+    if (!cmd) throw new Error('Usage: runbrowser session <new|list|delete> [id]')
 
     const config = readConfig()
     const client = new RelayApiClient({
@@ -67,7 +67,7 @@ registerBuiltinCommand({
           console.error(pc.dim('Waiting for extension...'))
           extensions = await client.waitForExtensions({ timeoutMs: 10000, pollIntervalMs: 250 })
         }
-        if (extensions.length === 0) throw new Error('No connected browsers. Click the termio browser extension icon.')
+        if (extensions.length === 0) throw new Error('No connected browsers. Click the runbrowser extension icon.')
 
         let ext = extensions[0]
         const browserKey = args.flags.get('browser') as string | undefined
@@ -202,11 +202,11 @@ registerBuiltinCommand({
     }
     const { createFileLogger, startRunBrowserCDPRelayServer } = await import('../../server/index.js')
     const logger = createFileLogger()
-    process.title = 'termio-browser-serve'
+    process.title = 'runbrowser-serve'
     process.on('uncaughtException', async (err) => { await logger.error('Uncaught:', err); process.exit(1) })
     process.on('unhandledRejection', async (reason) => { await logger.error('Unhandled:', reason); process.exit(1) })
     const server = await startRunBrowserCDPRelayServer({ port: RELAY_PORT, host, token, logger })
-    console.log(`termio browser relay server started on ${host}:${RELAY_PORT}`)
+    console.log(`runbrowser relay server started on ${host}:${RELAY_PORT}`)
     console.log(`Logs: ${logger.logFilePath}`)
     const shutdown = () => { console.log('\nShutting down...'); server.close(); process.exit(0) }
     process.on('SIGINT', shutdown)
@@ -327,7 +327,7 @@ registerBuiltinCommand({
       const reference = packageFile('skill.md')
       if (!reference) {
         throw new Error(
-          'This build embeds the reference rather than shipping a file. Run `termio-browser skill > SKILL.md` to write it out.',
+          'This build embeds the reference rather than shipping a file. Run `runbrowser skill > SKILL.md` to write it out.',
         )
       }
       console.log(reference)

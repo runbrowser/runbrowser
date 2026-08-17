@@ -2,9 +2,9 @@
  * Commands subgroup: list, install, uninstall community commands.
  *
  * Usage:
- *   termio-browser commands list              — lists available packages
- *   termio-browser commands install reddit    — downloads reddit/*.ts → ~/.termio/browser/commands/reddit/
- *   termio-browser commands uninstall reddit  — removes ~/.termio/browser/commands/reddit/
+ *   runbrowser commands list              — lists available packages
+ *   runbrowser commands install reddit    — downloads reddit/*.ts → ~/.termio/browser/commands/reddit/
+ *   runbrowser commands uninstall reddit  — removes ~/.termio/browser/commands/reddit/
  */
 
 import fs from 'node:fs'
@@ -24,7 +24,7 @@ const COMMANDS_DIR = path.join(TERMIO_BROWSER_DIR, 'commands')
  * someone else's repo is the same thing as one written by hand into
  * ~/.termio/browser/commands/.
  */
-const DEFAULT_REPO = 'termio-sh/browser'
+const DEFAULT_REPO = 'termio-sh/runbrowser'
 const DEFAULT_PATH = 'plugins'
 
 type PluginSource = { repo: string; path: string }
@@ -63,7 +63,7 @@ async function fetchGitHub(url: string): Promise<any> {
   const resp = await fetch(url, {
     headers: {
       'Accept': 'application/vnd.github.v3+json',
-      'User-Agent': 'termio-browser-cli',
+      'User-Agent': 'runbrowser-cli',
     },
   })
   if (!resp.ok) {
@@ -154,9 +154,9 @@ registerBuiltinCommand({
 
     if (!action || args.help) {
       console.log(pc.bold('Usage:'))
-      console.log(`  termio-browser commands list                  List available command extensions`)
-      console.log(`  termio-browser commands install <package>     Install a command extension`)
-      console.log(`  termio-browser commands uninstall <package>   Uninstall a command extension`)
+      console.log(`  runbrowser commands list                  List available command extensions`)
+      console.log(`  runbrowser commands install <package>     Install a command extension`)
+      console.log(`  runbrowser commands uninstall <package>   Uninstall a command extension`)
       process.exit(0)
     }
 
@@ -188,7 +188,7 @@ registerBuiltinCommand({
           }
 
           console.log()
-          console.log(`Run ${pc.cyan('termio-browser commands install <package>')} to install.`)
+          console.log(`Run ${pc.cyan('runbrowser commands install <package>')} to install.`)
           console.log(pc.dim(`Another repository: --repo owner/name [--path <dir>]`))
         } catch (e: any) {
           console.error(`Error: ${e.message}`)
@@ -200,8 +200,8 @@ registerBuiltinCommand({
       case 'install':
       case 'add': {
         if (!pkg) {
-          console.error('Usage: termio-browser commands install <package>')
-          console.error(`Run ${pc.cyan('termio-browser commands list')} to see available packages.`)
+          console.error('Usage: runbrowser commands install <package>')
+          console.error(`Run ${pc.cyan('runbrowser commands list')} to see available packages.`)
           process.exit(1)
         }
 
@@ -226,7 +226,7 @@ registerBuiltinCommand({
       case 'remove':
       case 'rm': {
         if (!pkg) {
-          console.error('Usage: termio-browser commands uninstall <package>')
+          console.error('Usage: runbrowser commands uninstall <package>')
           process.exit(1)
         }
 

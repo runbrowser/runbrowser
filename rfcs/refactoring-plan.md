@@ -60,7 +60,7 @@ MCP/CLI
 
 MCP server uses two-tool model (`skill` + `run`) instead of individual tools:
 - `skill` — Returns full CLI documentation + site command discovery
-- `run` — Executes any `termio-browser` command string
+- `run` — Executes any `runbrowser` command string
 
 The `run` tool internally dispatches to the same `RelayApiClient` methods as the CLI.
 

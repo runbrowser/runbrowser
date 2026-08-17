@@ -34,7 +34,7 @@ if ! npm whoami >/dev/null 2>&1; then
 fi
 echo "Publishing as $(npm whoami)"
 
-REPO="termio-sh/browser"
+REPO="termio-sh/runbrowser"
 WORKFLOW="publish.yml"
 
 echo "==> Building platform binaries"
@@ -48,7 +48,7 @@ for directory in dist-npm/*/; do
   npm publish "$directory" --access public $DRY_RUN
 done
 
-echo "==> Publishing @termio/browser"
+echo "==> Publishing runbrowser"
 npm publish packages/browser --access public $DRY_RUN
 
 if [[ -n "$DRY_RUN" ]]; then
@@ -60,10 +60,10 @@ fi
 # workflow publishes over OIDC and the repository holds no npm credential.
 echo "==> Configuring trusted publishing"
 for package in \
-  "@termio/browser" \
-  "@termio/browser-darwin-arm64" \
-  "@termio/browser-darwin-x64" \
-  "@termio/browser-linux-x64"
+  "runbrowser" \
+  "runbrowser-darwin-arm64" \
+  "runbrowser-darwin-x64" \
+  "runbrowser-linux-x64"
 do
   echo "--> $package"
   npm trust github "$package" --file "$WORKFLOW" --repo "$REPO" --allow-publish --yes

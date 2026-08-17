@@ -1,4 +1,4 @@
-# termio browser End-to-End Testing Guide
+# runbrowser End-to-End Testing Guide
 
 ## Prerequisites
 
@@ -21,8 +21,8 @@ pnpm run build:all
 ```
 
 This runs in order:
-1. `@termio/browser-server` (tsc) — WebSocket relay server
-3. `@termio/browser-mcp` + `termio-browser` cli (tsc, parallel) — MCP server + CLI
+1. `runbrowser` (tsc) — WebSocket relay server
+3. `runbrowser` + `runbrowser` cli (tsc, parallel) — MCP server + CLI
 4. `mcp-extension` (vite + download-prism) — Chrome extension → `packages/extension/dist/`
 
 ## Step 2 — Load Extension into Chrome
@@ -37,7 +37,7 @@ This runs in order:
 ## Step 3 — Enable Extension on a Tab
 
 1. Open any webpage in Chrome (e.g. `https://example.com`)
-2. **Click the termio browser extension icon** on that tab
+2. **Click the runbrowser extension icon** on that tab
 3. Icon turns **green** = tab is now controlled via CDP
 4. Chrome shows an **"is debugging this tab"** banner — this is expected
 
@@ -61,7 +61,7 @@ node packages/cli/bin.js session new
 
 `session new` output:
 ```
-Session 1 created. Use with: termio-browser -s 1 -e "..."
+Session 1 created. Use with: runbrowser -s 1 -e "..."
 ```
 
 ## Step 5 — Execute Commands via CLI

@@ -1,6 +1,6 @@
 import { createMCPClient } from './mcp-client.js'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { getCdpUrl } from '@termio/browser/utils'
+import { getCdpUrl } from 'runbrowser/utils'
 import {
   setupTestContext,
   cleanupTestContext,

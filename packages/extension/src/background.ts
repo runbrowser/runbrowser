@@ -5,8 +5,8 @@ declare const __TERMIO_BROWSER_VERSION__: string
 
 import { createStore } from 'zustand/vanilla'
 import type { ExtensionState, ConnectionState, TabState, TabInfo } from './types'
-import type { CDPEvent, Protocol } from '@termio/browser/types'
-import type { ExtensionCommandMessage, ExtensionResponseMessage, RelayToExtensionMessage } from '@termio/browser/protocol'
+import type { CDPEvent, Protocol } from 'runbrowser/types'
+import type { ExtensionCommandMessage, ExtensionResponseMessage, RelayToExtensionMessage } from 'runbrowser/protocol'
 
 import {
   getActiveRecordings,

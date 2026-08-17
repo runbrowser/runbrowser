@@ -20,7 +20,7 @@ export const TARGETS = [
 ] as const
 
 export function packageNameFor(target: { os: string; cpu: string }): string {
-  return `@termio/browser-${target.os}-${target.cpu}`
+  return `runbrowser-${target.os}-${target.cpu}`
 }
 
 /**

@@ -1,5 +1,5 @@
 {
-  "name": "@termio/browser",
+  "name": "runbrowser",
   "version": "0.1.0",
   "description": "Control your running Chrome browser over CDP \u2014 your logins, extensions and cookies already there",
   "type": "module",
@@ -15,7 +15,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "termio-browser": "./bin.js"
+    "runbrowser": "./bin.js"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -39,10 +39,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/termio-sh/browser.git",
+    "url": "git+https://github.com/termio-sh/runbrowser.git",
     "directory": "packages/browser"
   },
-  "homepage": "https://github.com/termio-sh/browser",
+  "homepage": "https://runbrowser.com",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

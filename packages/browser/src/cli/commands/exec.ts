@@ -1,7 +1,7 @@
 /**
  * exec — run a snippet against the browser, with helpers already in scope.
  *
- *   termio-browser exec <<'JS'
+ *   runbrowser exec <<'JS'
  *     await cdp('Page.navigate', { url: 'https://example.com' })
  *     await waitFor(async () => (await evaluate('document.readyState')) === 'complete')
  *     return await evaluate('document.title')
@@ -124,7 +124,7 @@ registerBuiltinCommand({
   def: {
     name: 'exec',
     description: 'Run a snippet against the browser with helpers in scope',
-    usage: "termio-browser exec [code]   (reads stdin when no code is given)",
+    usage: "runbrowser exec [code]   (reads stdin when no code is given)",
     positionals: [{ name: 'code', description: 'Code to run; omit to read stdin' }],
     flags: {
       helpers: { type: 'boolean', description: 'List the helpers in scope and exit' },

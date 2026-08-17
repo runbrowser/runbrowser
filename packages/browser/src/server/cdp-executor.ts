@@ -170,7 +170,7 @@ export class CDPExecutor implements ExecutorLike {
     })) as { success: boolean; sessionId: string; targetInfo: any }
 
     if (!result?.success || !result.sessionId) {
-      throw new Error('No connected browser tab found and failed to auto-create one. Click the termio browser extension icon on a tab.')
+      throw new Error('No connected browser tab found and failed to auto-create one. Click the runbrowser extension icon on a tab.')
     }
 
     // Register the target in relay state ourselves.

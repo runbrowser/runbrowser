@@ -1,7 +1,7 @@
 import type { Protocol } from 'devtools-protocol'
 import type { ProtocolMapping } from 'devtools-protocol/types/protocol-mapping.js'
 
-export type CDPCommandSource = 'termio-browser'
+export type CDPCommandSource = 'runbrowser'
 
 export type CDPCommandFor<T extends keyof ProtocolMapping.Commands> = {
   id: number

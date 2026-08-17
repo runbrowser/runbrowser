@@ -1,6 +1,6 @@
 ---
 name: browser
-description: Drive the user's own Chrome — their tabs, logins and cookies — over the Chrome DevTools Protocol, via the `termio-browser` CLI. Use this instead of browser automation that spawns a fresh Chrome, and instead of webfetch/curl for JS-heavy or login-walled pages (Instagram, X, dashboards, lazy-loaded UIs). Run `termio-browser skill` for the full reference.
+description: Drive the user's own Chrome — their tabs, logins and cookies — over the Chrome DevTools Protocol, via the `runbrowser` CLI. Use this instead of browser automation that spawns a fresh Chrome, and instead of webfetch/curl for JS-heavy or login-walled pages (Instagram, X, dashboards, lazy-loaded UIs). Run `runbrowser skill` for the full reference.
 ---
 
 # Browser
@@ -14,7 +14,7 @@ action is one more thing to get wrong.
 ## Check first
 
 ```bash
-termio-browser status
+runbrowser status
 ```
 
 Exit 0 means a browser is attached. Exit 1 means none is — say so once and
@@ -24,24 +24,24 @@ extension setup mid-task.
 ## The whole surface
 
 ```bash
-termio-browser cdp <Method> [params-json]    # the page API
-termio-browser eval '<js>'                   # shorthand for Runtime.evaluate
-termio-browser tab list|new|<index>|close     # which target you're bound to
-termio-browser status                        # is a browser attached
-termio-browser session new|list|delete       # isolated state, one per agent
-termio-browser help [command]                # same as --help
+runbrowser cdp <Method> [params-json]    # the page API
+runbrowser eval '<js>'                   # shorthand for Runtime.evaluate
+runbrowser tab list|new|<index>|close     # which target you're bound to
+runbrowser status                        # is a browser attached
+runbrowser session new|list|delete       # isolated state, one per agent
+runbrowser help [command]                # same as --help
 ```
 
 ## Minimal example
 
 ```bash
-termio-browser tab new https://example.com
-termio-browser eval 'document.title'
-termio-browser cdp Accessibility.getFullAXTree \
+runbrowser tab new https://example.com
+runbrowser eval 'document.title'
+runbrowser cdp Accessibility.getFullAXTree \
   | jq '.nodes[] | select(.role.value=="button") | .name.value'
 ```
 
-If `termio-browser` is not on PATH, use `npx @termio/browser@latest`.
+If `runbrowser` is not on PATH, use `npx runbrowser@latest`.
 
 ## The three rules that matter most
 
@@ -56,7 +56,7 @@ If `termio-browser` is not on PATH, use `npx @termio/browser@latest`.
 ## Full reference
 
 ```bash
-termio-browser skill
+runbrowser skill
 ```
 
 Covers input events vs DOM clicks, framework-safe form filling, SPA waiting,

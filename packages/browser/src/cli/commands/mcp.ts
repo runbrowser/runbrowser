@@ -11,7 +11,7 @@ registerBuiltinCommand({
   def: {
     name: 'mcp',
     description: 'Run the MCP server on stdio, for Claude Code / Cursor and friends',
-    usage: 'termio-browser mcp [--host <host>] [--token <token>]',
+    usage: 'runbrowser mcp [--host <host>] [--token <token>]',
   },
   async execute(args) {
     const { startMcp } = await import('../../mcp/server.js')

@@ -1,5 +1,5 @@
 {
-  "name": "termio-browser-root",
+  "name": "runbrowser-root",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -7,9 +7,9 @@
     "build": "pnpm --filter mcp-extension build",
     "build:extension": "pnpm --filter mcp-extension build",
     "dev:extension": "pnpm --filter mcp-extension dev",
-    "typecheck": "pnpm --filter @termio/browser typecheck",
-    "test": "pnpm --filter @termio/browser test",
-    "publish:all": "pnpm --filter @termio/browser publish --no-git-checks"
+    "typecheck": "pnpm --filter runbrowser typecheck",
+    "test": "pnpm --filter runbrowser test",
+    "publish:all": "pnpm --filter runbrowser publish --no-git-checks"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

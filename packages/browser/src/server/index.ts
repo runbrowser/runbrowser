@@ -1,5 +1,5 @@
 /**
- * termio-browser-server — CDP server for RunBrowser.
+ * runbrowser-server — CDP server for RunBrowser.
  *
  * Bridges Chrome extension WebSocket connections to Playwright CDP clients.
  * This package provides the core relay server functionality, shared types,
