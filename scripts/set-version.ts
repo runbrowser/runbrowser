@@ -2,17 +2,22 @@
 /**
  * Write a release version into the package manifest.
  *
- * The version lives in two places that must agree: the package's own `version`
- * and the exact pins in `optionalDependencies`, one per platform binary. Bump
- * one without the other and npm reports nothing — the optional dependency is
- * simply absent, and the CLI fails on a user's first command. So nobody edits
- * either by hand; this writes both from one argument.
+ * Two things have to agree: the package's own `version` and the exact pins on
+ * each platform binary. Bump one without the other and npm reports nothing —
+ * the optional dependency is simply absent, and the CLI fails on a user's
+ * first command. So nobody edits either by hand; this writes both.
+ *
+ * The optionalDependencies are added here rather than kept in the manifest
+ * because they name packages that exist only after a release publishes them.
+ * In the source tree they would make a clean `pnpm install --frozen-lockfile`
+ * unsatisfiable, which is how CI failed the first time it ran.
  *
  * Usage:
  *   bun scripts/set-version.ts 0.2.0
  */
 
 import path from 'node:path'
+import { optionalDependenciesFor } from './targets.ts'
 
 const version = process.argv[2]
 
@@ -33,16 +38,12 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) {
 const manifestPath = path.resolve(import.meta.dir, '..', 'packages', 'browser', 'package.json')
 const manifest = await Bun.file(manifestPath).json()
 
-const platforms = Object.keys(manifest.optionalDependencies ?? {})
-if (platforms.length === 0) {
-  console.error('No optionalDependencies to update — refusing to write a half-set version.')
-  process.exit(1)
-}
-
 manifest.version = version
-manifest.optionalDependencies = Object.fromEntries(platforms.map((name) => [name, version]))
+manifest.optionalDependencies = optionalDependenciesFor(version)
 
 await Bun.write(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
 
 console.log(`@termio/browser -> ${version}`)
-for (const name of platforms) console.log(`  ${name} -> ${version}`)
+for (const name of Object.keys(manifest.optionalDependencies)) {
+  console.log(`  ${name} -> ${version}`)
+}

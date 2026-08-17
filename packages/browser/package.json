@@ -1,7 +1,7 @@
 {
   "name": "@termio/browser",
   "version": "0.1.0",
-  "description": "Control your running Chrome browser over CDP — your logins, extensions and cookies already there",
+  "description": "Control your running Chrome browser over CDP \u2014 your logins, extensions and cookies already there",
   "type": "module",
   "exports": {
     ".": "./src/server/index.ts",
@@ -63,10 +63,5 @@
     "typescript": "^5.9.3",
     "zod": "^4.3.5",
     "zustand": "^5.0.8"
-  },
-  "optionalDependencies": {
-    "@termio/browser-darwin-arm64": "0.1.0",
-    "@termio/browser-darwin-x64": "0.1.0",
-    "@termio/browser-linux-x64": "0.1.0"
   }
 }
