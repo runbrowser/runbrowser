@@ -73,6 +73,7 @@ jobs:
       # Refuse early and legibly. npm answers a duplicate version with a 403
       # that reads like a permissions problem.
       - name: Check the version is unpublished
+        if: vars.NPM_PUBLISH == 'true'
         run: |
           version="${{ steps.version.outputs.version }}"
           if npm view "runbrowser@$version" version >/dev/null 2>&1; then
@@ -106,10 +107,19 @@ jobs:
           ./dist-npm/runbrowser-linux-x64/runbrowser --help > /dev/null
           ./dist-npm/runbrowser-linux-x64/runbrowser skill > /dev/null
 
+      # npm is gated on a repository variable because the package is not
+      # bootstrapped yet: trusted publishing is configured on a package's
+      # settings page, and a package that has never been published has none.
+      # Until scripts/first-publish.sh runs from a developer machine, these
+      # steps fail — and failing here used to take the GitHub release down
+      # with them, which is why v0.1.0 had to be built and uploaded by hand.
+      # Set the NPM_PUBLISH variable to 'true' once the bootstrap is done.
+      #
       # Platform packages first: they are optional dependencies of the main
       # package, so the other order leaves a window in which installing it
       # resolves nothing to run.
       - name: Publish platform packages
+        if: vars.NPM_PUBLISH == 'true'
         run: |
           for directory in dist-npm/*/; do
             npm publish "$directory" --access public
@@ -118,6 +128,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
 
       - name: Publish runbrowser
+        if: vars.NPM_PUBLISH == 'true'
         run: npm publish packages/browser --access public
         env:
           NPM_CONFIG_PROVENANCE: true
@@ -131,9 +142,14 @@ jobs:
             name=$(basename "$directory")
             tar czf "$name-$version.tar.gz" -C "$directory" .
           done
+          # scripts/install.sh verifies against this before unpacking, and
+          # treats a missing file as "skip verification" — so leaving it out
+          # silently downgrades every install rather than failing one.
+          sha256sum ./*.tar.gz | sed 's| \./| |' > SHA256SUMS.txt
+          cat SHA256SUMS.txt
           gh release create "v$version" \
             --title "v$version" \
             --generate-notes \
-            ./*.tar.gz
+            ./*.tar.gz SHA256SUMS.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
