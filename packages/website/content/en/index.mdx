@@ -14,6 +14,8 @@ toc:
     href: "#events"
   - label: "Plugins"
     href: "#plugins"
+  - label: "Writing a plugin"
+    href: "#writing-a-plugin"
   - label: "Sessions"
     href: "#sessions"
   - label: "MCP"
@@ -161,6 +163,65 @@ runbrowser plugin install <site> --repo owner/name
 
 </Section>
 
+<Section id="writing-a-plugin" title="Writing a plugin">
+
+A plugin is one file. Drop it in `~/.runbrowser/plugins/<site>/<name>.js` and it becomes `runbrowser <site> <name>` immediately — no build step, no registration.
+
+**1. Find the request the site already makes.** Open the page, watch the Network tab, and look for the JSON endpoint its own frontend calls. That endpoint is almost always better than scraping markup: class names change every deploy, an API the site depends on does not.
+
+**2. Write the header and the function.**
+
+```js
+/* @meta
+{
+  "name": "hackernews/top",
+  "description": "Hacker News front page",
+  "domain": "news.ycombinator.com",
+  "args": { "limit": { "type": "number", "description": "How many stories" } },
+  "columns": ["rank", "title", "points"]
+}
+*/
+async function(args) {
+  const limit = args.limit || 20
+  return [...document.querySelectorAll('tr.athing')].slice(0, limit).map((tr, i) => ({
+    rank: i + 1,
+    title: tr.querySelector('.titleline a')?.textContent ?? '',
+    points: tr.nextElementSibling?.querySelector('.score')?.textContent ?? '',
+  }))
+}
+```
+
+The function body runs **in the page**, so `document`, `fetch` and the site's own JavaScript are all available. It is a bare `async function`, not a module — no imports, no exports.
+
+**3. Run it.**
+
+```bash
+runbrowser hackernews top --limit 5
+runbrowser hackernews top --limit 5 --json    # the raw value
+```
+
+### What actually goes wrong
+
+**Absolute URLs.** `fetch('/api/items')` after navigating to the site is same-origin and carries the user's cookies. `fetch('https://other-host/api')` is not, and the browser will refuse it — this is the single most common reason a plugin returns nothing.
+
+**Forgetting `credentials: 'include'`.** Without it, `fetch` sends no cookies and you get the logged-out version of the page.
+
+**Returning nothing useful.** Return an array of flat objects and the table renders itself. An envelope like `{ count, items }` also works — the array inside is found — but flat rows are easier to read.
+
+**Guessing instead of looking.** Use `runbrowser exec` to poke at the page first, then move what worked into a plugin. That is the whole loop: work it out once, write it down, never derive it again.
+
+### Sharing it
+
+Put the file in a GitHub repository under `<site>/<name>.js` and anyone can install it:
+
+```bash
+runbrowser plugin install <site> --repo you/your-repo
+```
+
+A leading underscore (`_helper.js`) marks a file that is not itself a command — shared code a site's plugins keep beside them.
+
+</Section>
+
 <Section id="sessions" title="Sessions">
 
 A session is isolated state bound to one tab. Tabs are shared; state is not, so several agents can work in the same browser without stepping on each other.
@@ -214,14 +275,31 @@ A browser on a server is worthless — no cookies, no SSO, no 2FA. The useful ar
 
 <Section id="comparison" title="Comparison">
 
-| | Playwright / Puppeteer | Cookie-extraction tools | RunBrowser |
-| --- | --- | --- | --- |
-| Browser | Fresh, headless | None — replays cookies | **Yours, already running** |
-| Login state | None | Copied out, goes stale | **Already there, stays fresh** |
-| Credential stored | — | On disk, yours to secure | **None. Nothing is extracted** |
-| Anti-bot | Detected on sight | Fails any check beyond cookies | **It is a real browser** |
-| Request signing, token refresh | Reimplement it | Breaks | **The page does it** |
-| Needs a live browser | No | No | **Yes** |
+<ComparisonTable
+  title="vs Playwright / Puppeteer"
+  headers={['', 'Playwright / Puppeteer', 'RunBrowser']}
+  rows={[
+    ['Browser', 'Fresh, headless', 'Yours, already running'],
+    ['Login state', 'None — log in every time', 'Already there'],
+    ['Extensions', 'None', 'The ones you use'],
+    ['Anti-bot', 'Detected on sight', 'It is a real browser'],
+    ['Request signing', 'Reimplement it yourself', 'The page does it'],
+    ['Needs a live browser', 'No', 'Yes'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs cookie-extraction tools"
+  headers={['', 'Cookie extraction', 'RunBrowser']}
+  rows={[
+    ['Where the session lives', 'Copied to disk, encrypted', 'Stays in Chrome'],
+    ['Credential stored', 'Yours to secure and refresh', 'None. Nothing is extracted'],
+    ['Staleness', 'Expires — needs a refresh loop', 'The page keeps it fresh'],
+    ['Fingerprinting, TLS checks', 'Fails them', 'It is Chrome'],
+    ['Token refresh the page performs', 'Breaks', 'Happens normally'],
+    ['Works headless on a server', 'Yes', 'No'],
+  ]}
+/>
 
 If a site has a real API and you want long-running headless jobs, use a credential-injection tool — that is a different problem, honestly solved elsewhere. RunBrowser is for the sites that have no API and whose frontend does the signing.
 

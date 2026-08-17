@@ -14,6 +14,8 @@ toc:
     href: "#events"
   - label: "插件"
     href: "#plugins"
+  - label: "怎么写插件"
+    href: "#writing-a-plugin"
   - label: "会话"
     href: "#sessions"
   - label: "MCP"
@@ -161,6 +163,65 @@ runbrowser plugin install <site> --repo owner/name
 
 </Section>
 
+<Section id="writing-a-plugin" title="怎么写一个插件">
+
+一个插件就是一个文件。丢到 `~/.runbrowser/plugins/<site>/<name>.js`，它立刻就是 `runbrowser <site> <name>`——不用构建，不用注册。
+
+**第一步：找到这个站点自己发的请求。** 打开页面，看 Network 面板，找它前端自己调的那个 JSON 接口。这个接口几乎总是比扒 DOM 更靠谱：class 名每次发版都可能变，站点自己依赖的接口不会。
+
+**第二步：写头和函数。**
+
+```js
+/* @meta
+{
+  "name": "hackernews/top",
+  "description": "Hacker News 首页",
+  "domain": "news.ycombinator.com",
+  "args": { "limit": { "type": "number", "description": "取几条" } },
+  "columns": ["rank", "title", "points"]
+}
+*/
+async function(args) {
+  const limit = args.limit || 20
+  return [...document.querySelectorAll('tr.athing')].slice(0, limit).map((tr, i) => ({
+    rank: i + 1,
+    title: tr.querySelector('.titleline a')?.textContent ?? '',
+    points: tr.nextElementSibling?.querySelector('.score')?.textContent ?? '',
+  }))
+}
+```
+
+函数体是**在页面里**跑的，所以 `document`、`fetch` 和站点自己的 JavaScript 都能直接用。它是一个裸的 `async function`，不是模块——不要 import，不要 export。
+
+**第三步：跑它。**
+
+```bash
+runbrowser hackernews top --limit 5
+runbrowser hackernews top --limit 5 --json    # 原始返回值
+```
+
+### 实际会踩的坑
+
+**写了绝对 URL。** 导航到站点之后 `fetch('/api/items')` 是同源的，会带上用户的 Cookie；`fetch('https://别的域名/api')` 不是，浏览器会直接拒绝——这是插件返回空最常见的原因。
+
+**忘了 `credentials: 'include'`。** 不加的话 `fetch` 不带 Cookie，你拿到的是未登录版本的页面。
+
+**返回的东西没法用。** 返回一个扁平对象的数组，表格自己就渲染出来了。像 `{ count, items }` 这种信封也行——里面的数组会被找出来——但扁平的行更好读。
+
+**靠猜而不是靠看。** 先用 `runbrowser exec` 在页面上试，跑通了再挪进插件。整个循环就是这样：搞明白一次，写下来，以后不用再推一遍。
+
+### 分享出去
+
+把文件按 `<site>/<name>.js` 放进一个 GitHub 仓库，别人就能装：
+
+```bash
+runbrowser plugin install <site> --repo 你/你的仓库
+```
+
+下划线开头的文件（`_helper.js`）表示它本身不是一个命令，只是同一个站点的插件们共用的代码。
+
+</Section>
+
 <Section id="sessions" title="会话">
 
 一个会话是绑定到一个标签页的隔离状态。标签页是共享的，状态不是——所以多个 agent 可以在同一个浏览器里干活而不互相踩。
@@ -214,14 +275,31 @@ RUNBROWSER_HOST=my-machine RUNBROWSER_TOKEN=<secret> runbrowser status
 
 <Section id="comparison" title="对比">
 
-| | Playwright / Puppeteer | 导 Cookie 的工具 | RunBrowser |
-| --- | --- | --- | --- |
-| 浏览器 | 新开的 headless | 没有，只重放 Cookie | **你正在用的那个** |
-| 登录态 | 没有 | 导出来的，会过期 | **现成的，而且一直新鲜** |
-| 存了凭据吗 | — | 存在磁盘上，你自己保管 | **没有。什么都不导出** |
-| 反爬 | 一眼认出 | 只要多查一样就挂 | **它本来就是真浏览器** |
-| 请求签名、token 刷新 | 自己重新实现 | 挂 | **页面自己做** |
-| 需要浏览器开着吗 | 不需要 | 不需要 | **需要** |
+<ComparisonTable
+  title="对比 Playwright / Puppeteer"
+  headers={['', 'Playwright / Puppeteer', 'RunBrowser']}
+  rows={[
+    ['浏览器', '新开的 headless', '你正在用的那个'],
+    ['登录态', '没有，每次重新登', '现成的'],
+    ['扩展', '没有', '你平时用的那些'],
+    ['反爬', '一眼认出', '它本来就是真浏览器'],
+    ['请求签名', '自己重新实现一遍', '页面自己做'],
+    ['需要浏览器开着吗', '不需要', '需要'],
+  ]}
+/>
+
+<ComparisonTable
+  title="对比导 Cookie 的工具"
+  headers={['', '导 Cookie', 'RunBrowser']}
+  rows={[
+    ['会话存在哪', '导到磁盘上，加密保存', '一直在 Chrome 里'],
+    ['存了凭据吗', '存了，你自己保管和刷新', '没有，什么都不导出'],
+    ['会过期吗', '会，得自己写刷新逻辑', '页面自己保持新鲜'],
+    ['指纹、TLS 校验', '过不了', '它就是 Chrome'],
+    ['页面自己做的 token 刷新', '挂', '正常发生'],
+    ['能在服务器上无头跑吗', '能', '不能'],
+  ]}
+/>
 
 如果站点有正经 API，而且你想跑长时间的无头任务，那就用凭据注入类的工具——那是另一个问题，别人解得挺好。RunBrowser 面向的是那些没有 API、签名逻辑全在前端的站点。
 
