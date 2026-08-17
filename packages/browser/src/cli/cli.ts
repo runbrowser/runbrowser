@@ -39,6 +39,7 @@ import './commands/browser.js'
 import './commands/management.js'
 import './commands/install.js'
 import './commands/mcp.js'
+import './commands/exec.js'
 
 import { getBuiltinCommand, getAllBuiltinCommands, type SessionResolver } from './commands/index.js'
 

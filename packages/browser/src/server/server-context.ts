@@ -15,6 +15,7 @@ import type {
 } from './protocol.js'
 import type { CDPExecutor } from './cdp-executor.js'
 import type { CDPExecutorManager } from './cdp-executor-manager.js'
+import type { EventBufferRegistry } from './events.js'
 
 import * as relayState from './state.js'
 import pc from 'picocolors'
@@ -51,6 +52,9 @@ export type ServerContext = {
   executorManager: CDPExecutorManager
   getCDPExecutor: (sessionId: string) => CDPExecutor | null
   nextSessionNumber: { value: number }
+
+  /** Buffered CDP events, so a caller can read what happened between calls. */
+  eventBuffers: EventBufferRegistry
 
 
   // Extension helpers

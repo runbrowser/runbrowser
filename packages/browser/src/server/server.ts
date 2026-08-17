@@ -17,6 +17,7 @@ import { isRestrictedTarget } from './target-filter.js'
 import { createCdpLogger, type CdpLogEntry, type CdpLogger } from './cdp-log.js'
 import { CDPExecutorManager } from './cdp-executor-manager.js'
 import * as relayState from './state.js'
+import { EventBufferRegistry } from './events.js'
 import { createPrivilegedGuard, withCorsRoutes, wrapRoutes, type Routes } from './http.js'
 
 // Routes
@@ -24,6 +25,7 @@ import { cdpDiscoveryRoutes } from './routes/cdp-discovery.js'
 import { apiCommandRoutes } from './routes/api-commands.js'
 import { apiSessionRoutes } from './routes/api-sessions.js'
 import { apiCustomCommandRoutes } from './routes/api-custom-commands.js'
+import { apiEventRoutes } from './routes/api-events.js'
 import { extensionSocketHandlers, extensionUpgradeRoute } from './routes/extension-ws.js'
 import { playwrightSocketHandlers, playwrightUpgradeRoute } from './routes/playwright-ws.js'
 
@@ -461,10 +463,20 @@ export async function startRunBrowserCDPRelayServer({
       })
     },
 
+    eventBuffers: new EventBufferRegistry(),
+
     // Executor manager (initialized immediately after ctx creation)
     executorManager: undefined!,
     getCDPExecutor: undefined!,
   }
+
+  // Every event the extension forwards lands in the buffers, so a caller that
+  // is not holding a socket open can still find out what happened between one
+  // command and the next. Sessions with no buffer cost nothing — the registry
+  // only fans out to buffers that were asked for.
+  emitter.on('cdp:event', ({ event }: { event: CDPEventBase }) => {
+    ctx.eventBuffers.record(event)
+  })
 
   // ========================================================================
   // Executor manager
@@ -497,7 +509,12 @@ export async function startRunBrowserCDPRelayServer({
   const httpRoutes: Routes = {
     ...cdpDiscoveryRoutes(ctx),
     ...wrapRoutes(
-      { ...apiSessionRoutes(ctx), ...apiCommandRoutes(ctx), ...apiCustomCommandRoutes(ctx) },
+      {
+        ...apiSessionRoutes(ctx),
+        ...apiCommandRoutes(ctx),
+        ...apiCustomCommandRoutes(ctx),
+        ...apiEventRoutes(ctx),
+      },
       guard,
     ),
   }

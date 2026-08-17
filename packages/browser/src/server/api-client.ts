@@ -398,6 +398,20 @@ export class RelayApiClient {
   // Site commands
   // --------------------------------------------------------------------------
 
+  async drainEvents(
+    sessionId: string,
+    options: { peek?: boolean } = {},
+  ): Promise<{ events: Array<Record<string, unknown>>; dropped: number }> {
+    return this.post('/api/events/drain', { sessionId, peek: options.peek })
+  }
+
+  async setEventFilter(
+    sessionId: string,
+    pattern: string | null,
+  ): Promise<{ filter: string | null; buffered: number }> {
+    return this.post('/api/events/filter', { sessionId, pattern })
+  }
+
   async listCommands(): Promise<Array<{ site: string; name: string; description: string; args?: Record<string, any>; columns?: string[] }>> {
     try {
       const baseUrl = this.getBaseUrl()

@@ -6,6 +6,7 @@
 
 import type { ExecutorLike } from './server.js'
 import type { ExtensionEntry, SessionMetadata } from './state.js'
+import { isRestrictedTarget } from './target-filter.js'
 
 /**
  * Sends one CDP command and resolves with its raw result.
@@ -295,23 +296,33 @@ export class CDPExecutor implements ExecutorLike {
   // captured in one call can name a different tab in the next.
   // --------------------------------------------------------------------------
 
+  /**
+   * Answered from relay state, not from the browser.
+   *
+   * This used to forward `Target.getTargets`, which Chrome refuses over a
+   * tab-attached debugger — every call came back `{"code":-32000,"message":
+   * "Not allowed"}`. The relay already tracks each attached target as the
+   * extension reports it, and the WebSocket path has always answered this
+   * method from that same state rather than forwarding it.
+   */
   async listTabs(): Promise<Array<{ index: number; targetId: string; url: string; title: string; active: boolean }>> {
-    const result = (await this.sendCDP('Target.getTargets')) as {
-      targetInfos: Array<{ targetId: string; type: string; url: string; title: string }>
-    }
-    const pages = (result?.targetInfos ?? []).filter((t) => t.type === 'page')
-    const { cdpSessionId } = this.getActiveCdpSession()
     const entry = this.getExtensionEntry(this.extensionStableKey)
-    const activeTargetId = entry
-      ? [...entry.connectedTargets.values()].find((t) => t.sessionId === cdpSessionId)?.targetId ?? null
-      : null
-    return pages.map((t, index) => ({
-      index,
-      targetId: t.targetId,
-      url: t.url,
-      title: t.title,
-      active: t.targetId === activeTargetId,
-    }))
+    if (!entry) return []
+
+    const { cdpSessionId } = this.getActiveCdpSession()
+    const activeTargetId =
+      [...entry.connectedTargets.values()].find((t) => t.sessionId === cdpSessionId)?.targetId ??
+      null
+
+    return [...entry.connectedTargets.values()]
+      .filter((t) => t.targetInfo.type === 'page' && !isRestrictedTarget(t.targetInfo))
+      .map((t, index) => ({
+        index,
+        targetId: t.targetId,
+        url: t.targetInfo.url,
+        title: t.targetInfo.title,
+        active: t.targetId === activeTargetId,
+      }))
   }
 
   async newTab(url?: string): Promise<{ targetId: string; url: string }> {
