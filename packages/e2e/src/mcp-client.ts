@@ -25,10 +25,14 @@ export async function createTransport({ args = [], port }: { args?: string[]; po
   if (port) {
     env.TERMIO_BROWSER_PORT = String(port)
   }
+  // The MCP server is a verb on the CLI, not a separate package with its own
+  // entrypoint. Driving it the way a real client does — `termio-browser mcp`
+  // over stdio — is also what keeps this honest about the shipped surface.
+  const browserPackage = path.resolve(path.dirname(__filename), '../../browser')
   const transport = new StdioClientTransport({
-    command: 'pnpm',
-    args: ['vite-node', path.resolve(path.dirname(__filename), '../../mcp/src/main.ts'), ...args],
-    cwd: path.resolve(path.dirname(__filename), '../../mcp'),
+    command: 'bun',
+    args: [path.join(browserPackage, 'src', 'cli', 'cli.ts'), 'mcp', ...args],
+    cwd: browserPackage,
     stderr: 'pipe',
     env,
   })

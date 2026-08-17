@@ -90,21 +90,36 @@ export async function setupTestContext({
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), tempDirPrefix))
   const extensionPath = path.resolve(__dirname, '../../extension', distDir)
 
-  const browserContext = await chromium.launchPersistentContext(userDataDir, {
-    channel: 'chromium',
-    headless: !process.env.HEADFUL,
-    colorScheme: 'dark',
-    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
-  })
-
-  const serviceWorker = await getExtensionServiceWorker(browserContext)
-
-  if (toggleExtension) {
-    const page = await browserContext.newPage()
-    await page.goto('about:blank')
-    await serviceWorker.evaluate(async () => {
-      await (globalThis as any).toggleExtensionForActiveTab()
+  // Anything that throws from here on has to take the relay server with it.
+  // Left listening, it fails the *next* suite with EADDRINUSE, which reads as
+  // a port conflict and buries the error that actually happened.
+  let browserContext: BrowserContext
+  try {
+    browserContext = await chromium.launchPersistentContext(userDataDir, {
+      channel: 'chromium',
+      headless: !process.env.HEADFUL,
+      colorScheme: 'dark',
+      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
     })
+  } catch (error) {
+    relayServer.close()
+    throw error
+  }
+
+  try {
+    const serviceWorker = await getExtensionServiceWorker(browserContext)
+
+    if (toggleExtension) {
+      const page = await browserContext.newPage()
+      await page.goto('about:blank')
+      await serviceWorker.evaluate(async () => {
+        await (globalThis as any).toggleExtensionForActiveTab()
+      })
+    }
+  } catch (error) {
+    await browserContext.close().catch(() => {})
+    relayServer.close()
+    throw error
   }
 
   return { browserContext, userDataDir, relayServer }

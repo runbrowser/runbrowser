@@ -181,7 +181,15 @@ export async function startRunBrowserCDPRelayServer({
 
       const safeSend = (client: relayState.PlaywrightClient) => {
         try {
-          client.ws.send(messageStr)
+          // send() reports rather than throws: 0 means the message was dropped,
+          // -1 means backpressure (still queued). A dropped CDP response is
+          // silent data loss — the client waits on a reply that will never
+          // arrive — so it has to be surfaced, not swallowed.
+          if (client.ws.send(messageStr) === 0) {
+            logger?.error(
+              pc.red(`[Relay] Dropped a message to client ${client.id} — the socket refused it.`),
+            )
+          }
         } catch (e) {
           logger?.log(
             pc.gray(`[Relay] Skipped sending to closing client ${client.id}: ${(e as Error).message}`),
@@ -274,9 +282,7 @@ export async function startRunBrowserCDPRelayServer({
           return
         }
 
-        try {
-          latestExt.ws.send(JSON.stringify(message))
-        } catch (error) {
+        const failSend = (cause: Error) => {
           clearTimeout(timeoutId)
           store.setState((s) =>
             relayState.removeExtensionPendingRequest(s, {
@@ -284,8 +290,17 @@ export async function startRunBrowserCDPRelayServer({
               requestId: id,
             }),
           )
-          const sendError = error instanceof Error ? error : new Error(String(error))
-          reject(new Error(`Extension send failed: ${method}`, { cause: sendError }))
+          reject(new Error(`Extension send failed: ${method}`, { cause }))
+        }
+
+        try {
+          // A dropped message would otherwise sit here until the 30s timeout,
+          // reporting a hang for what is really a refused write.
+          if (latestExt.ws.send(JSON.stringify(message)) === 0) {
+            failSend(new Error('WebSocket dropped the message'))
+          }
+        } catch (error) {
+          failSend(error instanceof Error ? error : new Error(String(error)))
         }
       })
     },
