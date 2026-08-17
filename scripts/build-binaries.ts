@@ -22,21 +22,26 @@ const entry = path.join(root, 'packages', 'browser', 'src', 'cli', 'cli.ts')
 const outputRoot = path.join(root, 'dist-npm')
 
 /**
- * The launcher finds a binary through optionalDependencies, so this list and
- * that field have to agree exactly, at the same version. When they drift npm
- * reports nothing — the optional dependency is simply absent, and the CLI
- * fails at first run on a user's machine instead of here.
+ * The launcher finds a binary through optionalDependencies, so that field and
+ * this target list have to agree, at the same version.
+ *
+ * An absent field means this is a plain build — CI compiles on every push to
+ * check the artifact still runs, and has no release to prepare. A field that
+ * is present and disagrees means set-version wrote one and something changed
+ * underneath it, which npm would report as nothing at all: the optional
+ * dependency is simply missing and the CLI fails on a user's first command.
  */
-const expected = optionalDependenciesFor(packageJson.version)
 const declared = packageJson.optionalDependencies ?? {}
 
-if (JSON.stringify(expected) !== JSON.stringify(declared)) {
-  console.error('optionalDependencies do not match the build targets.')
-  console.error('Run `bun scripts/set-version.ts <version>` first — it writes them.\n')
-  console.error('  declared:', JSON.stringify(declared))
-  console.error('  expected:', JSON.stringify(expected))
-  console.error('\nUpdate packages/browser/package.json to match, then rerun.')
-  process.exit(1)
+if (Object.keys(declared).length > 0) {
+  const expected = optionalDependenciesFor(packageJson.version)
+  if (JSON.stringify(expected) !== JSON.stringify(declared)) {
+    console.error('optionalDependencies do not match the build targets.')
+    console.error('Run `bun scripts/set-version.ts <version>` to rewrite them.\n')
+    console.error('  declared:', JSON.stringify(declared))
+    console.error('  expected:', JSON.stringify(expected))
+    process.exit(1)
+  }
 }
 
 await rm(outputRoot, { recursive: true, force: true })
