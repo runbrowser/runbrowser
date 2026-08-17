@@ -1,26 +1,240 @@
 ---
-title: "RunBrowser is now the browser layer for termio"
-description: "RunBrowser has moved to termio-sh/browser. Same idea — drive your real logged-in Chrome over CDP — now built into termio."
-toc: []
+title: "RunBrowser - Chrome extension & CLI that lets agents use your real browser"
+description: "Chrome extension and CLI that let your agents control your actual browser. Your logins, extensions, cookies — already there. No credential is ever extracted or stored."
+toc:
+  - label: "Getting started"
+    href: "#getting-started"
+  - label: "How it works"
+    href: "#how-it-works"
+  - label: "The commands"
+    href: "#commands"
+  - label: "exec"
+    href: "#exec"
+  - label: "Events"
+    href: "#events"
+  - label: "Plugins"
+    href: "#plugins"
+  - label: "Sessions"
+    href: "#sessions"
+  - label: "MCP"
+    href: "#mcp"
+  - label: "Remote access"
+    href: "#remote-access"
+  - label: "Comparison"
+    href: "#comparison"
+  - label: "Security"
+    href: "#security"
 ---
 
-RunBrowser has moved. The code, the history and the design notes now live at
-[termio-sh/browser](https://github.com/termio-sh/browser), and the project is becoming the
-browser layer for [termio](https://termio.sh) — a terminal-first environment for coding agents.
+A Chrome extension and CLI that let your agents drive **your actual browser** — with logins, extensions and cookies already there. [Star on GitHub](https://github.com/termio-sh/runbrowser).
 
-The idea hasn't changed: give an agent **your real Chrome**, with your logins, cookies and
-extensions already there, instead of a fresh headless instance that is logged into nothing.
+Other browser tools **spawn a fresh Chrome**: logged into nothing, extensions gone, flagged by bot detection on sight. Others extract your cookies to a file and replay them, which works until a site checks anything beyond a cookie. RunBrowser does neither. Your code runs **inside the page**, on the site's own origin, so the browser attaches your session itself. **No credential is ever extracted or stored** — there is nothing for this tool to leak, because it never holds one.
 
-What did change is the interface. The old CLI had 38 commands — `click`, `fill`, `snapshot`,
-`@ref` element handles. They're gone. Chrome's DevTools Protocol is already complete and
-documented, and models are trained on it, so a hand-written vocabulary on top only got in the
-way. What's left is `cdp` and `eval`, and the reasoning is written down in
-[the RFC](https://github.com/termio-sh/browser/blob/main/rfcs/minimal-cdp-surface.md).
+<Section id="getting-started" title="Getting started">
 
-One thing worth knowing if you came here to install it: since **Chrome 136**, the
-`--remote-debugging-port` switch is ignored for your default profile, and a separate
-`--user-data-dir` gets different encryption. A Chrome extension is now the only way into a
-browser you're actually logged into. That's the part being built.
+**Install the CLI.** One binary, self-contained — no Node, Bun or npm involved.
 
-**Status:** mid-rewrite. The published npm package is the older version, and `main` is not
-shippable yet. Watch the repo if you want to know when it is.
+```bash
+curl -fsSL https://runbrowser.com/install | sh
+```
+
+**Install the extension**, then click its icon on a tab to attach it. The icon turns green.
+
+**Check it worked.**
+
+```bash
+runbrowser status
+runbrowser eval 'document.title'
+```
+
+</Section>
+
+<Section id="how-it-works" title="How it works">
+
+Three pieces, and the browser is never one you launched.
+
+The **extension** attaches to a tab you choose, via `chrome.debugger`. The **relay** runs on your machine and speaks the Chrome DevTools Protocol to that extension over a local WebSocket. The **CLI** talks to the relay.
+
+Nothing leaves your machine. Nothing is stored. The tab is one you picked, and Chrome shows its own "is being debugged" banner the whole time — which RunBrowser never suppresses.
+
+</Section>
+
+<Section id="commands" title="The commands">
+
+Everything a page can do is a CDP method, so `cdp` reaches the entire protocol. There is no `click`, no `snapshot`, no element-handle system — a wrapper per action is one more thing to get wrong, and Chrome's protocol is complete, documented, and versioned by Chrome.
+
+```bash
+runbrowser cdp <Method> [params-json]   # the whole protocol
+runbrowser eval '<js>'                  # JavaScript in the page
+runbrowser exec                         # a snippet with helpers, from stdin
+runbrowser tab list|new|<index>|close   # which target you are bound to
+runbrowser session new|list|delete      # isolated state, one per agent
+runbrowser plugin list|install          # site plugins
+runbrowser mcp                          # MCP server on stdio
+runbrowser serve                        # the relay, for remote access
+```
+
+`cdp` prints JSON, so pipe it:
+
+```bash
+runbrowser cdp Accessibility.getFullAXTree \
+  | jq '.nodes[] | select(.role.value=="button") | .name.value'
+```
+
+`eval` runs in the same mode the DevTools console does — the value is the last expression, and top-level `await` works:
+
+```bash
+runbrowser eval 'document.title'
+runbrowser eval 'const r = await fetch("/api/me"); (await r.json()).name'
+```
+
+</Section>
+
+<Section id="exec" title="exec">
+
+`cdp` and `eval` are one call each. When a task needs a loop, a condition, or a wait built from what actually happened, use `exec` — a snippet with helpers already in scope.
+
+```bash
+runbrowser exec <<'JS'
+  await cdp('Page.navigate', { url: 'https://example.com' })
+  await waitFor(async () => (await evaluate('document.readyState')) === 'complete')
+  const links = await evaluate('[...document.querySelectorAll("a")].map(a => a.href)')
+  return { title: await evaluate('document.title'), links }
+JS
+```
+
+In scope: `cdp`, `evaluate`, `pageInfo`, `tabs`, `newTab`, `switchTab`, `closeTab`, `drainEvents`, `setEventFilter`, `wait`, `waitFor`.
+
+Anything you export from `~/.runbrowser/workspace/helpers.ts` joins that scope and reloads when you edit it — so when you work out a sequence that works, you keep it instead of deriving it again next time.
+
+</Section>
+
+<Section id="events" title="Events">
+
+CDP is commands *and* events. Commands return results; events are buffered per session and drained when you want them. That is what lets you wait on things with no observable side effect to poll for — dialogs, downloads, popups, target attachment.
+
+```bash
+runbrowser exec <<'JS'
+  await setEventFilter('^Page\\.')
+  await drainEvents()
+  await cdp('Page.navigate', { url: 'https://example.com' })
+  const { events, dropped } = await drainEvents()
+  return events.map(e => e.method)
+JS
+```
+
+The buffer is capped and reports what it dropped, so a busy page cannot grow it without limit — set a filter rather than letting `Network.*` flood it.
+
+</Section>
+
+<Section id="plugins" title="Plugins">
+
+**144 plugins across 50 sites** ship with RunBrowser — reddit, twitter, zhihu, weibo, bilibili, v2ex, github, hackernews, linkedin, xiaohongshu and more.
+
+```bash
+runbrowser plugin list
+runbrowser plugin install v2ex
+runbrowser v2ex hot --count 5
+```
+
+A plugin is a JSON header and a bare async function, evaluated **in the page** — one round trip, with that site's cookies, origin and its own JavaScript available:
+
+```js
+/* @meta
+{ "name": "v2ex/hot", "domain": "www.v2ex.com",
+  "args": { "count": { "type": "number", "description": "How many" } } }
+*/
+async function(args) {
+  const resp = await fetch('/api/topics/hot.json', { credentials: 'include' })
+  const topics = await resp.json()
+  return topics.slice(0, args.count || 20).map((t, i) => ({
+    rank: i + 1, title: t.title, replies: t.replies,
+  }))
+}
+```
+
+`domain` is the load-bearing field: it decides which origin the function runs on, and therefore whose cookies it gets. Install from anyone's repository:
+
+```bash
+runbrowser plugin install <site> --repo owner/name
+```
+
+</Section>
+
+<Section id="sessions" title="Sessions">
+
+A session is isolated state bound to one tab. Tabs are shared; state is not, so several agents can work in the same browser without stepping on each other.
+
+```bash
+runbrowser session new       # → prints an id
+runbrowser -s 3 tab list     # act inside session 3
+```
+
+Without `-s`, the CLI reuses an existing session or creates one.
+
+</Section>
+
+<Section id="mcp" title="MCP">
+
+The MCP server is a verb on the same binary, not a separate package:
+
+```json
+{
+  "mcpServers": {
+    "runbrowser": { "command": "runbrowser", "args": ["mcp"] }
+  }
+}
+```
+
+For agents that read skills rather than tool schemas:
+
+```bash
+runbrowser skill install     # → ./.claude/skills and ./.agents/skills
+```
+
+</Section>
+
+<Section id="remote-access" title="Remote access">
+
+The browser lives where you are; the agent can live elsewhere. Run the relay bound to an interface the agent can reach, with a token:
+
+```bash
+runbrowser serve --host 0.0.0.0 --token <secret>
+```
+
+Then point the CLI at it:
+
+```bash
+RUNBROWSER_HOST=my-machine RUNBROWSER_TOKEN=<secret> runbrowser status
+```
+
+A browser on a server is worthless — no cookies, no SSO, no 2FA. The useful arrangement is the opposite: the browser stays with the human, and the agent reaches back to it.
+
+</Section>
+
+<Section id="comparison" title="Comparison">
+
+| | Playwright / Puppeteer | Cookie-extraction tools | RunBrowser |
+| --- | --- | --- | --- |
+| Browser | Fresh, headless | None — replays cookies | **Yours, already running** |
+| Login state | None | Copied out, goes stale | **Already there, stays fresh** |
+| Credential stored | — | On disk, yours to secure | **None. Nothing is extracted** |
+| Anti-bot | Detected on sight | Fails any check beyond cookies | **It is a real browser** |
+| Request signing, token refresh | Reimplement it | Breaks | **The page does it** |
+| Needs a live browser | No | No | **Yes** |
+
+If a site has a real API and you want long-running headless jobs, use a credential-injection tool — that is a different problem, honestly solved elsewhere. RunBrowser is for the sites that have no API and whose frontend does the signing.
+
+</Section>
+
+<Section id="security" title="Security">
+
+**No credential is ever extracted or stored.** The relay has no cookie access — no `getCookies`, no cookie jar, nothing on disk. Plugin code runs inside the page, so the browser attaches your session itself, over its own TLS stack.
+
+**The relay binds to localhost** by default, and the extension endpoint accepts connections only from a known extension origin on the local machine. Remote access is opt-in, requires a token, and refuses cross-origin browser requests outright.
+
+**Chrome's own banner stays up.** The "is being debugged" notice is never suppressed — if something is driving your browser, you can see it.
+
+**One tab, chosen by you.** The extension attaches to the tab whose icon you clicked, not to your whole profile.
+
+</Section>

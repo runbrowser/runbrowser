@@ -1,22 +1,240 @@
 ---
-title: "RunBrowser 现在是 termio 的浏览器层"
-description: "RunBrowser 已迁移到 termio-sh/browser。思路不变——用 CDP 驱动你自己已登录的 Chrome——现在内建于 termio。"
-toc: []
+title: "RunBrowser - 让 agent 用你真实浏览器的 Chrome 扩展和 CLI"
+description: "Chrome 扩展加 CLI，让 agent 直接操作你正在用的浏览器。登录态、扩展、Cookie 都在。全程不导出、不保存任何凭据。"
+toc:
+  - label: "快速开始"
+    href: "#getting-started"
+  - label: "工作原理"
+    href: "#how-it-works"
+  - label: "命令"
+    href: "#commands"
+  - label: "exec"
+    href: "#exec"
+  - label: "事件"
+    href: "#events"
+  - label: "插件"
+    href: "#plugins"
+  - label: "会话"
+    href: "#sessions"
+  - label: "MCP"
+    href: "#mcp"
+  - label: "远程访问"
+    href: "#remote-access"
+  - label: "对比"
+    href: "#comparison"
+  - label: "安全"
+    href: "#security"
 ---
 
-RunBrowser 搬家了。代码、历史和设计记录都在
-[termio-sh/browser](https://github.com/termio-sh/browser)，这个项目正在成为
-[termio](https://termio.sh) 的浏览器层——一个面向编程 agent 的终端优先开发环境。
+一个 Chrome 扩展加一个 CLI，让 agent 操作**你正在用的那个浏览器**——登录态、扩展、Cookie 全都现成的。[在 GitHub 上 Star](https://github.com/termio-sh/runbrowser)。
 
-想法没变：让 agent 用**你真实的 Chrome**，你的登录态、cookie 和扩展都在，而不是一个什么都没登录的全新无头实例。
+别的方案要么**新开一个干净的 Chrome**：什么都没登录，扩展没了，反爬一眼就认出来；要么把你的 Cookie 导出来存成文件再重放，只要网站多查一样东西就失效。RunBrowser 两样都不做。你的代码跑在**页面里面**，在网站自己的源上，浏览器自己把会话带上。**全程不导出、不保存任何凭据**——这个工具没有东西可泄露，因为它从来不持有。
 
-变的是接口。旧 CLI 有 38 条命令——`click`、`fill`、`snapshot`、`@ref` 元素句柄，现在都删掉了。
-Chrome DevTools Protocol 本身已经完整且有文档，模型也在上面训练过，再手写一层词汇表只会挡路。
-留下的是 `cdp` 和 `eval`，理由写在
-[这份 RFC](https://github.com/termio-sh/browser/blob/main/rfcs/minimal-cdp-surface.md) 里。
+<Section id="getting-started" title="快速开始">
 
-如果你是来安装的，有件事值得知道：从 **Chrome 136** 起，`--remote-debugging-port` 对默认 profile
-不再生效，而换一个 `--user-data-dir` 会用不同的加密。也就是说，要进入一个你真正登录着的浏览器，
-Chrome 扩展是现在唯一的路。这正是在做的部分。
+**装 CLI**。单个自包含二进制，不需要 Node、Bun 或 npm。
 
-**状态：** 重写中。npm 上已发布的是旧版本，`main` 还不能用。想知道什么时候能用，watch 一下仓库。
+```bash
+curl -fsSL https://runbrowser.com/install | sh
+```
+
+**装扩展**，然后在想操作的标签页上点一下扩展图标，图标变绿就接上了。
+
+**验证一下**。
+
+```bash
+runbrowser status
+runbrowser eval 'document.title'
+```
+
+</Section>
+
+<Section id="how-it-works" title="工作原理">
+
+三个部分，浏览器永远不是你启动的那个。
+
+**扩展**通过 `chrome.debugger` 接到你选的那个标签页。**中继**跑在你本机，用 Chrome DevTools Protocol 通过本地 WebSocket 和扩展通信。**CLI** 只跟中继说话。
+
+没有任何东西离开你的机器，没有任何东西被存下来。标签页是你自己点的，而且 Chrome 那条"正在被调试"的提示条全程都在——RunBrowser 从不隐藏它。
+
+</Section>
+
+<Section id="commands" title="命令">
+
+页面能做的一切都是一个 CDP 方法，所以 `cdp` 直接够到整个协议。这里没有 `click`、没有 `snapshot`、没有元素句柄系统——每包一层动词就多一处会出错的地方，而 Chrome 的协议本来就完整、有文档，还跟着 Chrome 一起版本化。
+
+```bash
+runbrowser cdp <Method> [params-json]   # 整个协议
+runbrowser eval '<js>'                  # 在页面里跑 JavaScript
+runbrowser exec                         # 带 helper 的代码片段，从 stdin 读
+runbrowser tab list|new|<index>|close   # 当前绑定的是哪个标签页
+runbrowser session new|list|delete      # 隔离状态，一个 agent 一个
+runbrowser plugin list|install          # 站点插件
+runbrowser mcp                          # stdio 上的 MCP server
+runbrowser serve                        # 中继，用于远程访问
+```
+
+`cdp` 输出 JSON，直接管道接走：
+
+```bash
+runbrowser cdp Accessibility.getFullAXTree \
+  | jq '.nodes[] | select(.role.value=="button") | .name.value'
+```
+
+`eval` 的行为和 DevTools 控制台一致——值就是最后一个表达式，顶层 `await` 可用：
+
+```bash
+runbrowser eval 'document.title'
+runbrowser eval 'const r = await fetch("/api/me"); (await r.json()).name'
+```
+
+</Section>
+
+<Section id="exec" title="exec">
+
+`cdp` 和 `eval` 一次一个调用。一旦需要循环、判断，或者需要根据实际发生的事情来等待，就用 `exec`——helper 已经在作用域里的代码片段。
+
+```bash
+runbrowser exec <<'JS'
+  await cdp('Page.navigate', { url: 'https://example.com' })
+  await waitFor(async () => (await evaluate('document.readyState')) === 'complete')
+  const links = await evaluate('[...document.querySelectorAll("a")].map(a => a.href)')
+  return { title: await evaluate('document.title'), links }
+JS
+```
+
+作用域里有：`cdp`、`evaluate`、`pageInfo`、`tabs`、`newTab`、`switchTab`、`closeTab`、`drainEvents`、`setEventFilter`、`wait`、`waitFor`。
+
+你从 `~/.runbrowser/workspace/helpers.ts` 导出的东西也会进这个作用域，改了会自动重新加载——所以哪次调通了一段序列，就把它留下来，下次不用再推一遍。
+
+</Section>
+
+<Section id="events" title="事件">
+
+CDP 既有命令也有事件。命令返回结果，事件按会话缓冲，你想要的时候再取。这样才能等那些没有可轮询副作用的东西——弹窗、下载、新开窗口、target 挂载。
+
+```bash
+runbrowser exec <<'JS'
+  await setEventFilter('^Page\\.')
+  await drainEvents()
+  await cdp('Page.navigate', { url: 'https://example.com' })
+  const { events, dropped } = await drainEvents()
+  return events.map(e => e.method)
+JS
+```
+
+缓冲区有上限，并且会报告丢了多少条，所以页面再忙也不会把它撑爆——与其让 `Network.*` 淹掉，不如先设个过滤。
+
+</Section>
+
+<Section id="plugins" title="插件">
+
+RunBrowser 自带 **50 个站点、144 个插件**——reddit、twitter、知乎、微博、bilibili、V2EX、github、hackernews、领英、小红书等等。
+
+```bash
+runbrowser plugin list
+runbrowser plugin install v2ex
+runbrowser v2ex hot --count 5
+```
+
+一个插件就是一段 JSON 头加一个裸的 async 函数，**在页面里**求值——一次往返，拿得到那个站点的 Cookie、源和它自己的 JavaScript：
+
+```js
+/* @meta
+{ "name": "v2ex/hot", "domain": "www.v2ex.com",
+  "args": { "count": { "type": "number", "description": "取几条" } } }
+*/
+async function(args) {
+  const resp = await fetch('/api/topics/hot.json', { credentials: 'include' })
+  const topics = await resp.json()
+  return topics.slice(0, args.count || 20).map((t, i) => ({
+    rank: i + 1, title: t.title, replies: t.replies,
+  }))
+}
+```
+
+`domain` 是最关键的一个字段：它决定函数跑在哪个源上，也就决定了拿到谁的 Cookie。也可以装别人仓库里的：
+
+```bash
+runbrowser plugin install <site> --repo owner/name
+```
+
+</Section>
+
+<Section id="sessions" title="会话">
+
+一个会话是绑定到一个标签页的隔离状态。标签页是共享的，状态不是——所以多个 agent 可以在同一个浏览器里干活而不互相踩。
+
+```bash
+runbrowser session new       # → 输出一个 id
+runbrowser -s 3 tab list     # 在会话 3 里操作
+```
+
+不带 `-s` 时，CLI 会复用已有会话，没有就新建一个。
+
+</Section>
+
+<Section id="mcp" title="MCP">
+
+MCP server 是同一个二进制上的一个动词，不是另一个包：
+
+```json
+{
+  "mcpServers": {
+    "runbrowser": { "command": "runbrowser", "args": ["mcp"] }
+  }
+}
+```
+
+如果你的 agent 读 skill 而不是工具 schema：
+
+```bash
+runbrowser skill install     # → ./.claude/skills 和 ./.agents/skills
+```
+
+</Section>
+
+<Section id="remote-access" title="远程访问">
+
+浏览器在你身边，agent 可以在别处。把中继绑到 agent 能访问的网卡上，加个 token：
+
+```bash
+runbrowser serve --host 0.0.0.0 --token <secret>
+```
+
+然后让 CLI 指过去：
+
+```bash
+RUNBROWSER_HOST=my-machine RUNBROWSER_TOKEN=<secret> runbrowser status
+```
+
+服务器上的浏览器没有价值——没有 Cookie、没有 SSO、没有二次验证。有用的安排正好反过来：浏览器留在人这边，agent 从远处连回来。
+
+</Section>
+
+<Section id="comparison" title="对比">
+
+| | Playwright / Puppeteer | 导 Cookie 的工具 | RunBrowser |
+| --- | --- | --- | --- |
+| 浏览器 | 新开的 headless | 没有，只重放 Cookie | **你正在用的那个** |
+| 登录态 | 没有 | 导出来的，会过期 | **现成的，而且一直新鲜** |
+| 存了凭据吗 | — | 存在磁盘上，你自己保管 | **没有。什么都不导出** |
+| 反爬 | 一眼认出 | 只要多查一样就挂 | **它本来就是真浏览器** |
+| 请求签名、token 刷新 | 自己重新实现 | 挂 | **页面自己做** |
+| 需要浏览器开着吗 | 不需要 | 不需要 | **需要** |
+
+如果站点有正经 API，而且你想跑长时间的无头任务，那就用凭据注入类的工具——那是另一个问题，别人解得挺好。RunBrowser 面向的是那些没有 API、签名逻辑全在前端的站点。
+
+</Section>
+
+<Section id="security" title="安全">
+
+**全程不导出、不保存任何凭据。** 中继根本没有读 Cookie 的能力——没有 `getCookies`，没有 cookie jar，磁盘上什么都没有。插件代码跑在页面里，浏览器用它自己的 TLS 栈带上你的会话。
+
+**中继默认只监听 localhost**，扩展端点只接受本机、已知扩展源的连接。远程访问是显式开启的，必须带 token，并且直接拒绝跨源的浏览器请求。
+
+**Chrome 自己的提示条一直在。** "正在被调试"那条通知从不被隐藏——有东西在操作你的浏览器，你看得见。
+
+**只有一个标签页，还是你自己点的。** 扩展接的是你点了图标的那个标签页，不是你整个浏览器配置。
+
+</Section>

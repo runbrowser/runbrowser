@@ -1,25 +1,461 @@
 ---
-title: "RunBrowser は termio のブラウザレイヤーになりました"
-description: "RunBrowser は termio-sh/browser に移動しました。CDP で実際にログイン済みの Chrome を操作するという考えはそのまま、termio に組み込まれます。"
-toc: []
+title: "RunBrowser - エージェントが実際のブラウザを操作できる Chrome 拡張機能と CLI"
+description: "Chrome 拡張機能と CLI で、エージェントがあなたの実際のブラウザを操作。ログイン状態、拡張機能、Cookie はすべてそのまま。ヘッドレスインスタンス不要、ボット検出なし。"
+toc:
+  - label: "はじめに"
+    href: "#getting-started"
+  - label: "仕組み"
+    href: "#how-it-works"
+  - label: "コラボレーション"
+    href: "#collaboration"
+  - label: "スナップショット"
+    href: "#snapshots"
+  - label: "CLI コマンド"
+    href: "#cli-commands"
+  - label: "サイトコマンド"
+    href: "#site-commands"
+  - label: "コマンド拡張"
+    href: "#command-extensions"
+  - label: "セッション"
+    href: "#sessions"
+  - label: "画面録画"
+    href: "#screen-recording"
+  - label: "MCP 連携"
+    href: "#mcp-integration"
+  - label: "比較"
+    href: "#comparison"
+  - label: "リモートアクセス"
+    href: "#remote-access"
+  - label: "セキュリティ"
+    href: "#security"
 ---
 
-RunBrowser は移動しました。コード、履歴、設計メモは
-[termio-sh/browser](https://github.com/termio-sh/browser) にあり、このプロジェクトは
-[termio](https://termio.sh)——コーディングエージェント向けのターミナル中心の開発環境——の
-ブラウザレイヤーになります。
+Chrome 拡張機能と CLI で、エージェントが**あなたの実際のブラウザ**を操作 — ログイン状態、拡張機能、Cookie がすでに利用可能。ヘッドレスインスタンス不要、ボット検出なし、余分なメモリ消費なし。[GitHub で Star](https://github.com/runbrowser/runbrowser)。
 
-考え方は変わりません。何もログインしていない新しいヘッドレスインスタンスではなく、
-ログイン情報・Cookie・拡張機能がそのまま入った**あなた自身の Chrome** をエージェントに渡します。
+他のブラウザ MCP は**新しい Chrome を起動**します — ログインなし、拡張機能なし、即座にボット検出、メモリ2倍消費。RunBrowser は**実行中のブラウザ**に接続します。Chrome 拡張機能1つで、完全な CDP アクセス、すでにログイン済みのすべてのサイトにアクセス可能。
 
-変わったのはインターフェースです。以前の CLI には `click`、`fill`、`snapshot`、`@ref` など
-38 のコマンドがありましたが、すべて削除しました。Chrome DevTools Protocol は既に完全で
-ドキュメントもあり、モデルもそれで学習しています。その上に手書きの語彙を重ねても邪魔になるだけでした。
-残ったのは `cdp` と `eval` で、理由は
-[RFC](https://github.com/termio-sh/browser/blob/main/rfcs/minimal-cdp-surface.md) に書いてあります。
+<Section id="getting-started" title="はじめに">
 
-インストール目的で来た方へ。**Chrome 136** 以降、`--remote-debugging-port` は既定のプロファイルでは
-無視され、別の `--user-data-dir` は暗号化が異なります。実際にログイン済みのブラウザに入る手段は、
-現状 Chrome 拡張だけです。今作っているのはその部分です。
+**3ステップ**でエージェントがブラウジングを開始。
 
-**状況:** 書き直し中。npm で公開されているのは旧バージョンで、`main` はまだ動きません。
+1. CLI をインストール：
+
+```bash
+npm i -g @jiweiyuan/runbrowser
+```
+
+2. Chrome に拡張機能をロード：`chrome://extensions/` を開き、デベロッパーモードを有効化、**パッケージ化されていない拡張機能を読み込む**をクリック、`packages/extension/dist` フォルダを選択
+
+3. タブの拡張機能アイコンをクリック — 緑色に変わります。使い始めましょう：
+
+```bash
+runbrowser navigate https://example.com
+runbrowser snapshot
+runbrowser click @e5
+```
+
+セッション管理は不要 — 最初のコマンドでセッションが**自動作成**されます。拡張機能がブラウザを `localhost:19988` のローカル WebSocket リレーに接続します。CLI がリレーを通じて CDP コマンドを送信。リモートサーバーなし、アカウント不要。
+
+**skill** もインストールしましょう — エージェントに RunBrowser の使い方を教えます：
+
+```bash
+npx -y skills add runbrowser/runbrowser
+```
+
+<Caption>拡張機能アイコン 緑 = 接続済み。グレー = このタブに未接続。</Caption>
+
+</Section>
+
+<Section id="how-it-works" title="仕組み">
+
+タブの拡張機能アイコンをクリック — `chrome.debugger` で接続し、ローカルリレーへの WebSocket を開きます。エージェント（CLI または MCP）が同じリレーに接続。**CDP コマンドが拡張機能を通じて直接 Chrome に流れます** — Playwright なし、中間層なし。
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│   BROWSER           │     │   LOCALHOST          │     │   CLIENT        │
+│                     │     │                      │     │                 │
+│  ┌───────────────┐  │     │ WebSocket Server     │     │  ┌───────────┐  │
+│  │   Extension   │<───────┬───>  :19988          │     │  │ CLI / MCP │  │
+│  └───────┬───────┘  │ WS  │                      │     │  └───────────┘  │
+│          │          │     │  /extension          │     │        │        │
+│    chrome.debugger  │     │       │              │     │        v        │
+│          v          │     │       v              │     │  ┌────────────┐ │
+│  ┌───────────────┐  │     │  CDPExecutor         │     │  │  HTTP API  │ │
+│  │ Tab 1 (green) │  │     │  (direct CDP)        │     │  │  /api/*    │ │
+│  │ Tab 2 (green) │  │     └──────────────────────┘     │  └────────────┘ │
+│  │ Tab 3 (gray)  │  │                                  │                 │
+└─────────────────────┘     Tab 3 not controlled         └─────────────────┘`}
+</CodeBlock>
+
+リレーは**セッションを多重化**するため、複数のエージェントや CLI インスタンスが同時にブラウザを操作可能。すべてのブラウザコマンドは CDP で直接実行 — Playwright 依存なし。
+
+</Section>
+
+<Section id="collaboration" title="コラボレーション">
+
+エージェントが**あなたのブラウザ**で動作するため、コラボレーションが可能。すべてをリアルタイムで確認 — クリックごとにターゲット要素に**緑のハイライト**が表示され、コマンドごとに微妙なボーダーの光が点滅。CAPTCHA が出たら**あなたが解決**。Cookie 同意が出たら、クリックして通過。エージェントが詰まったら、そのタブで拡張機能を無効化、手動で修正、再度有効化すれば、エージェントは中断したところから再開。
+
+リモート画面を見ているのでも、事後にログを読んでいるのでもない。**ブラウザを共有**しているのです。
+
+</Section>
+
+<Section id="snapshots" title="アクセシビリティスナップショット">
+
+エージェントは操作前にページを**見る**必要があります。アクセシビリティスナップショットは、すべてのインタラクティブ要素をテキストで返し、`@ref` ラベルが付きます。スクリーンショットの 100KB+ に対して **5～20KB** — 安価、高速、ビジョンなしで解析可能。
+
+```bash
+runbrowser snapshot
+
+# 出力:
+# - banner:
+#     - link "Home" @e1
+#     - navigation:
+#         - link "Docs" @e2
+#         - link "Blog" @e3
+# - main:
+#     - heading "Welcome" @e4
+#     - button "Get started" @e5
+```
+
+各行の **@ref** をコマンドに直接渡せます。スナップショットを**ページを読む主要な方法**として使用。
+
+```bash
+# スナップショットの ref でインタラクション
+runbrowser click @e5
+runbrowser fill @e3 "検索キーワード"
+runbrowser get text @e4
+
+# インタラクティブ要素のみフィルタ
+runbrowser snapshot -i
+
+# CSS セレクタでスコープ
+runbrowser snapshot -S "main"
+```
+
+</Section>
+
+<Section id="cli-commands" title="CLI コマンド">
+
+RunBrowser はカテゴリ別に整理された **50+ コマンド**を提供。すべてのコマンドが `--json` 出力と自動セッション作成をサポート。
+
+```bash
+# ナビゲーション
+runbrowser navigate https://example.com
+runbrowser back
+runbrowser forward
+runbrowser reload
+runbrowser close
+
+# 観察
+runbrowser snapshot                        # @refs 付きアクセシビリティツリー
+runbrowser snapshot -i                     # インタラクティブ要素のみ
+runbrowser screenshot shot.png             # スクリーンショット保存
+runbrowser get url                         # 現在の URL
+runbrowser get title                       # ページタイトル
+runbrowser get text @e5                    # 要素のテキスト
+runbrowser is visible @e5                  # 要素状態チェック
+
+# インタラクション
+runbrowser click @e5                       # 要素クリック
+runbrowser fill @e3 "hello world"          # 入力フィールドクリア＋入力
+runbrowser type "検索キーワード"             # 現在のフォーカスでタイプ
+runbrowser press Enter                     # キー押下
+runbrowser select @e5 "option-value"       # ドロップダウン選択
+runbrowser check @e5                       # チェックボックス
+runbrowser scroll down                     # スクロール
+runbrowser hover @e5                       # ホバー
+runbrowser viewport 1280 720              # ビューポートサイズ設定
+
+# 待機条件
+runbrowser wait @e5                        # 要素が表示されるまで待機
+runbrowser wait 2000                       # ミリ秒待機
+runbrowser wait --text "Welcome"           # テキスト出現待機
+
+# セマンティックロケーター
+runbrowser find role button click --name "Submit"
+runbrowser find text "ログイン" click
+
+# タブ＆フレーム管理
+runbrowser tab list
+runbrowser tab new https://example.com
+runbrowser frame "iframe#embed"
+runbrowser frame main
+
+# 実行
+runbrowser eval 'document.title'           # ブラウザで JS 実行
+runbrowser cdp Page.captureScreenshot '{}' # 生の CDP コマンド
+```
+
+<Caption>ホットパスにはフラットコマンド。管理にはサブグループ。eval はその他すべて。</Caption>
+
+</Section>
+
+<Section id="site-commands" title="サイトコマンド">
+
+任意のウェブサイトを **CLI コマンド**に変換。サイトコマンドは TypeScript プラグインで、ナビゲーション、スクレイピング、データ抽出を再利用可能なコマンドにカプセル化。1つのコマンドで**構造化 JSON** を取得。
+
+```bash
+# GitHub トレンドリポジトリを構造化データとして取得
+runbrowser github trending --limit 5
+
+# RANK  NAME                 STARS   LANGUAGE
+# ---   ----                 -----   --------
+# 1     denoland/deno        5.2k    Rust
+# 2     tauri-apps/tauri     3.8k    Rust
+
+# エージェント向け JSON 出力
+runbrowser github trending --limit 3 --json
+```
+
+`~/.runbrowser/commands/` に `.ts` ファイルを置くだけで**カスタムコマンドを作成**。TypeScript、IDE サポート完備。
+
+```typescript
+// ~/.runbrowser/commands/github/trending.ts
+
+export const description = 'GitHub trending repositories'
+export const columns = ['rank', 'name', 'stars', 'language']
+
+export const args = {
+  limit: { type: 'number', default: 20, description: 'Number of items' },
+}
+
+export async function run(ctx, args) {
+  await ctx.navigate('https://github.com/trending')
+  const data = await ctx.evaluate(`
+    [...document.querySelectorAll('article.Box-row')].map(el => ({
+      name: el.querySelector('h2 a')?.textContent?.trim(),
+      stars: el.querySelector('.octicon-star')?.parentElement?.textContent?.trim(),
+      language: el.querySelector('[itemprop="programmingLanguage"]')?.textContent?.trim(),
+    }))
+  `)
+  return data.slice(0, args.limit).map((item, i) => ({ rank: i + 1, ...item }))
+}
+```
+
+<Caption>TypeScript プラグイン。構造化データ。ナビゲーション→スナップショット→解析の代わりに1コマンド。</Caption>
+
+</Section>
+
+<Section id="command-extensions" title="コマンド拡張">
+
+[runbrowser/commands](https://github.com/runbrowser/commands) リポジトリから**コミュニティメンテナンスのコマンド**をインストール。クローン不要、ビルド不要 — インストールしてすぐに使用。
+
+```bash
+# 利用可能なコマンド拡張を一覧表示
+runbrowser commands list
+
+# Available command extensions:
+#
+#   reddit
+#   youtube
+#   x ✓ installed
+#   hackernews
+#   producthunt
+
+# 拡張をインストール
+runbrowser commands install reddit
+# ✓ Installed reddit/
+#   → ~/.runbrowser/commands/reddit/hot.ts
+#   → ~/.runbrowser/commands/reddit/search.ts
+
+# すぐに使用可能
+runbrowser reddit hot --limit 5
+runbrowser reddit search "ブラウザ自動化"
+
+# アンインストール
+runbrowser commands uninstall reddit
+# ✓ Uninstalled reddit/
+```
+
+コミュニティコマンドは **TypeScript ファイル**として `~/.runbrowser/commands/<site>/` にダウンロードされます。カスタムサイトコマンドと同じ形式 — 閲覧、修正、フォークが可能。
+
+**仕組み：** CLI が `runbrowser/commands` GitHub リポジトリから `.ts` ファイルを取得しローカルに保存。リレーサーバーが jiti で実行時にロード — コンパイル不要。各拡張は1つ以上のコマンドファイルを含むディレクトリ。
+
+**自分のコマンドを貢献：** [runbrowser/commands](https://github.com/runbrowser/commands) リポジトリにディレクトリを作成し、`.ts` ファイルを置いて PR を提出。あなたのコマンドが `runbrowser commands install` で全員に利用可能に。
+
+<Caption>一貫したサブコマンドパターン。コミュニティメンテナンス。カスタムコマンドと同じ TypeScript 形式。</Caption>
+
+</Section>
+
+<Section id="sessions" title="セッション">
+
+セッションは**自動作成** — コマンドを実行するだけで動作。高度な用途では明示的にセッションを管理。
+
+```bash
+runbrowser session new              # セッション作成、id を出力
+runbrowser session list             # セッションと状態キーを表示
+runbrowser session delete 1         # セッション削除
+```
+
+**複数のエージェントを同時に実行**しても互いに干渉しません。各セッションは独立したサンドボックス。ブラウザタブは共有、セッション状態は独立。
+
+```bash
+# 明示的なセッション指定
+runbrowser navigate https://a.com -s 1
+runbrowser navigate https://b.com -s 2
+
+# デフォルトセッションの設定
+export RUNBROWSER_SESSION=1
+runbrowser snapshot                 # セッション1を使用
+```
+
+</Section>
+
+<Section id="screen-recording" title="画面録画">
+
+エージェントの操作を **MP4 動画として録画**。`chrome.tabCapture` を使用し拡張機能コンテキストで実行するため、**ページナビゲーション後も継続**。
+
+```bash
+# 録画開始
+runbrowser record start -o recording.mp4
+
+# ナビゲーション、インタラクション — 録画はページをまたいで継続
+runbrowser navigate https://example.com
+runbrowser click @e5
+
+# 停止して保存
+runbrowser record stop
+```
+
+<Caption>ネイティブタブキャプチャ。ナビゲーションを越えて持続。H.264 MP4 に自動トランスコード。</Caption>
+
+</Section>
+
+<Section id="mcp-integration" title="MCP 連携">
+
+RunBrowser は **2ツールの MCP モデル** — `skill` と `run`。ツールの肥大化なし、スキーマの膨張なし。
+
+```json
+{
+  "mcpServers": {
+    "runbrowser": {
+      "command": "npx",
+      "args": ["-y", "@jiweiyuan/runbrowser-mcp@latest"]
+    }
+  }
+}
+```
+
+エージェントは `skill` で利用可能なコマンドを学習し、`run` で実行：
+
+```
+skill()  → 完全な CLI ドキュメント + サイトコマンドを返す
+run({ command: "navigate https://example.com" })
+run({ command: "snapshot" })
+run({ command: "click @e1" })
+run({ command: "eval document.title" })
+```
+
+`run` ツールは CLI と同じ構文。エージェントは別の API を学ぶ必要なし。
+
+<CodeBlock lang="diagram" lineHeight="1.3" showLineNumbers={false}>
+{`┌──────────────────────────────────────────────────────────────────────┐
+│                         MCP クライアント                              │
+│                  (Claude, Cursor, Windsurf...)                      │
+└──────────────┬──────────────────────────────┬────────────────────────┘
+               │                              │
+          skill()                        run(command)
+               │                              │
+               v                              v
+┌──────────────────────────────────────────────────────────────────────┐
+│                     RunBrowser MCP サーバー                           │
+│                                                                     │
+│   ┌─────────────────┐              ┌──────────────────────────┐     │
+│   │   skill ツール   │              │      run ツール          │     │
+│   │                 │              │                          │     │
+│   │  CLI ドキュメント │              │  コマンド文字列を解析     │     │
+│   │  + サイトコマンド │              │  リレーに転送            │     │
+│   │  一覧を返す      │              │  結果を返す              │     │
+│   └─────────────────┘              └────────────┬─────────────┘     │
+│                                                 │                   │
+└─────────────────────────────────────────────────┼───────────────────┘
+                                                  │
+                                            HTTP / WS
+                                                  │
+                                                  v
+                                    ┌─────────────────────────┐
+                                    │   リレー :19988          │
+                                    │   CDPExecutor           │
+                                    └────────────┬────────────┘
+                                                 │
+                                            chrome.debugger
+                                                 │
+                                                 v
+                                    ┌─────────────────────────┐
+                                    │   あなたの Chrome        │
+                                    └─────────────────────────┘`}
+</CodeBlock>
+
+</Section>
+
+<Section id="comparison" title="比較">
+
+他の選択肢との比較。
+
+<ComparisonTable
+  title="vs Playwright MCP"
+  headers={['', 'Playwright MCP', 'RunBrowser']}
+  rows={[
+    ['ブラウザ', '新しい Chrome を起動', 'あなたの Chrome を使用'],
+    ['拡張機能', 'なし', '既存のものをそのまま'],
+    ['ログイン状態', '新規', 'ログイン済み'],
+    ['ボット検出', '常に検出される', '回避可能'],
+    ['コラボレーション', '別ウィンドウ', 'ユーザーと同じブラウザ'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs BrowserUse"
+  headers={['', 'BrowserUse', 'RunBrowser']}
+  rows={[
+    ['言語', 'Python', 'TypeScript / Node.js'],
+    ['ブラウザ', '新しい Chrome を起動（Playwright）', 'あなたの Chrome を使用'],
+    ['アプローチ', 'AI エージェントフレームワーク（LLM が判断）', 'CLI + MCP ツール（エージェントがコマンド送信）'],
+    ['ログイン状態', '新規', 'ログイン済み'],
+    ['CLI', 'なし', 'あり — 50+ コマンド'],
+  ]}
+/>
+
+<ComparisonTable
+  title="vs Agent Browser"
+  headers={['', 'Agent Browser', 'RunBrowser']}
+  rows={[
+    ['ブラウザ', 'ヘッドレス Chromium を起動', '実行中の Chrome'],
+    ['コマンド数', '~90（肥大化）', '~50（精選）'],
+    ['コマンド拡張', 'なし', 'あり — コミュニティコマンドをインストール'],
+    ['CLI', 'Rust CLI → Node デーモン', 'Node CLI → リレー（シンプル）'],
+    ['ボット検出', '常に検出される', '回避可能'],
+    ['リアルタブ', 'いいえ', 'はい'],
+  ]}
+/>
+
+</Section>
+
+<Section id="remote-access" title="リモートアクセス">
+
+**リモートマシン**の Chrome を操作 — ヘッドレス Mac mini、クラウド VM、devcontainer。パブリックバインドとトークンでリレーサーバーを起動。
+
+```bash
+# ホストマシンで — リレーサーバー起動
+runbrowser serve --host 0.0.0.0 --token <secret>
+
+# どこからでも — 環境変数を設定して通常通り使用
+export RUNBROWSER_HOST=192.168.1.10
+export RUNBROWSER_TOKEN=<secret>
+runbrowser navigate https://example.com
+```
+
+**devcontainer や Docker** にも対応 — `RUNBROWSER_HOST=host.docker.internal` を使用。
+
+</Section>
+
+<Section id="security" title="セキュリティ">
+
+すべてが**あなたのマシン**で動作。リレーは `localhost:19988` にバインドし、拡張機能からの接続のみ受付。リモートサーバーなし、アカウント不要、テレメトリなし。
+
+- **ローカルのみ** — WebSocket サーバーは localhost にバインド。データがマシンから出ることはない。
+- **オリジン検証** — RunBrowser 拡張機能のオリジンのみ受付。悪意あるサイトは接続不可。
+- **明示的同意** — 拡張機能アイコンをクリックしたタブのみ制御。バックグラウンドアクセスなし。
+- **可視の自動化** — 制御中のタブに自動化バナーを表示。すべてのエージェント操作に視覚フィードバック（緑のハイライト）。
+
+</Section>
