@@ -134,13 +134,19 @@ runbrowser -s 3 tab list                 # act inside session 3
 
 ### Plugins
 
-Site commands from the [runbrowser/commands](https://github.com/runbrowser/commands)
-repo are unchanged — they are a different audience from the agent CDP path.
+144 plugins across 50 sites ship with RunBrowser. A plugin is a `@meta` JSON
+header and a bare async function, evaluated *in the page* — one round trip, with
+that site's cookies, origin and its own JavaScript available.
 
 ```bash
 runbrowser plugin list
 runbrowser plugin install reddit
+runbrowser plugin install <site> --repo owner/name   # anyone's repository
 ```
+
+The format and the bundled corpus come from
+[bb-sites](https://github.com/epiral/bb-sites). Reading that format rather than
+inventing one means a plugin written for either runs on both.
 
 ### Configuration
 
@@ -268,7 +274,6 @@ runbrowser logfile  # prints log file paths
 RunBrowser wouldn't exist without the work of these projects and their maintainers.
 
 - [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. RunBrowser began as a fork of playwriter and owes its Chrome extension architecture to Tommaso's original design.
-- [bb-browser](https://github.com/epiral/bb-browser) & [bb-sites](https://github.com/epiral/bb-sites) — A beautifully designed browser automation tool with an impressive collection of 45+ community site adapters. The bb-sites ecosystem is a constant source of inspiration.
 - [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Pioneered many ideas around comprehensive browser CLIs for AI agents.
 - [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — The plugins system (`runbrowser plugin install/list/uninstall`) was inspired by pi's elegant approach to extensibility and package management.
 

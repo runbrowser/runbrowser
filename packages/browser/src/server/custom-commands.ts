@@ -62,10 +62,10 @@ export interface CommandContext {
  * An adapter in the `@meta` format: a JSON header comment followed by a bare
  * async function, which is evaluated *in the page* rather than on the host.
  *
- * This is browser-use's bb-sites layout. Supporting it is what lets someone run
- * `commands install <site> --repo epiral/bb-sites` and get that community's
- * adapters from their repository, on their terms — rather than this project
- * copying a corpus it has no licence to.
+ * The format is bb-sites'. Reading it rather than inventing our own is what
+ * lets `plugin install <site> --repo owner/name` pull adapters straight from
+ * anyone's repository, including bb-sites itself, instead of requiring every
+ * corpus to be rewritten before it can run here.
  */
 type MetaHeader = {
   name?: string

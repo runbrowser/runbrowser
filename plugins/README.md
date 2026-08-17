@@ -65,6 +65,7 @@ orchestrate across several pages.
 
 ## Provenance
 
-Adapted from [bb-sites](https://github.com/epiral/bb-sites), the same author's
-adapter collection for bb-browser. The `@meta` format is theirs, which is why
-`--repo epiral/bb-sites` also works directly.
+Adapted from [bb-sites](https://github.com/epiral/bb-sites), the adapter
+collection for bb-browser, by this project's author. The `@meta` format is
+bb-sites', which is why `--repo epiral/bb-sites` also installs from it
+directly — a plugin written for either runs on both.
