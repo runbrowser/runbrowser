@@ -102,9 +102,9 @@ jobs:
       # on a user's first command.
       - name: Smoke-test the binary
         run: |
-          ./dist-npm/browser-linux-x64/runbrowser --version
-          ./dist-npm/browser-linux-x64/runbrowser --help > /dev/null
-          ./dist-npm/browser-linux-x64/runbrowser skill > /dev/null
+          ./dist-npm/runbrowser-linux-x64/runbrowser --version
+          ./dist-npm/runbrowser-linux-x64/runbrowser --help > /dev/null
+          ./dist-npm/runbrowser-linux-x64/runbrowser skill > /dev/null
 
       # Platform packages first: they are optional dependencies of the main
       # package, so the other order leaves a window in which installing it
