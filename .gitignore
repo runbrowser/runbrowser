@@ -9,3 +9,4 @@ packages/extension/dist-*
 screenshots/
 tmp/
 dist-npm/
+.vercel
