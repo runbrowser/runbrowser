@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 
 /**
- * RunBrowser CLI — hand-written argument parser with two-phase parsing.
+ * termio-browser CLI — hand-written argument parser.
  *
- * Phase 1: Parse known flags, stash unknown flags
- * Phase 2: After extensions/site commands load, re-resolve unknown flags
+ * Dispatches, in order:
+ * - built-in commands: cdp, eval, tab, status, session, mcp, …
+ * - site commands: `termio-browser github trending`, whose flags are not known
+ *   until the relay reports them, so unrecognised flags are collected rather
+ *   than rejected and handed to the command as its arguments.
  *
- * Supports:
- * - Built-in commands: cdp, eval, tab, status, session, ...
- * - Site commands: termio-browser github trending, termio-browser bilibili hot
- * - Extension-registered flags
+ * A parser library would want the command tree declared up front, which the
+ * site commands are not. That is the whole reason this is hand-written; if
+ * site commands ever move behind a static manifest, the reason goes with them.
  */
 
 import util from 'node:util'
@@ -26,7 +28,7 @@ import {
   readConfig,
 } from '../server/index.js'
 
-import { parseArgs, resolveUnknownFlags, type ParsedArgs, type FlagDef } from './args.js'
+import { parseArgs, type ParsedArgs, type FlagDef } from './args.js'
 import { printMainHelp, printCommandHelp } from './help.js'
 
 
@@ -147,11 +149,6 @@ async function main() {
 
     // Re-parse with command-specific flags for proper flag resolution
     const finalArgs = parseArgs(argv, builtin.def.flags)
-
-    // TODO: Phase 2 — resolve extension flags here
-    // const extFlags = await loadExtensionFlags()
-    // const unknown = resolveUnknownFlags(finalArgs, extFlags)
-    // if (unknown.length > 0) throw new Error(`Unknown flags: ${unknown.join(', ')}`)
 
     await builtin.execute(finalArgs, resolveSession)
     return

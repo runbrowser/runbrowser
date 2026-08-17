@@ -3,8 +3,8 @@
  *
  * Usage:
  *   termio-browser commands list              — lists available packages
- *   termio-browser commands install reddit    — downloads reddit/*.ts → ~/.runbrowser/commands/reddit/
- *   termio-browser commands uninstall reddit  — removes ~/.runbrowser/commands/reddit/
+ *   termio-browser commands install reddit    — downloads reddit/*.ts → ~/.termio/browser/commands/reddit/
+ *   termio-browser commands uninstall reddit  — removes ~/.termio/browser/commands/reddit/
  */
 
 import fs from 'node:fs'
@@ -52,7 +52,7 @@ async function listAvailable(): Promise<string[]> {
 }
 
 /**
- * Install a package: download all .ts files from repo/<site>/ to ~/.runbrowser/commands/<site>/
+ * Install a package: download all .ts files from repo/<site>/ to ~/.termio/browser/commands/<site>/
  */
 async function installPackage(site: string): Promise<string[]> {
   const files: GitHubFile[] = await fetchGitHub(`${REPO_API_BASE}/${site}`)
@@ -81,7 +81,7 @@ async function installPackage(site: string): Promise<string[]> {
 }
 
 /**
- * Uninstall a package: remove ~/.runbrowser/commands/<site>/
+ * Uninstall a package: remove ~/.termio/browser/commands/<site>/
  */
 function uninstallPackage(site: string): boolean {
   const dir = path.join(COMMANDS_DIR, site)
@@ -153,7 +153,9 @@ registerBuiltinCommand({
           const files = await installPackage(pkg)
           console.log(pc.green(`✓ Installed ${pkg}/`))
           for (const f of files) {
-            console.log(pc.dim(`  → ~/.runbrowser/commands/${pkg}/${f}`))
+            // Printed from the directory actually written to. The literal that
+            // used to be here named a path the CLI stopped using.
+            console.log(pc.dim(`  → ${path.join(COMMANDS_DIR, pkg, f)}`))
           }
         } catch (e: any) {
           console.error(`Error: ${e.message}`)

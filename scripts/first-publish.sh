@@ -63,9 +63,7 @@ for package in \
   "@termio/browser" \
   "@termio/browser-darwin-arm64" \
   "@termio/browser-darwin-x64" \
-  "@termio/browser-linux-x64" \
-  "@termio/browser-linux-arm64" \
-  "@termio/browser-win32-x64"
+  "@termio/browser-linux-x64"
 do
   echo "--> $package"
   npm trust github "$package" --file "$WORKFLOW" --repo "$REPO" --allow-publish --yes

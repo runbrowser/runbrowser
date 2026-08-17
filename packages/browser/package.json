@@ -23,7 +23,9 @@
     "test:watch": "bun test --watch"
   },
   "files": [
-    "bin.js"
+    "bin.js",
+    "LICENSE",
+    "README.md"
   ],
   "keywords": [
     "runbrowser",
@@ -46,7 +48,7 @@
     "access": "public"
   },
   "engines": {
-    "bun": ">=1.3.0"
+    "node": ">=20"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
@@ -62,8 +64,6 @@
   "optionalDependencies": {
     "@termio/browser-darwin-arm64": "0.1.0",
     "@termio/browser-darwin-x64": "0.1.0",
-    "@termio/browser-linux-x64": "0.1.0",
-    "@termio/browser-linux-arm64": "0.1.0",
-    "@termio/browser-win32-x64": "0.1.0"
+    "@termio/browser-linux-x64": "0.1.0"
   }
 }

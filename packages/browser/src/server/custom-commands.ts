@@ -1,11 +1,11 @@
 /**
  * Custom command loader.
  *
- * Loads user-defined commands from ~/.runbrowser/commands/<site>/<name>.ts
+ * Loads user-defined commands from ~/.termio/browser/commands/<site>/<name>.ts
  * TypeScript is imported directly — the runtime transpiles it, no build step
  * and no loader dependency.
  *
- * Example: ~/.runbrowser/commands/reddit/hot.ts
+ * Example: ~/.termio/browser/commands/reddit/hot.ts
  */
 
 import fs from 'node:fs'
@@ -63,7 +63,7 @@ async function importCommand(filePath: string): Promise<CommandModule> {
 }
 
 /**
- * List all available custom commands by scanning ~/.runbrowser/commands/.
+ * List all available custom commands by scanning ~/.termio/browser/commands/.
  */
 export async function listCustomCommands(): Promise<CommandDef[]> {
   const commands: CommandDef[] = []

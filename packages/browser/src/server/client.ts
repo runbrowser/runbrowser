@@ -183,7 +183,7 @@ export function getExtensionOutdatedWarning(extensionRunbrowserVersion: string |
     return null
   }
   if (compareVersions(extensionRunbrowserVersion, VERSION) > 0) {
-    return `RunBrowser ${VERSION} is outdated (extension requires ${extensionRunbrowserVersion}). Run \`npm install -g runbrowser@latest\` or update the termio-browser package in your project.`
+    return `RunBrowser ${VERSION} is outdated (extension requires ${extensionRunbrowserVersion}). Run \`npm install -g @termio/browser@latest\` or update the termio-browser package in your project.`
   }
   return null
 }
