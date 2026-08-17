@@ -94,6 +94,26 @@ const resolveSession: SessionResolver = async (args) => {
   return { sessionId: String(session.id), client }
 }
 
+/**
+ * Find the rows in a plugin's result.
+ *
+ * Plugins written for this CLI return an array. Plugins in the @meta format
+ * often return an envelope instead — `{ count, topics }`, `{ items }` — and the
+ * table renderer given an object prints nothing at all, which reads as a
+ * failure rather than a shape mismatch. `--json` still gets the whole envelope;
+ * only the table needs the rows dug out.
+ */
+function tabular(data: unknown): any[] {
+  if (Array.isArray(data)) return data
+  if (data && typeof data === 'object') {
+    const arrays = Object.values(data).filter(Array.isArray)
+    if (arrays.length === 1) return arrays[0] as any[]
+    // No single obvious row set — show the object as one row rather than nothing.
+    return [data]
+  }
+  return []
+}
+
 // ============================================================================
 // Main
 // ============================================================================
@@ -175,7 +195,13 @@ async function main() {
       } else {
         const { formatTable } = await import('./output.js')
         const fmt = (args.format as string) || 'table'
-        console.log(formatTable(result.data, result.columns, fmt))
+        const rows = tabular(result.data)
+        // The server derives columns from the payload it was handed, which for
+        // an envelope is the envelope's own keys. Take them from the rows being
+        // rendered instead when it could not.
+        const columns =
+          result.columns?.length > 0 ? result.columns : rows.length > 0 ? Object.keys(rows[0]) : []
+        console.log(formatTable(rows, columns, fmt))
       }
     } catch (e: any) {
       console.error(`Error: ${e.message}`)

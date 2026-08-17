@@ -1,11 +1,11 @@
 /**
  * Custom command loader.
  *
- * Loads user-defined commands from ~/.runbrowser/commands/<site>/<name>.ts
+ * Loads user-defined commands from ~/.runbrowser/plugins/<site>/<name>.ts
  * TypeScript is imported directly — the runtime transpiles it, no build step
  * and no loader dependency.
  *
- * Example: ~/.runbrowser/commands/reddit/hot.ts
+ * Example: ~/.runbrowser/plugins/reddit/hot.ts
  */
 
 import fs from 'node:fs'
@@ -13,7 +13,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { RUNBROWSER_DIR } from './utils.js'
 
-const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
+const PLUGINS_DIR = path.join(RUNBROWSER_DIR, 'plugins')
 
 export interface CommandArg {
   type: 'string' | 'number' | 'boolean'
@@ -147,21 +147,21 @@ async function importCommand(filePath: string): Promise<CommandModule> {
 }
 
 /**
- * List all available custom commands by scanning ~/.runbrowser/commands/.
+ * List all available custom commands by scanning ~/.runbrowser/plugins/.
  */
 export async function listCustomCommands(): Promise<CommandDef[]> {
   const commands: CommandDef[] = []
 
-  if (!fs.existsSync(COMMANDS_DIR)) {
+  if (!fs.existsSync(PLUGINS_DIR)) {
     return commands
   }
 
-  const sites = fs.readdirSync(COMMANDS_DIR, { withFileTypes: true })
+  const sites = fs.readdirSync(PLUGINS_DIR, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
 
   for (const site of sites) {
-    const siteDir = path.join(COMMANDS_DIR, site)
+    const siteDir = path.join(PLUGINS_DIR, site)
     const files = fs.readdirSync(siteDir)
       .filter(f => f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.mjs'))
       // A leading underscore marks a file that is not itself a command —
@@ -193,9 +193,9 @@ export async function listCustomCommands(): Promise<CommandDef[]> {
  */
 export async function loadCommand(site: string, name: string): Promise<CommandModule | null> {
   const candidates = [
-    path.join(COMMANDS_DIR, site, `${name}.ts`),
-    path.join(COMMANDS_DIR, site, `${name}.js`),
-    path.join(COMMANDS_DIR, site, `${name}.mjs`),
+    path.join(PLUGINS_DIR, site, `${name}.ts`),
+    path.join(PLUGINS_DIR, site, `${name}.js`),
+    path.join(PLUGINS_DIR, site, `${name}.mjs`),
   ]
 
   for (const filePath of candidates) {

@@ -132,14 +132,14 @@ runbrowser session new                   # → prints an id
 runbrowser -s 3 tab list                 # act inside session 3
 ```
 
-### Command Extensions
+### Plugins
 
 Site commands from the [runbrowser/commands](https://github.com/runbrowser/commands)
 repo are unchanged — they are a different audience from the agent CDP path.
 
 ```bash
-runbrowser commands list
-runbrowser commands install reddit
+runbrowser plugin list
+runbrowser plugin install reddit
 ```
 
 ### Configuration
@@ -270,7 +270,7 @@ RunBrowser wouldn't exist without the work of these projects and their maintaine
 - [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. RunBrowser began as a fork of playwriter and owes its Chrome extension architecture to Tommaso's original design.
 - [bb-browser](https://github.com/epiral/bb-browser) & [bb-sites](https://github.com/epiral/bb-sites) — A beautifully designed browser automation tool with an impressive collection of 45+ community site adapters. The bb-sites ecosystem is a constant source of inspiration.
 - [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Pioneered many ideas around comprehensive browser CLIs for AI agents.
-- [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — The command extensions system (`runbrowser commands install/list/uninstall`) was inspired by pi's elegant approach to extensibility and package management.
+- [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — The plugins system (`runbrowser plugin install/list/uninstall`) was inspired by pi's elegant approach to extensibility and package management.
 
 Thank you to all these maintainers for pushing the ecosystem forward.
 

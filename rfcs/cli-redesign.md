@@ -172,7 +172,7 @@ config show                     # Show current config
 
 # ── commands: manage command packages ──
 commands list                   # List available packages
-commands install <package>      # Install community commands
+plugin install <name>      # Install community commands
 commands uninstall <package>    # Remove installed commands
 
 # ── Utilities ──
@@ -301,7 +301,7 @@ command = "github", subcommand = "trending"
          ↓
 POST /api/command/run { sessionId, site: "github", name: "trending", args: { limit: 5 } }
          ↓
-Relay loads ~/.runbrowser/commands/github/trending.ts via jiti
+Relay loads ~/.runbrowser/plugins/github/trending.ts via jiti
          ↓
 Returns structured data → formatted as table/json/csv/md
 ```

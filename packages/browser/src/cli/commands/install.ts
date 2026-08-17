@@ -1,10 +1,15 @@
 /**
- * Commands subgroup: list, install, uninstall community commands.
+ * Plugin subgroup: list, install, uninstall site plugins.
+ *
+ * A plugin is a site folder you install; a command is one thing inside it you
+ * invoke. `runbrowser plugin install reddit` fetches the folder, and
+ * `runbrowser reddit posts` runs a command from it — which is why the loader
+ * next door still speaks of commands and this file does not.
  *
  * Usage:
- *   runbrowser commands list              — lists available packages
- *   runbrowser commands install reddit    — downloads reddit/*.ts → ~/.runbrowser/commands/reddit/
- *   runbrowser commands uninstall reddit  — removes ~/.runbrowser/commands/reddit/
+ *   runbrowser plugin list                — plugins available and installed
+ *   runbrowser plugin install reddit      — reddit/*.ts → ~/.runbrowser/plugins/reddit/
+ *   runbrowser plugin uninstall reddit    — removes ~/.runbrowser/plugins/reddit/
  */
 
 import fs from 'node:fs'
@@ -14,7 +19,7 @@ import { RUNBROWSER_DIR } from '../../server/index.js'
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
 
-const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
+const PLUGINS_DIR = path.join(RUNBROWSER_DIR, 'plugins')
 
 /**
  * Where plugins come from by default: this project's own `plugins/` directory.
@@ -22,7 +27,7 @@ const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
  * Any GitHub repository laid out the same way works — `--repo owner/name`, or
  * RUNBROWSER_PLUGIN_REPO. Installing is only a download, so a plugin from
  * someone else's repo is the same thing as one written by hand into
- * ~/.runbrowser/commands/.
+ * ~/.runbrowser/plugins/.
  */
 const DEFAULT_REPO = 'termio-sh/runbrowser'
 const DEFAULT_PATH = 'plugins'
@@ -84,7 +89,7 @@ async function listAvailable(source: PluginSource): Promise<string[]> {
 }
 
 /**
- * Install a package: download all .ts files from repo/<site>/ to ~/.runbrowser/commands/<site>/
+ * Install a package: download all .ts files from repo/<site>/ to ~/.runbrowser/plugins/<site>/
  */
 async function installPackage(site: string, source: PluginSource): Promise<string[]> {
   const files: GitHubFile[] = await fetchGitHub(contentsUrl(source, site))
@@ -108,7 +113,7 @@ async function installPackage(site: string, source: PluginSource): Promise<strin
     downloaded.push({ name: file.name, content: await resp.text() })
   }
 
-  const destDir = path.join(COMMANDS_DIR, site)
+  const destDir = path.join(PLUGINS_DIR, site)
   fs.mkdirSync(destDir, { recursive: true })
   for (const file of downloaded) {
     fs.writeFileSync(path.join(destDir, file.name), file.content, 'utf-8')
@@ -118,10 +123,10 @@ async function installPackage(site: string, source: PluginSource): Promise<strin
 }
 
 /**
- * Uninstall a package: remove ~/.runbrowser/commands/<site>/
+ * Uninstall a package: remove ~/.runbrowser/plugins/<site>/
  */
 function uninstallPackage(site: string): boolean {
-  const dir = path.join(COMMANDS_DIR, site)
+  const dir = path.join(PLUGINS_DIR, site)
   if (!fs.existsSync(dir)) {
     return false
   }
@@ -135,11 +140,12 @@ function uninstallPackage(site: string): boolean {
 
 registerBuiltinCommand({
   def: {
-    name: 'commands',
-    description: 'Manage command extensions: list, install, uninstall',
+    name: 'plugin',
+    aliases: ['plugins'],
+    description: 'Manage site plugins: list, install, uninstall',
     positionals: [
       { name: 'action', description: 'Action: list, install, uninstall', required: true },
-      { name: 'package', description: 'Package name (e.g. reddit, youtube)' },
+      { name: 'package', description: 'Plugin name (e.g. reddit, v2ex)' },
     ],
     flags: {
       repo: { type: 'string', description: `Source repository, owner/name (default: ${DEFAULT_REPO})` },
@@ -154,9 +160,9 @@ registerBuiltinCommand({
 
     if (!action || args.help) {
       console.log(pc.bold('Usage:'))
-      console.log(`  runbrowser commands list                  List available command extensions`)
-      console.log(`  runbrowser commands install <package>     Install a command extension`)
-      console.log(`  runbrowser commands uninstall <package>   Uninstall a command extension`)
+      console.log(`  runbrowser plugin list                  List available plugins`)
+      console.log(`  runbrowser plugin install <package>     Install a plugin`)
+      console.log(`  runbrowser plugin uninstall <package>   Uninstall a plugin`)
       process.exit(0)
     }
 
@@ -168,11 +174,11 @@ registerBuiltinCommand({
           const available = await listAvailable(source)
           // Anything already on disk is listed too, whether or not this source
           // knows about it — a hand-written command is as real as a fetched one.
-          const local = fs.existsSync(COMMANDS_DIR)
-            ? fs.readdirSync(COMMANDS_DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+          const local = fs.existsSync(PLUGINS_DIR)
+            ? fs.readdirSync(PLUGINS_DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
             : []
 
-          console.log(pc.bold(`Command extensions in ${source.repo}${source.path ? '/' + source.path : ''}:`))
+          console.log(pc.bold(`Plugins in ${source.repo}${source.path ? '/' + source.path : ''}:`))
           console.log()
           for (const p of available) {
             const marker = local.includes(p) ? pc.green(' ✓ installed') : ''
@@ -188,7 +194,7 @@ registerBuiltinCommand({
           }
 
           console.log()
-          console.log(`Run ${pc.cyan('runbrowser commands install <package>')} to install.`)
+          console.log(`Run ${pc.cyan('runbrowser plugin install <package>')} to install.`)
           console.log(pc.dim(`Another repository: --repo owner/name [--path <dir>]`))
         } catch (e: any) {
           console.error(`Error: ${e.message}`)
@@ -200,8 +206,8 @@ registerBuiltinCommand({
       case 'install':
       case 'add': {
         if (!pkg) {
-          console.error('Usage: runbrowser commands install <package>')
-          console.error(`Run ${pc.cyan('runbrowser commands list')} to see available packages.`)
+          console.error('Usage: runbrowser plugin install <package>')
+          console.error(`Run ${pc.cyan('runbrowser plugin list')} to see available packages.`)
           process.exit(1)
         }
 
@@ -213,7 +219,7 @@ registerBuiltinCommand({
           for (const f of files) {
             // Printed from the directory actually written to. The literal that
             // used to be here named a path the CLI stopped using.
-            console.log(pc.dim(`  → ${path.join(COMMANDS_DIR, pkg, f)}`))
+            console.log(pc.dim(`  → ${path.join(PLUGINS_DIR, pkg, f)}`))
           }
         } catch (e: any) {
           console.error(`Error: ${e.message}`)
@@ -226,7 +232,7 @@ registerBuiltinCommand({
       case 'remove':
       case 'rm': {
         if (!pkg) {
-          console.error('Usage: runbrowser commands uninstall <package>')
+          console.error('Usage: runbrowser plugin uninstall <package>')
           process.exit(1)
         }
 

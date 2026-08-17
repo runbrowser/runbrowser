@@ -87,10 +87,10 @@ runbrowser github trending    ← CLI (short-lived)
 
 ### 4.1 Command Definition Format
 
-Site commands are `.ts` or `.js` files in `~/.runbrowser/commands/<site>/<name>.ts`:
+Site commands are `.ts` or `.js` files in `~/.runbrowser/plugins/<site>/<name>.ts`:
 
 ```typescript
-// ~/.runbrowser/commands/github/trending.ts
+// ~/.runbrowser/plugins/github/trending.ts
 
 export const description = 'GitHub trending repositories'
 
@@ -125,7 +125,7 @@ export async function run(ctx, args) {
 The relay server loads commands on demand using [jiti](https://github.com/unjs/jiti):
 
 ```typescript
-// Scans ~/.runbrowser/commands/<site>/<name>.ts
+// Scans ~/.runbrowser/plugins/<site>/<name>.ts
 const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
 
 // List all available commands (for --help, /api/commands)
@@ -181,7 +181,7 @@ The `run` MCP tool handles site commands as a fallback:
 ## 5. Command Management & Discovery: Full Flow
 
 ```
-$ runbrowser commands list
+$ runbrowser plugin list
 Available command packages:
 
   reddit
@@ -190,12 +190,12 @@ Available command packages:
   hackernews
   producthunt
 
-Run runbrowser commands install <package> to install.
+Run runbrowser plugin install <package> to install.
 
-$ runbrowser commands install github
+$ runbrowser plugin install github
 Installing github...
 ✓ Installed github/
-  → ~/.runbrowser/commands/github/trending.ts
+  → ~/.runbrowser/plugins/github/trending.ts
 
 $ runbrowser github trending --limit 3
 

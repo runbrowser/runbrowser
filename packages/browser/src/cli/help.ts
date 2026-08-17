@@ -26,7 +26,7 @@ export function printMainHelp(
     'Browser':      [],
     'Connection':   [],
     'Config':       [],
-    'Command Extensions': [],
+    'Plugins': [],
     'Server':       [],
   }
 
@@ -34,7 +34,7 @@ export function printMainHelp(
   const browserCmds = new Set(['cdp', 'eval'])
   const connCmds = new Set(['status', 'tab', 'session'])
   const cfgCmds = new Set(['config'])
-  const cmdsCmds = new Set(['commands'])
+  const pluginCmds = new Set(['plugin', 'plugins'])
   const srvCmds = new Set(['serve', 'logfile', 'skill'])
 
   for (const cmd of builtinCommands) {
@@ -42,7 +42,7 @@ export function printMainHelp(
     if (browserCmds.has(name)) categories['Browser'].push(cmd)
     else if (connCmds.has(name)) categories['Connection'].push(cmd)
     else if (cfgCmds.has(name)) categories['Config'].push(cmd)
-    else if (cmdsCmds.has(name)) categories['Command Extensions'].push(cmd)
+    else if (pluginCmds.has(name)) categories['Plugins'].push(cmd)
     else if (srvCmds.has(name)) categories['Server'].push(cmd)
     else categories['Server'].push(cmd) // default
   }

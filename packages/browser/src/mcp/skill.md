@@ -34,7 +34,7 @@ runbrowser exec                         # a snippet with helpers in scope (stdin
 runbrowser tab list|new|<index>|close   # which target you're bound to
 runbrowser status                       # is a browser attached
 runbrowser session new|list|delete      # isolated state, one per agent
-runbrowser commands list|install        # site plugins
+runbrowser plugin list|install         # site plugins
 runbrowser mcp                          # MCP server on stdio
 runbrowser help [command]               # same as --help
 runbrowser skill install                # write the skill into ./.claude and ./.agents
@@ -303,8 +303,8 @@ async function(args) {
 common reason a plugin silently returns nothing.
 
 ```bash
-runbrowser commands list                              # installed, and available
-runbrowser commands install v2ex                      # from this project
-runbrowser commands install <site> --repo owner/name  # from anyone's repository
+runbrowser plugin list                              # installed, and available
+runbrowser plugin install v2ex                      # from this project
+runbrowser plugin install <site> --repo owner/name  # from anyone's repository
 runbrowser v2ex hot --count 5
 ```
