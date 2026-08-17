@@ -255,6 +255,11 @@ Without `-s`, the CLI reuses an existing session or creates one.
 6. **You're in the user's real browser.** Don't close their tabs, submit
    anything irreversible, or navigate away from work they have open. Open a new
    tab instead.
+7. **Check whether a plugin writes before running it.** Most read; a few act as
+   the signed-in user — opening a pull request, forking a repo, sending a direct
+   message. Those are marked `[WRITES — acts as the signed-in user]` in the
+   listing. Confirm with the user before running one; the account it posts from
+   is theirs.
 
 ## `exec` — when one command is not enough
 

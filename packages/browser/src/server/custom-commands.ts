@@ -27,12 +27,25 @@ export interface CommandDef {
   description: string
   args?: Record<string, CommandArg>
   columns?: string[]
+  /**
+   * False when the plugin changes something on the site.
+   *
+   * Eight of the shipped plugins do — opening a pull request, forking a repo,
+   * sending a direct message — and they act as the signed-in user. A caller
+   * that cannot tell those apart from a read is one bad guess away from
+   * posting something.
+   */
+  readOnly?: boolean
+  /** A worked invocation, shown in help. */
+  example?: string
 }
 
 export interface CommandModule {
   description: string
   args?: Record<string, CommandArg>
   columns?: string[]
+  readOnly?: boolean
+  example?: string
   run: (ctx: CommandContext, args: Record<string, any>) => Promise<any[]>
 }
 
@@ -64,6 +77,15 @@ type MetaHeader = {
   /** Typed form, when the adapter declares one. Preferred. */
   params?: Record<string, Partial<CommandArg> & { required?: boolean }>
   columns?: string[]
+  /**
+   * Declared by every plugin in the shipped corpus, and false for the eight
+   * that write. The elaborate alternatives in the same format — side_effect,
+   * max_concurrency, serialization_key — are declared by four plugins out of
+   * a hundred and forty-four, so this is the field that actually carries the
+   * signal.
+   */
+  readOnly?: boolean
+  example?: string
 }
 
 /**
@@ -112,6 +134,8 @@ function parseMetaAdapter(source: string, site: string, name: string): CommandMo
     description: meta.description || `${site} ${name}`,
     args: normaliseArgs(meta),
     columns: meta.columns,
+    readOnly: meta.readOnly,
+    example: meta.example,
     async run(ctx, args) {
       // The function is shipped into the page whole and called there, so it
       // gets the site's cookies, its origin and its own JavaScript — and costs
@@ -178,6 +202,8 @@ export async function listCustomCommands(): Promise<CommandDef[]> {
           description: mod.description || `${site} ${name}`,
           args: mod.args,
           columns: mod.columns,
+          readOnly: mod.readOnly,
+          example: mod.example,
         })
       } catch {
         commands.push({ site, name, description: `${site} ${name}` })

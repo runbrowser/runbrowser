@@ -137,7 +137,11 @@ to click and type via CDP, and the \`eval\` wrapping caveat.`,
                 def.required ? ` <${name}>` : ` [--${name}]`
               ).join('')
             : ''
-          return `command({ site: "${cmd.site}", name: "${cmd.name}"${argStr ? `, args: { /* ${argStr.trim()} */ }` : ''} })  # ${cmd.description}`
+          // A plugin that writes acts as the signed-in user — opening a pull
+          // request, sending a message. Marked so it cannot be mistaken for a
+          // read at a glance.
+          const writes = cmd.readOnly === false ? '  [WRITES — acts as the signed-in user]' : ''
+          return `command({ site: "${cmd.site}", name: "${cmd.name}"${argStr ? `, args: { /* ${argStr.trim()} */ }` : ''} })  # ${cmd.description}${writes}`
         }).join('\n')
       }
     } catch {
