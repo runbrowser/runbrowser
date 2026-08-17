@@ -59,8 +59,37 @@ type MetaHeader = {
   description?: string
   /** The origin the function runs against. Its cookies are the whole point. */
   domain?: string
-  args?: Record<string, CommandArg>
+  /** Loose form: a description string per argument, or a partial object. */
+  args?: Record<string, string | Partial<CommandArg>>
+  /** Typed form, when the adapter declares one. Preferred. */
+  params?: Record<string, Partial<CommandArg> & { required?: boolean }>
   columns?: string[]
+}
+
+/**
+ * Normalise the two argument shapes an @meta header may carry.
+ *
+ * `params` is the typed one and wins where present; `args` is often just a
+ * description string per name. Left unnormalised, a string lands where the
+ * help renderer expects an object and every argument reads as untyped.
+ */
+function normaliseArgs(meta: MetaHeader): Record<string, CommandArg> | undefined {
+  const source = meta.params ?? meta.args
+  if (!source) return undefined
+
+  const args: Record<string, CommandArg> = {}
+  for (const [name, value] of Object.entries(source)) {
+    if (typeof value === 'string') {
+      args[name] = { type: 'string', description: value }
+      continue
+    }
+    args[name] = {
+      type: value.type ?? 'string',
+      description: value.description,
+      default: value.default,
+    }
+  }
+  return args
 }
 
 const META_BLOCK = /^\s*\/\*\s*@meta\s*([\s\S]*?)\*\//
@@ -81,7 +110,7 @@ function parseMetaAdapter(source: string, site: string, name: string): CommandMo
 
   return {
     description: meta.description || `${site} ${name}`,
-    args: meta.args,
+    args: normaliseArgs(meta),
     columns: meta.columns,
     async run(ctx, args) {
       // The function is shipped into the page whole and called there, so it
@@ -135,6 +164,9 @@ export async function listCustomCommands(): Promise<CommandDef[]> {
     const siteDir = path.join(COMMANDS_DIR, site)
     const files = fs.readdirSync(siteDir)
       .filter(f => f.endsWith('.ts') || f.endsWith('.js') || f.endsWith('.mjs'))
+      // A leading underscore marks a file that is not itself a command —
+      // shared code a site's adapters keep beside them.
+      .filter(f => !f.startsWith('_'))
 
     for (const file of files) {
       const name = path.basename(file, path.extname(file))
