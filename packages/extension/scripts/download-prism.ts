@@ -5,7 +5,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const BASE = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/'
-const DEST = path.join('dist', 'src')
+// Same env var vite.config.mts reads for outDir. Hardcoding 'dist' meant this
+// wrote next to a build that went somewhere else: e2e builds into dist-<port>,
+// so the download failed with ENOENT unless a stale default dist/ happened to
+// be lying around from an earlier build.
+const DEST = path.join(process.env.TERMIO_BROWSER_EXTENSION_DIST || 'dist', 'src')
 
 const files: [string, string][] = [
   ['prism.min.js', 'prism.min.js'],

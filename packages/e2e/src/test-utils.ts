@@ -7,7 +7,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { startRunBrowserCDPRelayServer, createFileLogger, killPortProcess, type RelayServer } from '@jiweiyuan/runbrowser-server'
+import { startRunBrowserCDPRelayServer, createFileLogger, killPortProcess, type RelayServer } from '@termio/browser'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -23,7 +23,7 @@ async function buildExtension({ port, distDir }: { port: number; distDir: string
     })
     .then(async () => {
       // Build into a per-port dist to avoid parallel test runs overwriting each other.
-      await execAsync(`TESTING=1 RUNBROWSER_PORT=${port} RUNBROWSER_EXTENSION_DIST=${distDir} pnpm build`, {
+      await execAsync(`TESTING=1 TERMIO_BROWSER_PORT=${port} TERMIO_BROWSER_EXTENSION_DIST=${distDir} pnpm build`, {
         cwd: path.resolve(__dirname, '../../extension'),
       })
     })
@@ -90,21 +90,36 @@ export async function setupTestContext({
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), tempDirPrefix))
   const extensionPath = path.resolve(__dirname, '../../extension', distDir)
 
-  const browserContext = await chromium.launchPersistentContext(userDataDir, {
-    channel: 'chromium',
-    headless: !process.env.HEADFUL,
-    colorScheme: 'dark',
-    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
-  })
-
-  const serviceWorker = await getExtensionServiceWorker(browserContext)
-
-  if (toggleExtension) {
-    const page = await browserContext.newPage()
-    await page.goto('about:blank')
-    await serviceWorker.evaluate(async () => {
-      await (globalThis as any).toggleExtensionForActiveTab()
+  // Anything that throws from here on has to take the relay server with it.
+  // Left listening, it fails the *next* suite with EADDRINUSE, which reads as
+  // a port conflict and buries the error that actually happened.
+  let browserContext: BrowserContext
+  try {
+    browserContext = await chromium.launchPersistentContext(userDataDir, {
+      channel: 'chromium',
+      headless: !process.env.HEADFUL,
+      colorScheme: 'dark',
+      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
     })
+  } catch (error) {
+    relayServer.close()
+    throw error
+  }
+
+  try {
+    const serviceWorker = await getExtensionServiceWorker(browserContext)
+
+    if (toggleExtension) {
+      const page = await browserContext.newPage()
+      await page.goto('about:blank')
+      await serviceWorker.evaluate(async () => {
+        await (globalThis as any).toggleExtensionForActiveTab()
+      })
+    }
+  } catch (error) {
+    await browserContext.close().catch(() => {})
+    relayServer.close()
+    throw error
   }
 
   return { browserContext, userDataDir, relayServer }

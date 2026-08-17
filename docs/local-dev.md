@@ -23,7 +23,7 @@ pnpm build
 node packages/relay/dist/start.js
 ```
 
-Server runs at `http://127.0.0.1:19988`. You should see:
+Server runs at `http://127.0.0.1:8790`. You should see:
 ```
 CDP Relay Server running. Press Ctrl+C to stop.
 ```
@@ -127,17 +127,17 @@ If you want to expose the server to Docker or other machines:
 node packages/cli/bin.js serve --host 0.0.0.0 --token mysecret
 
 # From Docker, connect via:
-# RUNBROWSER_HOST=host.docker.internal RUNBROWSER_TOKEN=mysecret
+# TERMIO_BROWSER_HOST=host.docker.internal TERMIO_BROWSER_TOKEN=mysecret
 ```
 
 ## Verify Everything Works
 
 ```bash
 # 1. Check server is running
-curl http://127.0.0.1:19988/version
+curl http://127.0.0.1:8790/version
 
 # 2. Check extension is connected
-curl http://127.0.0.1:19988/extension/status
+curl http://127.0.0.1:8790/extension/status
 # Should show: {"connected":true, ...}
 
 # 3. Create session and run code
@@ -149,28 +149,28 @@ node packages/cli/bin.js -s 1 -e "document.title"
 
 | Problem | Fix |
 |---------|-----|
-| Server won't start (port in use) | `lsof -i :19988` then `kill <PID>`, or use `node packages/cli/bin.js serve --replace` |
+| Server won't start (port in use) | `lsof -i :8790` then `kill <PID>`, or use `node packages/cli/bin.js serve --replace` |
 | Extension icon stays gray | Click the icon on a tab. Make sure relay server is running. Check Chrome DevTools → extension service worker for errors |
 | `session new` hangs | Extension not connected. Click extension icon on a tab first |
 | `ECONNREFUSED` | Relay server not running. Start it in Terminal 1 |
-| Extension can't connect | Check relay server is on port 19988. Extension hardcodes `127.0.0.1:19988` |
+| Extension can't connect | Check relay server is on port 8790. Extension hardcodes `127.0.0.1:8790` |
 | Build errors | Run `pnpm install` then `pnpm build` from root |
 
 ## Port Configuration
 
-Default port is `19988`. To change:
+Default port is `8790`. To change:
 
 ```bash
 # Server
-RUNBROWSER_PORT=19999 node packages/relay/dist/start.js
+TERMIO_BROWSER_PORT=19999 node packages/relay/dist/start.js
 
 # Extension (must rebuild with matching port)
 cd packages/extension
-RUNBROWSER_PORT=19999 pnpm build
+TERMIO_BROWSER_PORT=19999 pnpm build
 # Then reload extension in Chrome
 
 # CLI
-RUNBROWSER_PORT=19999 node packages/cli/bin.js session new
+TERMIO_BROWSER_PORT=19999 node packages/cli/bin.js session new
 ```
 
 ## Log Files

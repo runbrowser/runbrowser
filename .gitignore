@@ -8,3 +8,4 @@ packages/cli/relay-server.log
 packages/extension/dist-*
 screenshots/
 tmp/
+dist-npm/

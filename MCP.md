@@ -1,15 +1,15 @@
 # MCP Setup
 
-> **Note:** CLI is the recommended way to use RunBrowser. See [README.md](./README.md) for CLI usage.
+> **Note:** CLI is the recommended way to use termio browser. See [README.md](./README.md) for CLI usage.
 
 Add to your MCP client settings:
 
 ```json
 {
   "mcpServers": {
-    "runbrowser": {
+    "browser": {
       "command": "npx",
-      "args": ["-y", "@jiweiyuan/runbrowser-mcp@latest"]
+      "args": ["-y", "@termio/browser-mcp@latest"]
     }
   }
 }
@@ -54,7 +54,7 @@ click its centre. Prefer that over screenshots — cheaper and searchable.
 
 ## Environment Variables
 
-### `RUNBROWSER_AUTO_ENABLE`
+### `TERMIO_BROWSER_AUTO_ENABLE`
 
 Auto-create a tab when Playwright connects (no manual extension click needed).
 
@@ -63,11 +63,11 @@ Auto-create a tab when Playwright connects (no manual extension click needed).
 ```json
 {
   "mcpServers": {
-    "runbrowser": {
+    "browser": {
       "command": "npx",
-      "args": ["-y", "@jiweiyuan/runbrowser-mcp@latest"],
+      "args": ["-y", "@termio/browser-mcp@latest"],
       "env": {
-        "RUNBROWSER_AUTO_ENABLE": "1"
+        "TERMIO_BROWSER_AUTO_ENABLE": "1"
       }
     }
   }
@@ -83,7 +83,7 @@ Run agents in isolated environments while controlling Chrome on your host.
 **On host (where Chrome runs):**
 
 ```bash
-npx -y @jiweiyuan/runbrowser serve --token <secret>
+npx -y @termio/browser serve --token <secret>
 ```
 
 **In container/VM (where agent runs):**
@@ -91,9 +91,9 @@ npx -y @jiweiyuan/runbrowser serve --token <secret>
 ```json
 {
   "mcpServers": {
-    "runbrowser": {
+    "browser": {
       "command": "npx",
-      "args": ["-y", "@jiweiyuan/runbrowser-mcp@latest", "--host", "host.docker.internal", "--token", "<secret>"]
+      "args": ["-y", "@termio/browser-mcp@latest", "--host", "host.docker.internal", "--token", "<secret>"]
     }
   }
 }
@@ -104,12 +104,12 @@ Or with environment variables:
 ```json
 {
   "mcpServers": {
-    "runbrowser": {
+    "browser": {
       "command": "npx",
-      "args": ["-y", "@jiweiyuan/runbrowser-mcp@latest"],
+      "args": ["-y", "@termio/browser-mcp@latest"],
       "env": {
-        "RUNBROWSER_HOST": "host.docker.internal",
-        "RUNBROWSER_TOKEN": "<secret>"
+        "TERMIO_BROWSER_HOST": "host.docker.internal",
+        "TERMIO_BROWSER_TOKEN": "<secret>"
       }
     }
   }

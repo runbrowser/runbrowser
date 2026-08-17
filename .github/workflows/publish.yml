@@ -1,29 +1,37 @@
-name: Publish to npm
+name: Release
 
-# Publishing is manual for now.
+# The file is named publish.yml because npm's trusted-publisher config binds
+# to the workflow *filename*. Renaming it would break OIDC on every package.
 #
-# The tag trigger is deliberately absent: `packages/server` does not compile and
-# session creation returns HTTP 400, so a `v*` tag would publish a CLI whose
-# main verbs cannot work. Re-add
+# A release is a tag. Nothing in the repository is edited to cut one:
 #
-#   push:
-#     tags: ['v*']
+#   git tag v0.2.0 && git push origin v0.2.0
 #
-# once `pnpm run typecheck` passes and `runbrowser cdp` works against a browser.
+# The tag is the version. It is written into the manifest here, not committed,
+# so there is no bump commit to forget and no way for the manifest and the tag
+# to disagree.
 #
-# The packages also still carry the @jiweiyuan scope while the project moves to
-# @termio; rename them and this file together, in one release, rather than
-# leaving the two scopes half-migrated.
+# Before the first release, run scripts/first-publish.sh from a developer
+# machine. Publishing here authenticates over OIDC, which npm configures on a
+# package's settings page — and a package that has never been published does
+# not have one. That bootstrap is one time; do not add a publish token to work
+# around it.
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.2.0)'
+        required: true
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
-      id-token: write  # Required for OIDC Trusted Publishing
+      contents: write # create the GitHub release and upload binaries
+      id-token: write # authenticate to npm over OIDC, and sign provenance
 
     steps:
       - name: Checkout code
@@ -34,6 +42,8 @@ jobs:
         with:
           version: 9
 
+      # Node is here for pnpm and the extension's Vite build. Nothing that
+      # ships runs on it.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -41,32 +51,89 @@ jobs:
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Resolve the version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Typecheck before build so a compile failure stops the run here, with a
-      # readable error, rather than surfacing as a broken artifact on npm. tsc
-      # emits output even when it reports errors, so `build` alone is not a gate.
+      # Refuse early and legibly. npm answers a duplicate version with a 403
+      # that reads like a permissions problem.
+      - name: Check the version is unpublished
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          if npm view "@termio/browser@$version" version >/dev/null 2>&1; then
+            echo "@termio/browser@$version is already on npm. Versions cannot be reused."
+            exit 1
+          fi
+
       - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Build all packages
-        run: pnpm run build
-
-      - name: Run tests
+      - name: Test
         run: pnpm run test
 
-      - name: Publish @jiweiyuan/runbrowser-server
-        run: pnpm --filter @jiweiyuan/runbrowser-server publish --no-git-checks --access public
+      - name: Build extension
+        run: pnpm run build
+
+      - name: Write the version
+        run: bun scripts/set-version.ts "${{ steps.version.outputs.version }}"
+
+      # Bun cross-compiles every target from this one runner, so there is no
+      # matrix here.
+      - name: Build platform binaries
+        run: bun scripts/build-binaries.ts
+
+      # Running the artifact is the only check that covers it. A read of a file
+      # that is not on disk inside the binary passes every test above and fails
+      # on a user's first command.
+      - name: Smoke-test the binary
+        run: |
+          ./dist-npm/browser-linux-x64/termio-browser --version
+          ./dist-npm/browser-linux-x64/termio-browser --help > /dev/null
+          ./dist-npm/browser-linux-x64/termio-browser skill > /dev/null
+
+      # Platform packages first: they are optional dependencies of the main
+      # package, so the other order leaves a window in which installing it
+      # resolves nothing to run.
+      - name: Publish platform packages
+        run: |
+          for directory in dist-npm/*/; do
+            npm publish "$directory" --access public
+          done
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      - name: Publish @jiweiyuan/runbrowser-mcp
-        run: pnpm --filter @jiweiyuan/runbrowser-mcp publish --no-git-checks --access public
+      - name: Publish @termio/browser
+        run: npm publish packages/browser --access public
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      - name: Publish @jiweiyuan/runbrowser
-        run: pnpm --filter @jiweiyuan/runbrowser publish --no-git-checks --access public
+      # The binaries are attached so a Homebrew formula or a curl installer has
+      # somewhere to fetch from that is not npm.
+      - name: Create the GitHub release
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          for directory in dist-npm/*/; do
+            name=$(basename "$directory")
+            tar czf "$name-$version.tar.gz" -C "$directory" .
+          done
+          gh release create "v$version" \
+            --title "v$version" \
+            --generate-notes \
+            ./*.tar.gz
         env:
-          NPM_CONFIG_PROVENANCE: true
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
