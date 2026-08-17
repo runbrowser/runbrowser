@@ -1,7 +1,7 @@
 {
   "name": "@termio/browser",
   "version": "0.1.0",
-  "description": "Control your running Chrome browser over CDP \u2014 your logins, extensions and cookies already there",
+  "description": "Control your running Chrome browser over CDP — your logins, extensions and cookies already there",
   "type": "module",
   "exports": {
     ".": "./src/server/index.ts",
