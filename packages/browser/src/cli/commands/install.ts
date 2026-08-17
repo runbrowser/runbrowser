@@ -15,7 +15,39 @@ import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
 
 const COMMANDS_DIR = path.join(TERMIO_BROWSER_DIR, 'commands')
-const REPO_API_BASE = 'https://api.github.com/repos/runbrowser/commands/contents'
+
+/**
+ * Where plugins come from by default: this project's own `plugins/` directory.
+ *
+ * Any GitHub repository laid out the same way works — `--repo owner/name`, or
+ * TERMIO_BROWSER_PLUGIN_REPO. Installing is only a download, so a plugin from
+ * someone else's repo is the same thing as one written by hand into
+ * ~/.termio/browser/commands/.
+ */
+const DEFAULT_REPO = 'termio-sh/browser'
+const DEFAULT_PATH = 'plugins'
+
+type PluginSource = { repo: string; path: string }
+
+function resolveSource(args: ParsedArgs): PluginSource {
+  const repo = (args.flags.get('repo') as string) || process.env.TERMIO_BROWSER_PLUGIN_REPO || DEFAULT_REPO
+  // `--path ""` is meaningful: repositories that keep adapters at their root,
+  // like bb-sites, need it. Testing truthiness would silently ignore it.
+  const dir = args.flags.has('path')
+    ? String(args.flags.get('path') ?? '')
+    : (process.env.TERMIO_BROWSER_PLUGIN_PATH ?? DEFAULT_PATH)
+
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+    throw new Error(`Not a repository: ${repo}. Expected owner/name.`)
+  }
+  return { repo, path: dir.replace(/^\/+|\/+$/g, '') }
+}
+
+function contentsUrl({ repo, path: dir }: PluginSource, subpath = ''): string {
+  const base = `https://api.github.com/repos/${repo}/contents`
+  const parts = [dir, subpath].filter(Boolean).join('/')
+  return parts ? `${base}/${parts}` : base
+}
 
 interface GitHubFile {
   name: string
@@ -43,8 +75,8 @@ async function fetchGitHub(url: string): Promise<any> {
 /**
  * List available packages (directories in the repo root).
  */
-async function listAvailable(): Promise<string[]> {
-  const entries: GitHubFile[] = await fetchGitHub(REPO_API_BASE)
+async function listAvailable(source: PluginSource): Promise<string[]> {
+  const entries: GitHubFile[] = await fetchGitHub(contentsUrl(source))
   return entries
     .filter(e => e.type === 'dir')
     .map(e => e.name)
@@ -54,30 +86,35 @@ async function listAvailable(): Promise<string[]> {
 /**
  * Install a package: download all .ts files from repo/<site>/ to ~/.termio/browser/commands/<site>/
  */
-async function installPackage(site: string): Promise<string[]> {
-  const files: GitHubFile[] = await fetchGitHub(`${REPO_API_BASE}/${site}`)
+async function installPackage(site: string, source: PluginSource): Promise<string[]> {
+  const files: GitHubFile[] = await fetchGitHub(contentsUrl(source, site))
   const tsFiles = files.filter(f => f.name.endsWith('.ts') || f.name.endsWith('.js'))
 
   if (tsFiles.length === 0) {
     throw new Error(`No command files found for "${site}"`)
   }
 
-  const destDir = path.join(COMMANDS_DIR, site)
-  fs.mkdirSync(destDir, { recursive: true })
-
-  const installed: string[] = []
+  // Download everything before writing anything. A failure partway through
+  // used to leave an empty or half-filled directory that later read as
+  // "installed" — the reason `commands install` could report success and
+  // produce nothing.
+  const downloaded: Array<{ name: string; content: string }> = []
   for (const file of tsFiles) {
     const resp = await fetch(file.download_url)
     if (!resp.ok) {
-      throw new Error(`Failed to download ${file.name}: ${resp.status}`)
+      const hint = resp.status === 429 ? ' (rate limited by GitHub — try again shortly)' : ''
+      throw new Error(`Failed to download ${file.name}: ${resp.status}${hint}`)
     }
-    const content = await resp.text()
-    const destPath = path.join(destDir, file.name)
-    fs.writeFileSync(destPath, content, 'utf-8')
-    installed.push(file.name)
+    downloaded.push({ name: file.name, content: await resp.text() })
   }
 
-  return installed
+  const destDir = path.join(COMMANDS_DIR, site)
+  fs.mkdirSync(destDir, { recursive: true })
+  for (const file of downloaded) {
+    fs.writeFileSync(path.join(destDir, file.name), file.content, 'utf-8')
+  }
+
+  return downloaded.map((f) => f.name)
 }
 
 /**
@@ -104,6 +141,10 @@ registerBuiltinCommand({
       { name: 'action', description: 'Action: list, install, uninstall', required: true },
       { name: 'package', description: 'Package name (e.g. reddit, youtube)' },
     ],
+    flags: {
+      repo: { type: 'string', description: `Source repository, owner/name (default: ${DEFAULT_REPO})` },
+      path: { type: 'string', description: `Directory within that repo (default: ${DEFAULT_PATH})` },
+    },
   },
   async execute(args: ParsedArgs, _resolveSession: SessionResolver) {
     // args.subcommand = action (list, install, uninstall)
@@ -123,16 +164,32 @@ registerBuiltinCommand({
       case 'list':
       case 'ls': {
         try {
-          console.log(pc.bold('Available command extensions:'))
+          const source = resolveSource(args)
+          const available = await listAvailable(source)
+          // Anything already on disk is listed too, whether or not this source
+          // knows about it — a hand-written command is as real as a fetched one.
+          const local = fs.existsSync(COMMANDS_DIR)
+            ? fs.readdirSync(COMMANDS_DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+            : []
+
+          console.log(pc.bold(`Command extensions in ${source.repo}${source.path ? '/' + source.path : ''}:`))
           console.log()
-          const packages = await listAvailable()
-          for (const p of packages) {
-            const installed = fs.existsSync(path.join(COMMANDS_DIR, p))
-            const marker = installed ? pc.green(' ✓ installed') : ''
+          for (const p of available) {
+            const marker = local.includes(p) ? pc.green(' ✓ installed') : ''
             console.log(`  ${pc.cyan(p)}${marker}`)
           }
+
+          const localOnly = local.filter((p) => !available.includes(p)).sort()
+          if (localOnly.length > 0) {
+            console.log()
+            console.log(pc.bold('Installed, not from this source:'))
+            console.log()
+            for (const p of localOnly) console.log(`  ${pc.cyan(p)}${pc.green(' ✓ installed')}`)
+          }
+
           console.log()
           console.log(`Run ${pc.cyan('termio-browser commands install <package>')} to install.`)
+          console.log(pc.dim(`Another repository: --repo owner/name [--path <dir>]`))
         } catch (e: any) {
           console.error(`Error: ${e.message}`)
           process.exit(1)
@@ -149,8 +206,9 @@ registerBuiltinCommand({
         }
 
         try {
-          console.log(`Installing ${pc.cyan(pkg)}...`)
-          const files = await installPackage(pkg)
+          const source = resolveSource(args)
+          console.log(`Installing ${pc.cyan(pkg)} from ${source.repo}...`)
+          const files = await installPackage(pkg, source)
           console.log(pc.green(`✓ Installed ${pkg}/`))
           for (const f of files) {
             // Printed from the directory actually written to. The literal that

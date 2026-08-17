@@ -200,13 +200,18 @@ export class CDPExecutor implements ExecutorLike {
     timeout: number,
   ): Promise<{ text: string; images: Array<{ data: string; mimeType: string }>; isError: boolean }> {
     try {
-      // Try direct expression evaluation first (handles `document.title`, `1+1`, etc.)
-      // Fall back to async IIFE wrapper only for multi-statement code (has semicolons or explicit return)
-      const trimmed = code.trim()
-      const isMultiStatement = trimmed.includes(';') || trimmed.startsWith('return ')
-      const expression = isMultiStatement
-        ? `(async () => { ${trimmed} })()`
-        : trimmed
+      // replMode is what the DevTools console runs on: it permits top-level
+      // await and yields the completion value of the last statement. Both
+      // matter here — snippets are written as a sequence of awaits ending in
+      // an expression, with no `return`.
+      //
+      // The previous approach guessed, wrapping in an async IIFE only when the
+      // code contained a semicolon or began with `return`. Semicolon-free code
+      // — which is how every published site command is written — fell through
+      // to a raw evaluate and died on "await is only valid in async
+      // functions", and the wrapped branch would have discarded the value
+      // anyway for want of an explicit return.
+      const expression = code.trim()
 
       const result = (await this.sendCDP(
         'Runtime.evaluate',
@@ -214,6 +219,8 @@ export class CDPExecutor implements ExecutorLike {
           expression,
           awaitPromise: true,
           returnByValue: true,
+          // Top-level await, and the completion value of the last statement.
+          replMode: true,
           timeout,
         },
         timeout + 5000,

@@ -46,7 +46,55 @@ export interface CommandContext {
 }
 
 /**
- * Import a command module.
+ * An adapter in the `@meta` format: a JSON header comment followed by a bare
+ * async function, which is evaluated *in the page* rather than on the host.
+ *
+ * This is browser-use's bb-sites layout. Supporting it is what lets someone run
+ * `commands install <site> --repo epiral/bb-sites` and get that community's
+ * adapters from their repository, on their terms — rather than this project
+ * copying a corpus it has no licence to.
+ */
+type MetaHeader = {
+  name?: string
+  description?: string
+  /** The origin the function runs against. Its cookies are the whole point. */
+  domain?: string
+  args?: Record<string, CommandArg>
+  columns?: string[]
+}
+
+const META_BLOCK = /^\s*\/\*\s*@meta\s*([\s\S]*?)\*\//
+
+function parseMetaAdapter(source: string, site: string, name: string): CommandModule | null {
+  const match = source.match(META_BLOCK)
+  if (!match) return null
+
+  let meta: MetaHeader
+  try {
+    meta = JSON.parse(match[1])
+  } catch (error) {
+    throw new Error(`${site}/${name}: @meta header is not valid JSON — ${(error as Error).message}`)
+  }
+
+  const body = source.slice(match[0].length).trim()
+  if (!body) throw new Error(`${site}/${name}: @meta header with no function after it`)
+
+  return {
+    description: meta.description || `${site} ${name}`,
+    args: meta.args,
+    columns: meta.columns,
+    async run(ctx, args) {
+      // The function is shipped into the page whole and called there, so it
+      // gets the site's cookies, its origin and its own JavaScript — and costs
+      // one round trip rather than one per statement.
+      if (meta.domain) await ctx.navigate(`https://${meta.domain}`)
+      return await ctx.evaluate(`await (${body})(${JSON.stringify(args ?? {})})`)
+    },
+  }
+}
+
+/**
+ * Load a command from disk, in either supported format.
  *
  * The URL carries the file's mtime because ESM caches a specifier for the life
  * of the process. Without it, a command the user just edited keeps running its
@@ -54,6 +102,13 @@ export interface CommandContext {
  * keeping these as loose files.
  */
 async function importCommand(filePath: string): Promise<CommandModule> {
+  const source = fs.readFileSync(filePath, 'utf-8')
+  const site = path.basename(path.dirname(filePath))
+  const name = path.basename(filePath, path.extname(filePath))
+
+  const adapter = parseMetaAdapter(source, site, name)
+  if (adapter) return adapter
+
   const { mtimeMs } = fs.statSync(filePath)
   const specifier = `${pathToFileURL(filePath).href}?v=${mtimeMs}`
   const namespace = (await import(specifier)) as CommandModule & { default?: CommandModule }
