@@ -29,10 +29,13 @@ runbrowser status
 
 ```
 runbrowser cdp <Method> [params-json]   # the page API
-runbrowser eval '<js>'                  # JavaScript in the page (see caveat below)
-runbrowser tab list|new|<index>|close    # which target you're bound to
+runbrowser eval '<js>'                  # JavaScript in the page
+runbrowser exec                         # a snippet with helpers in scope (stdin)
+runbrowser tab list|new|<index>|close   # which target you're bound to
 runbrowser status                       # is a browser attached
 runbrowser session new|list|delete      # isolated state, one per agent
+runbrowser commands list|install        # site plugins
+runbrowser mcp                          # MCP server on stdio
 runbrowser help [command]               # same as --help
 runbrowser skill install                # write the skill into ./.claude and ./.agents
 ```
@@ -58,22 +61,27 @@ runbrowser cdp Target.getTargets | jq '.targetInfos[] | select(.type=="page") | 
 `eval` prints the value as plain text, not JSON — `runbrowser eval 'document.title'`
 prints the title, unquoted. Use `--json` if you need it wrapped.
 
-### `eval` caveat — it is not a transparent `Runtime.evaluate`
+### `eval` semantics
 
-If your code contains a `;` or starts with `return`, it is wrapped in an async
-function before evaluation, and the wrapper does not return the last expression:
-
-```bash
-runbrowser eval 'document.title'    # → the title
-runbrowser eval 'document.title;'   # → empty. The trailing ; changed the semantics.
-```
-
-A `;` inside a string literal triggers the same wrapping. When writing more than
-one statement, return explicitly:
+`eval` runs in the same mode the DevTools console does, so it behaves the way
+typing into that console behaves: **the value is the last expression, and
+top-level `await` works.**
 
 ```bash
-runbrowser eval 'const t = document.title; return t.toUpperCase()'
+runbrowser eval 'document.title'                          # → the title
+runbrowser eval 'document.title;'                         # → the title
+runbrowser eval 'const t = document.title; t.toUpperCase()'  # → the title, upper-cased
+runbrowser eval 'const r = await fetch("/api"); r.status'    # → 200
 ```
+
+The one thing that does **not** work is a bare `return` — your code is not
+inside a function, so there is nothing to return from:
+
+```bash
+runbrowser eval 'const t = document.title; return t'      # → empty
+```
+
+End with the expression instead. If you want a wrapper you control, use `exec`.
 
 ## Reading a page
 
@@ -174,14 +182,34 @@ For SPAs, `readyState` lies — poll for the thing you actually need:
 until runbrowser eval 'document.querySelectorAll(".item").length >= 10' | grep -q true; do sleep 0.3; done
 ```
 
-### What you cannot wait on
+### Events
 
-`cdp` sends commands and returns their results. It does **not** deliver CDP
-*events*, so there is no way to wait on `Page.loadEventFired`,
-`Page.javascriptDialogOpening`, `Browser.downloadProgress`, popups, or new
-target attachment. Anything event-driven has to be reduced to polling for an
-observable side effect, as above — and downloads and dialogs may simply not be
-workable from here. Say so rather than retrying.
+CDP is commands *and* events. `cdp` returns command results; the events are
+buffered per session, and you drain them when you want them — which is what
+lets you wait on things that have no observable side effect to poll for.
+
+```bash
+runbrowser exec <<'JS'
+  await setEventFilter('^Page\\.')        # keep the buffer to what you care about
+  await drainEvents()                     # clear anything already queued
+  await cdp('Page.navigate', { url: 'https://example.com' })
+  const { events, dropped } = await waitFor(
+    async () => {
+      const e = await drainEvents({ peek: true })
+      return e.events.some(x => x.method === 'Page.loadEventFired') ? e : null
+    },
+    { label: 'load' },
+  )
+  return { seen: events.map(e => e.method), dropped }
+JS
+```
+
+`drainEvents()` takes and clears; `drainEvents({ peek: true })` looks without
+consuming. The buffer is capped and reports `dropped`, so a busy page cannot
+grow it without limit — set a filter rather than letting `Network.*` flood it.
+
+This covers dialogs, downloads, popups and target attachment, which polling
+could never reach.
 
 ## Screenshots
 
@@ -228,14 +256,55 @@ Without `-s`, the CLI reuses an existing session or creates one.
    anything irreversible, or navigate away from work they have open. Open a new
    tab instead.
 
-## When something needs a helper
+## `exec` — when one command is not enough
 
-If you find yourself writing the same CDP dance repeatedly for a site, write it
-down as a skill rather than asking for a new CLI verb — that's how site
-knowledge accumulates without the interface growing.
-
-Site commands already installed on this machine are listed by:
+`cdp` and `eval` are one call each. The moment a task needs a loop, a
+condition, or a wait built from what actually happened, use `exec`: a snippet
+with helpers already in scope, read from stdin.
 
 ```bash
-runbrowser commands list
+runbrowser exec <<'JS'
+  await cdp('Page.navigate', { url: 'https://example.com' })
+  await waitFor(async () => (await evaluate('document.readyState')) === 'complete')
+  const links = await evaluate('[...document.querySelectorAll("a")].map(a => a.href)')
+  return { title: await evaluate('document.title'), links }
+JS
+```
+
+In scope: `cdp`, `evaluate`, `pageInfo`, `tabs`, `newTab`, `switchTab`,
+`closeTab`, `drainEvents`, `setEventFilter`, `wait`, `waitFor`. Unlike `eval`,
+this **is** a function body, so `return` is how you produce a value.
+`runbrowser exec --helpers` lists everything available.
+
+## When something needs a helper
+
+Work out a CDP sequence once, then write it down — that is how site knowledge
+accumulates without the interface growing a verb per site.
+
+**For yourself**, export it from `~/.runbrowser/workspace/helpers.ts`; anything
+there joins `exec`'s scope, reloaded when you edit it.
+
+**For a site**, write a plugin — a `@meta` JSON header and a bare async
+function, evaluated *in the page*, so it gets that site's cookies, origin and
+its own JavaScript in one round trip:
+
+```js
+/* @meta
+{ "name": "v2ex/hot", "domain": "www.v2ex.com",
+  "args": { "count": { "type": "number" } } }
+*/
+async function(args) {
+  const resp = await fetch('/api/topics/hot.json', { credentials: 'include' })
+  return (await resp.json()).slice(0, args.count || 20)
+}
+```
+
+`domain` is the load-bearing field: absolute URLs to another host are the most
+common reason a plugin silently returns nothing.
+
+```bash
+runbrowser commands list                              # installed, and available
+runbrowser commands install v2ex                      # from this project
+runbrowser commands install <site> --repo owner/name  # from anyone's repository
+runbrowser v2ex hot --count 5
 ```

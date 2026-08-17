@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { notFound } from 'next/navigation'
@@ -34,6 +35,7 @@ export default async function LocaleLayout({
       </head>
       <body>
         <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+        <Analytics />
       </body>
     </html>
   )
