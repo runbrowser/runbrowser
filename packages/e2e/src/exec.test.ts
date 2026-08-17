@@ -5,7 +5,8 @@
  * page, and that CDP events actually accumulate somewhere a later call can
  * read them.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { spawn } from 'node:child_process'
 import { setupTestContext, cleanupTestContext, type TestContext } from './test-utils.js'
 
 const PORT = 19998
@@ -21,19 +22,22 @@ afterAll(async () => {
   await cleanupTestContext(ctx, null).catch(() => {})
 })
 
-async function cli(args: string[], stdin?: string) {
-  const proc = Bun.spawn(['bun', CLI, ...args], {
-    env: { ...process.env, TERMIO_BROWSER_PORT: String(PORT) },
-    stdin: stdin ? new TextEncoder().encode(stdin) : 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
+// The CLI runs under bun; these tests run under Node because Playwright does
+// not support Bun. Spawning across that line is the point of the split.
+function cli(args: string[], stdin?: string): Promise<{ out: string; err: string; code: number }> {
+  return new Promise((resolve) => {
+    const proc = spawn('bun', [CLI, ...args], {
+      env: { ...process.env, TERMIO_BROWSER_PORT: String(PORT) },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    let out = ''
+    let err = ''
+    proc.stdout.on('data', (d) => (out += d))
+    proc.stderr.on('data', (d) => (err += d))
+    if (stdin) proc.stdin.end(stdin)
+    else proc.stdin.end()
+    proc.on('close', (code) => resolve({ out: out.trim(), err: err.trim(), code: code ?? 1 }))
   })
-  const [out, err] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ])
-  await proc.exited
-  return { out: out.trim(), err: err.trim(), code: proc.exitCode }
 }
 
 describe('exec', () => {

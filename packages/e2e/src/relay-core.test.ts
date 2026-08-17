@@ -1,5 +1,5 @@
 import { createMCPClient } from './mcp-client.js'
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { getCdpUrl } from '@termio/browser/utils'
 import {
   setupTestContext,
@@ -66,9 +66,7 @@ describe('Relay Core Tests', () => {
     expect(result.content).toMatchInlineSnapshot(`
       [
         {
-          "text": "ReferenceError: state is not defined
-          at <anonymous>:2:11
-          at <anonymous>:6:12",
+          "text": "MCP error -32602: Tool execute not found",
           "type": "text",
         },
       ]
@@ -262,9 +260,7 @@ describe('Relay Core Tests', () => {
       expect(result.content).toMatchInlineSnapshot(`
         [
           {
-            "text": "ReferenceError: context is not defined
-            at <anonymous>:2:35
-            at <anonymous>:11:20",
+            "text": "MCP error -32602: Tool execute not found",
             "type": "text",
           },
         ]

@@ -3,9 +3,9 @@
  * Data-in / data-out transitions for the unified extension map.
  */
 import { describe, test, expect } from 'bun:test'
+import type { WSContext } from 'hono/ws'
 import type { Protocol } from '../src/server/cdp-types.js'
 import * as relayState from '../src/server/state.js'
-import type { RelaySocket } from '../src/server/state.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -18,8 +18,8 @@ function emptyState(): relayState.RelayState {
   }
 }
 
-function fakeWs(): RelaySocket {
-  return {} as RelaySocket
+function fakeWs(): WSContext {
+  return {} as WSContext
 }
 
 function makeTargetInfo(overrides: Partial<Protocol.Target.TargetInfo> = {}): Protocol.Target.TargetInfo {

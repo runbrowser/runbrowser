@@ -10,48 +10,37 @@
  * which conditions matter.
  */
 
-import type { Routes } from '../http.js'
-import { readJson } from '../http.js'
+import type { Hono } from 'hono'
 import type { ServerContext } from '../server-context.js'
 
-export function apiEventRoutes(ctx: ServerContext): Routes {
-  return {
-    '/api/events/drain': {
-      POST: async (request) => {
-        const body = await readJson<{ sessionId: string | number; peek?: boolean }>(request, {
-          sessionId: '',
-        })
-        const sessionId = ctx.normalizeSessionId(body.sessionId)
-        if (!sessionId) {
-          return Response.json({ error: 'sessionId is required' }, { status: 400 })
-        }
+export function registerApiEventRoutes(app: Hono, ctx: ServerContext) {
+  app.post('/api/events/drain', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      sessionId?: string | number
+      peek?: boolean
+    }
+    const sessionId = ctx.normalizeSessionId(body.sessionId)
+    if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
 
-        const buffer = ctx.eventBuffers.get(sessionId)
-        const result = body.peek ? buffer.peek() : buffer.drain()
-        return Response.json(result)
-      },
-    },
+    const buffer = ctx.eventBuffers.get(sessionId)
+    return c.json(body.peek ? buffer.peek() : buffer.drain())
+  })
 
-    '/api/events/filter': {
-      POST: async (request) => {
-        const body = await readJson<{ sessionId: string | number; pattern?: string | null }>(
-          request,
-          { sessionId: '' },
-        )
-        const sessionId = ctx.normalizeSessionId(body.sessionId)
-        if (!sessionId) {
-          return Response.json({ error: 'sessionId is required' }, { status: 400 })
-        }
+  app.post('/api/events/filter', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      sessionId?: string | number
+      pattern?: string | null
+    }
+    const sessionId = ctx.normalizeSessionId(body.sessionId)
+    if (!sessionId) return c.json({ error: 'sessionId is required' }, 400)
 
-        const buffer = ctx.eventBuffers.get(sessionId)
-        try {
-          buffer.setFilter(body.pattern ?? null)
-        } catch (error: any) {
-          // An invalid pattern would otherwise fail later, on an unrelated call.
-          return Response.json({ error: `Invalid filter: ${error.message}` }, { status: 400 })
-        }
-        return Response.json({ filter: buffer.getFilter(), buffered: buffer.size })
-      },
-    },
-  }
+    const buffer = ctx.eventBuffers.get(sessionId)
+    try {
+      buffer.setFilter(body.pattern ?? null)
+    } catch (error: any) {
+      // An invalid pattern would otherwise fail later, on an unrelated call.
+      return c.json({ error: `Invalid filter: ${error.message}` }, 400)
+    }
+    return c.json({ filter: buffer.getFilter(), buffered: buffer.size })
+  })
 }

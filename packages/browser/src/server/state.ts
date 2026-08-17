@@ -10,7 +10,7 @@
  * See docs/plan-centralize-relay-state.md for the full refactor plan.
  */
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import type { ServerWebSocket } from 'bun'
+import type { WSContext } from 'hono/ws'
 import type { Protocol } from './cdp-types.js'
 
 // ---------------------------------------------------------------------------
@@ -31,40 +31,6 @@ export type ExtensionInfo = {
   /** termio-browser package version the extension was built with (sent as ?v= query param) */
   version?: string
 }
-
-/**
- * Per-connection identity, attached when the request is upgraded and handed
- * back on every socket callback.
- *
- * Bun serves one WebSocket handler set for the whole server, so both endpoints
- * share it and dispatch on `kind`. What used to live in a per-connection
- * closure lives here instead.
- */
-export type ExtensionSocketData = {
-  kind: 'extension'
-  connectionId: string
-  info: ExtensionInfo
-}
-
-export type PlaywrightSocketData = {
-  kind: 'cdp'
-  clientId: string
-  /** Resolved at upgrade time; null means no extension could be bound. */
-  extensionId: string | null
-  /** What the client asked for, kept so a rejection can name it. */
-  requestedExtensionId: string | null
-}
-
-export type SocketData = ExtensionSocketData | PlaywrightSocketData
-
-export type ExtensionSocket = ServerWebSocket<ExtensionSocketData>
-export type PlaywrightSocket = ServerWebSocket<PlaywrightSocketData>
-
-/**
- * A socket held in relay state. The two endpoints store their sockets in the
- * same maps, so the stored type is the union.
- */
-export type RelaySocket = ServerWebSocket<SocketData>
 
 /** Session metadata identifying which browser/profile a session is bound to. */
 export type SessionMetadata = {
@@ -87,7 +53,7 @@ export type ExtensionEntry = {
   stableKey: string
   connectedTargets: Map<string, ConnectedTarget>
   // Runtime I/O fields
-  ws: RelaySocket | null
+  ws: WSContext | null
   pendingRequests: Map<number, ExtensionPendingRequest>
   messageId: number
   pingInterval: ReturnType<typeof setInterval> | null
@@ -96,7 +62,7 @@ export type ExtensionEntry = {
 export type PlaywrightClient = {
   id: string
   extensionId: string | null
-  ws: RelaySocket
+  ws: WSContext
 }
 
 export type RelayState = {
@@ -170,7 +136,7 @@ export function addExtension(
     id: string
     info: ExtensionInfo
     stableKey: string
-    ws: RelaySocket | null
+    ws: WSContext | null
   },
 ): RelayState {
   const newExtensions = new Map(state.extensions)
@@ -213,7 +179,7 @@ export function removeExtension(state: RelayState, { extensionId }: { extensionI
 /** Add a playwright client (state + ws handle co-located). */
 export function addPlaywrightClient(
   state: RelayState,
-  { id, extensionId, ws }: { id: string; extensionId: string | null; ws: RelaySocket },
+  { id, extensionId, ws }: { id: string; extensionId: string | null; ws: WSContext },
 ): RelayState {
   const newClients = new Map(state.playwrightClients)
   newClients.set(id, { id, extensionId, ws })
@@ -265,7 +231,7 @@ export function updateExtensionIO(
     pingInterval,
   }: {
     extensionId: string
-    ws?: RelaySocket | null
+    ws?: WSContext | null
     pingInterval?: ReturnType<typeof setInterval> | null
   },
 ): RelayState {

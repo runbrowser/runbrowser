@@ -1,33 +1,41 @@
 /**
  * CDP Relay Server — composition root.
  *
- * Creates the ServerContext and assembles the route table.
+ * Creates the ServerContext and assembles all route handlers.
  * No business logic lives here — only wiring.
  */
+
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { createRuntimeAdapter } from './adapter.js'
 
 import { EventEmitter } from 'node:events'
 import util from 'node:util'
 import pc from 'picocolors'
 
 import type { Protocol } from './cdp-types.js'
-import type { CDPEventBase } from './cdp-types.js'
+import type { CDPCommand, CDPResponseBase, CDPEventBase } from './cdp-types.js'
 import type { ServerContext, Logger } from './server-context.js'
 import { logCdpMessage } from './server-context.js'
 import { isRestrictedTarget } from './target-filter.js'
 import { createCdpLogger, type CdpLogEntry, type CdpLogger } from './cdp-log.js'
 import { CDPExecutorManager } from './cdp-executor-manager.js'
+import { CDPExecutor } from './cdp-executor.js'
 import * as relayState from './state.js'
 import { EventBufferRegistry } from './events.js'
-import { createPrivilegedGuard, withCorsRoutes, wrapRoutes, type Routes } from './http.js'
+import { VERSION, EXTENSION_IDS } from './utils.js'
 
 // Routes
-import { cdpDiscoveryRoutes } from './routes/cdp-discovery.js'
-import { apiCommandRoutes } from './routes/api-commands.js'
-import { apiSessionRoutes } from './routes/api-sessions.js'
-import { apiCustomCommandRoutes } from './routes/api-custom-commands.js'
-import { apiEventRoutes } from './routes/api-events.js'
-import { extensionSocketHandlers, extensionUpgradeRoute } from './routes/extension-ws.js'
-import { playwrightSocketHandlers, playwrightUpgradeRoute } from './routes/playwright-ws.js'
+import { registerCdpDiscoveryRoutes } from './routes/cdp-discovery.js'
+import { registerApiCommandRoutes } from './routes/api-commands.js'
+import { registerApiSessionRoutes } from './routes/api-sessions.js'
+import { registerApiCustomCommandRoutes } from './routes/api-custom-commands.js'
+import { registerApiEventRoutes } from './routes/api-events.js'
+import { registerExtensionWsRoute } from './routes/extension-ws.js'
+import { registerPlaywrightWsRoute } from './routes/playwright-ws.js'
+import { createPrivilegedMiddleware } from './middleware/privileged.js'
+
+
 
 // Prevent Buffers from dumping hex bytes in util.inspect output.
 Buffer.prototype[util.inspect.custom] = function () {
@@ -183,15 +191,7 @@ export async function startRunBrowserCDPRelayServer({
 
       const safeSend = (client: relayState.PlaywrightClient) => {
         try {
-          // send() reports rather than throws: 0 means the message was dropped,
-          // -1 means backpressure (still queued). A dropped CDP response is
-          // silent data loss — the client waits on a reply that will never
-          // arrive — so it has to be surfaced, not swallowed.
-          if (client.ws.send(messageStr) === 0) {
-            logger?.error(
-              pc.red(`[Relay] Dropped a message to client ${client.id} — the socket refused it.`),
-            )
-          }
+          client.ws.send(messageStr)
         } catch (e) {
           logger?.log(
             pc.gray(`[Relay] Skipped sending to closing client ${client.id}: ${(e as Error).message}`),
@@ -284,7 +284,9 @@ export async function startRunBrowserCDPRelayServer({
           return
         }
 
-        const failSend = (cause: Error) => {
+        try {
+          latestExt.ws.send(JSON.stringify(message))
+        } catch (error) {
           clearTimeout(timeoutId)
           store.setState((s) =>
             relayState.removeExtensionPendingRequest(s, {
@@ -292,17 +294,8 @@ export async function startRunBrowserCDPRelayServer({
               requestId: id,
             }),
           )
-          reject(new Error(`Extension send failed: ${method}`, { cause }))
-        }
-
-        try {
-          // A dropped message would otherwise sit here until the 30s timeout,
-          // reporting a hang for what is really a refused write.
-          if (latestExt.ws.send(JSON.stringify(message)) === 0) {
-            failSend(new Error('WebSocket dropped the message'))
-          }
-        } catch (error) {
-          failSend(error instanceof Error ? error : new Error(String(error)))
+          const sendError = error instanceof Error ? error : new Error(String(error))
+          reject(new Error(`Extension send failed: ${method}`, { cause: sendError }))
         }
       })
     },
@@ -454,7 +447,9 @@ export async function startRunBrowserCDPRelayServer({
       const ext = store.getState().extensions.get(extensionId)
       if (!ext?.pingInterval) return
       clearInterval(ext.pingInterval)
-      store.setState((s) => relayState.updateExtensionIO(s, { extensionId, pingInterval: null }))
+      store.setState((s) =>
+        relayState.updateExtensionIO(s, { extensionId, pingInterval: null }),
+      )
     },
 
     getPageTargetForFrameId({ extensionState, frameId }) {
@@ -468,12 +463,12 @@ export async function startRunBrowserCDPRelayServer({
     // Executor manager (initialized immediately after ctx creation)
     executorManager: undefined!,
     getCDPExecutor: undefined!,
+
   }
 
   // Every event the extension forwards lands in the buffers, so a caller that
   // is not holding a socket open can still find out what happened between one
-  // command and the next. Sessions with no buffer cost nothing — the registry
-  // only fans out to buffers that were asked for.
+  // command and the next.
   emitter.on('cdp:event', ({ event }: { event: CDPEventBase }) => {
     ctx.eventBuffers.record(event)
   })
@@ -501,75 +496,53 @@ export async function startRunBrowserCDPRelayServer({
   }
 
   // ========================================================================
-  // Route table
+  // Hono app
   // ========================================================================
 
-  const guard = createPrivilegedGuard({ token, logger })
+  const app = new Hono()
 
-  const httpRoutes: Routes = {
-    ...cdpDiscoveryRoutes(ctx),
-    ...wrapRoutes(
-      {
-        ...apiSessionRoutes(ctx),
-        ...apiCommandRoutes(ctx),
-        ...apiCustomCommandRoutes(ctx),
-        ...apiEventRoutes(ctx),
+  // CORS middleware — only allows our specific extension IDs
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => {
+        if (!origin.startsWith('chrome-extension://')) return null
+        const extensionId = origin.replace('chrome-extension://', '')
+        if (!EXTENSION_IDS.includes(extensionId)) return null
+        return origin
       },
-      guard,
-    ),
-  }
+      allowMethods: ['GET', 'POST', 'HEAD', 'OPTIONS'],
+    }),
+  )
 
-  // The upgrade routes are registered raw, outside the CORS wrapper. That
-  // wrapper is async, so it hands Bun a promise where an upgrade needs a
-  // synchronous answer, and the 101 goes out late enough that a strict client
-  // reads the first frames as part of the handshake response. CORS has nothing
-  // to say about a WebSocket upgrade anyway — the browser does not preflight
-  // one, and both routes do their own origin check.
-  const routes: Routes = {
-    ...withCorsRoutes(httpRoutes),
-    // /cdp carries no client id in the discovery URL, so both shapes are
-    // registered: Bun has no optional path parameter.
-    '/cdp': playwrightUpgradeRoute(ctx),
-    '/cdp/:clientId': playwrightUpgradeRoute(ctx),
-    '/extension': extensionUpgradeRoute(ctx),
-  }
+  const adapter = await createRuntimeAdapter(app)
+  const { upgradeWebSocket } = adapter
+
+  // Security middleware for privileged routes
+  const privilegedMiddleware = createPrivilegedMiddleware({ token, logger })
+  app.use('/api/*', privilegedMiddleware)
+  app.use('/recording/*', privilegedMiddleware)
+
+  // ========================================================================
+  // Register all routes
+  // ========================================================================
+
+  registerCdpDiscoveryRoutes(app, ctx)
+  registerPlaywrightWsRoute(app, ctx, upgradeWebSocket)
+  registerExtensionWsRoute(app, ctx, upgradeWebSocket, adapter.remoteAddress)
+  registerApiSessionRoutes(app, ctx)
+  registerApiCommandRoutes(app, ctx)
+  registerApiCustomCommandRoutes(app, ctx)
+  registerApiEventRoutes(app, ctx)
 
   // ========================================================================
   // Start server
   // ========================================================================
 
-  const extensionSocket = extensionSocketHandlers(ctx)
-  const playwrightSocket = playwrightSocketHandlers(ctx)
-
-  const server = Bun.serve<relayState.SocketData>({
-    port,
-    hostname: host,
-    routes: routes as never,
-    fetch: () => new Response('Not Found', { status: 404 }),
-    websocket: {
-      open(ws) {
-        if (ws.data.kind === 'extension') extensionSocket.open(ws as relayState.ExtensionSocket)
-        else playwrightSocket.open(ws as relayState.PlaywrightSocket)
-      },
-      message(ws, message) {
-        if (ws.data.kind === 'extension') {
-          extensionSocket.message(ws as relayState.ExtensionSocket, message)
-        } else {
-          void playwrightSocket.message(ws as relayState.PlaywrightSocket, message)
-        }
-      },
-      close(ws, code, reason) {
-        if (ws.data.kind === 'extension') {
-          extensionSocket.close(ws as relayState.ExtensionSocket, code, reason)
-        } else {
-          playwrightSocket.close(ws as relayState.PlaywrightSocket)
-        }
-      },
-    },
-  })
+  const server = adapter.listen({ port, host })
 
   const wsHost = `ws://${host}:${port}`
-  logger?.log('CDP relay server started')
+  logger?.log(`CDP relay server started (${adapter.name})`)
   logger?.log('Host:', host)
   logger?.log('Port:', port)
   logger?.log('Extension endpoint:', `${wsHost}/extension`)
@@ -586,7 +559,7 @@ export async function startRunBrowserCDPRelayServer({
         ext.ws?.close(1000, 'Server stopped')
       }
       store.setState({ extensions: new Map(), playwrightClients: new Map() })
-      server.stop(true)
+      server.close()
       emitter.removeAllListeners()
     },
     on(event, listener) {

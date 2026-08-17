@@ -1,5 +1,5 @@
 import { createMCPClient } from './mcp-client.js'
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { chromium } from 'playwright-core'
 import { getCdpUrl } from '@termio/browser/utils'
 import {

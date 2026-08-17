@@ -3,190 +3,199 @@
  *
  * Handles the WebSocket connection from the Chrome extension.
  * Processes CDP events, target lifecycle, and extension messages.
- *
- * Split in two: the route handler authenticates the upgrade and pins the
- * connection's identity into socket data, and the handler set runs the socket.
- * Bun serves one WebSocket handler set per server, so nothing may live in a
- * per-connection closure the way it did under Hono's upgradeWebSocket.
  */
 
+import type { Hono } from 'hono'
 import type { Protocol } from '../cdp-types.js'
-import type { CDPEventBase } from '../cdp-types.js'
-import type { ExtensionEventMessage, ExtensionMessage } from '../protocol.js'
-import type { RouteHandler } from '../http.js'
-import { text } from '../http.js'
+import type { CDPEventBase, CDPEventFor } from '../cdp-types.js'
+import type {
+  ExtensionMessage,
+  ExtensionEventMessage,
+} from '../protocol.js'
 import type { ServerContext } from '../server-context.js'
 import { logCdpMessage } from '../server-context.js'
 import { isRestrictedTarget } from '../target-filter.js'
 import { EXTENSION_IDS } from '../utils.js'
 import * as relayState from '../state.js'
-import type { ExtensionSocket } from '../state.js'
 import pc from 'picocolors'
 
-// ============================================================================
-// Upgrade
-// ============================================================================
-
-export function extensionUpgradeRoute(ctx: ServerContext): RouteHandler {
-  return (request, server) => {
-    const remoteAddress = server.requestIP(request)?.address
-    const isLocalhost = !remoteAddress || remoteAddress === '127.0.0.1' || remoteAddress === '::1'
-
-    if (!isLocalhost) {
-      ctx.logger?.log(pc.red(`Rejecting /extension WebSocket from remote IP: ${remoteAddress}`))
-      return text('Forbidden - Extension must be local', 403)
+export function registerExtensionWsRoute(
+  app: Hono,
+  ctx: ServerContext,
+  upgradeWebSocket: ReturnType<typeof import('hono/bun').createBunWebSocket>['upgradeWebSocket'],
+  remoteAddress: (c: any) => string | undefined,
+) {
+  const getExtensionInfoFromRequest = (c: {
+    req: { query: (name: string) => string | undefined }
+  }): relayState.ExtensionInfo => {
+    const browser = c.req.query('browser')
+    const email = c.req.query('email')
+    const id = c.req.query('id')
+    const version = c.req.query('v')
+    return {
+      browser: browser || undefined,
+      email: email || undefined,
+      id: id || undefined,
+      version: version || undefined,
     }
-
-    const origin = request.headers.get('origin')
-    if (!origin || !origin.startsWith('chrome-extension://')) {
-      ctx.logger?.log(
-        pc.red(
-          `Rejecting /extension WebSocket: origin must be chrome-extension://, got: ${origin || 'none'}`,
-        ),
-      )
-      return text('Forbidden', 403)
-    }
-
-    const originExtensionId = origin.slice('chrome-extension://'.length)
-    if (!EXTENSION_IDS.includes(originExtensionId)) {
-      ctx.logger?.log(
-        pc.red(`Rejecting /extension WebSocket from unknown extension: ${originExtensionId}`),
-      )
-      return text('Forbidden', 403)
-    }
-
-    const query = new URL(request.url).searchParams
-    const info: relayState.ExtensionInfo = {
-      browser: query.get('browser') || undefined,
-      email: query.get('email') || undefined,
-      id: query.get('id') || undefined,
-      version: query.get('v') || undefined,
-    }
-    const connectionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
-
-    const upgraded = server.upgrade(request, {
-      data: { kind: 'extension', connectionId, info } satisfies relayState.ExtensionSocketData,
-    })
-    return upgraded ? undefined : text('Expected a WebSocket upgrade', 400)
   }
-}
 
-// ============================================================================
-// Socket handlers
-// ============================================================================
+  app.get(
+    '/extension',
+    // Auth middleware: extension must be local + from our extension ID
+    (c, next) => {
+      const address = remoteAddress(c)
+      const isLocalhost = !address || address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
 
-export function extensionSocketHandlers(ctx: ServerContext) {
-  return {
-    open(ws: ExtensionSocket) {
-      const { connectionId, info } = ws.data
-      const stableKey = ctx.buildStableExtensionKey(info, connectionId)
+      if (!isLocalhost) {
+        ctx.logger?.log(pc.red(`Rejecting /extension WebSocket from remote IP: ${address}`))
+        return c.text('Forbidden - Extension must be local', 403)
+      }
 
-      // Close any existing connection carrying the same stableKey.
-      const existingExt = relayState.findExtensionByStableKey(ctx.store.getState(), stableKey)
-      if (existingExt && existingExt.id !== connectionId) {
+      const origin = c.req.header('origin')
+      if (!origin || !origin.startsWith('chrome-extension://')) {
         ctx.logger?.log(
-          pc.yellow(
-            `Replacing extension connection for ${stableKey} (${existingExt.id} -> ${connectionId})`,
-          ),
+          pc.red(`Rejecting /extension WebSocket: origin must be chrome-extension://, got: ${origin || 'none'}`),
         )
-        existingExt.ws?.close(4001, 'Extension Replaced')
+        return c.text('Forbidden', 403)
       }
 
-      ctx.store.setState((s) =>
-        relayState.addExtension(s, { id: connectionId, info, stableKey, ws }),
-      )
+      const extensionId = origin.replace('chrome-extension://', '')
+      if (!EXTENSION_IDS.includes(extensionId)) {
+        ctx.logger?.log(pc.red(`Rejecting /extension WebSocket from unknown extension: ${extensionId}`))
+        return c.text('Forbidden', 403)
+      }
 
-      ctx.startExtensionPing(connectionId)
-      ctx.logger?.log(`Extension connected (${connectionId})`)
+      return next()
     },
+    upgradeWebSocket((c: any) => {
+      const incomingExtensionInfo = getExtensionInfoFromRequest(c)
+      const connectionId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 
-    message(ws: ExtensionSocket, raw: string | Buffer) {
-      const { connectionId } = ws.data
-      if (!ctx.store.getState().extensions.get(connectionId)) {
-        ws.close(1000, 'Extension not registered')
-        return
-      }
+      return {
+        onOpen(_event: any, ws: any) {
+          const stableKey = ctx.buildStableExtensionKey(incomingExtensionInfo, connectionId)
 
-      let message: ExtensionMessage
-      try {
-        message = JSON.parse(raw.toString())
-      } catch {
-        ws.close(1000, 'Invalid JSON')
-        return
-      }
-
-      // Response to a pending request
-      if (message.id !== undefined) {
-        handleExtensionResponse(ctx, connectionId, message)
-        return
-      }
-
-      switch (message.method) {
-        case 'pong':
-          break // Keep-alive response
-        case 'log':
-          handleExtensionLog(ctx, message)
-          break
-        case 'forwardCDPEvent':
-          handleCDPEvent(ctx, connectionId, message as ExtensionEventMessage)
-          break
-      }
-    },
-
-    close(ws: ExtensionSocket, code: number, reason: string) {
-      const { connectionId } = ws.data
-      ctx.logger?.log(
-        `Extension disconnected: code=${code} reason=${reason || 'none'} (${connectionId})`,
-      )
-
-      // Reject all pending I/O requests
-      const closingExt = ctx.store.getState().extensions.get(connectionId)
-      if (closingExt) {
-        ctx.stopExtensionPing(connectionId)
-        for (const pending of closingExt.pendingRequests.values()) {
-          pending.reject(new Error('Extension connection closed'))
-        }
-      }
-
-      // Check for a successor carrying the same stableKey
-      const currentRelayState = ctx.store.getState()
-      const closingExtension = currentRelayState.extensions.get(connectionId)
-      const successorExtension = closingExtension
-        ? Array.from(currentRelayState.extensions.values())
-            .reverse()
-            .find(
-              (ext) =>
-                ext.id !== connectionId &&
-                ext.stableKey === closingExtension.stableKey &&
-                Boolean(ext.ws),
+          // Check for existing connection with same stableKey and close it
+          const existingExt = relayState.findExtensionByStableKey(ctx.store.getState(), stableKey)
+          if (existingExt && existingExt.id !== connectionId) {
+            ctx.logger?.log(
+              pc.yellow(`Replacing extension connection for ${stableKey} (${existingExt.id} -> ${connectionId})`),
             )
-        : undefined
-
-      if (successorExtension) {
-        ctx.logger?.log(
-          pc.yellow(
-            `Rebinding clients from ${connectionId} to ${successorExtension.id} (stableKey: ${successorExtension.stableKey})`,
-          ),
-        )
-        ctx.store.setState((s) =>
-          relayState.rebindClientsToExtension(s, {
-            fromExtensionId: connectionId,
-            toExtensionId: successorExtension.id,
-          }),
-        )
-      } else {
-        // Close playwright clients bound to this extension when no successor exists
-        for (const client of ctx.store.getState().playwrightClients.values()) {
-          if (client.extensionId === connectionId) {
-            client.ws.close(1000, 'Extension disconnected')
+            if (existingExt.ws) {
+              existingExt.ws.close(4001, 'Extension Replaced')
+            }
           }
-        }
-      }
 
-      // State transition: remove extension + its bound clients atomically
-      ctx.store.setState((s) => relayState.removeExtension(s, { extensionId: connectionId }))
-    },
-  }
+          ctx.store.setState((s) =>
+            relayState.addExtension(s, {
+              id: connectionId,
+              info: incomingExtensionInfo,
+              stableKey,
+              ws,
+            }),
+          )
+
+          ctx.startExtensionPing(connectionId)
+          ctx.logger?.log(`Extension connected (${connectionId})`)
+        },
+
+        async onMessage(event: any, ws: any) {
+          const ext = ctx.store.getState().extensions.get(connectionId)
+          if (!ext) {
+            ws.close(1000, 'Extension not registered')
+            return
+          }
+
+          let message: ExtensionMessage
+          try {
+            message = JSON.parse(event.data.toString())
+          } catch {
+            ws.close(1000, 'Invalid JSON')
+            return
+          }
+
+          // Response to a pending request
+          if (message.id !== undefined) {
+            handleExtensionResponse(ctx, connectionId, message)
+            return
+          }
+
+          // Dispatch by method
+          switch (message.method) {
+            case 'pong':
+              break // Keep-alive response
+            case 'log':
+              handleExtensionLog(ctx, message)
+              break
+            case 'forwardCDPEvent':
+              handleCDPEvent(ctx, connectionId, message as ExtensionEventMessage)
+              break
+          }
+        },
+
+        onClose(event: any) {
+          ctx.logger?.log(
+            `Extension disconnected: code=${event.code} reason=${event.reason || 'none'} (${connectionId})`,
+          )
+
+          // Reject all pending I/O requests
+          const closingExt = ctx.store.getState().extensions.get(connectionId)
+          if (closingExt) {
+            ctx.stopExtensionPing(connectionId)
+            for (const pending of closingExt.pendingRequests.values()) {
+              pending.reject(new Error('Extension connection closed'))
+            }
+          }
+
+          // Check for successor with same stableKey
+          const currentRelayState = ctx.store.getState()
+          const closingExtension = currentRelayState.extensions.get(connectionId)
+          const successorExtension = closingExtension
+            ? Array.from(currentRelayState.extensions.values())
+                .reverse()
+                .find(
+                  (ext) =>
+                    ext.id !== connectionId &&
+                    ext.stableKey === closingExtension.stableKey &&
+                    Boolean(ext.ws),
+                )
+            : undefined
+
+          if (successorExtension) {
+            ctx.logger?.log(
+              pc.yellow(
+                `Rebinding clients from ${connectionId} to ${successorExtension.id} (stableKey: ${successorExtension.stableKey})`,
+              ),
+            )
+            ctx.store.setState((s) =>
+              relayState.rebindClientsToExtension(s, {
+                fromExtensionId: connectionId,
+                toExtensionId: successorExtension.id,
+              }),
+            )
+          }
+
+          // Close playwright clients bound to this extension when no successor exists
+          if (!successorExtension) {
+            const { playwrightClients } = ctx.store.getState()
+            for (const client of playwrightClients.values()) {
+              if (client.extensionId === connectionId) {
+                client.ws.close(1000, 'Extension disconnected')
+              }
+            }
+          }
+
+          // State transition: remove extension + its bound clients atomically
+          ctx.store.setState((s) => relayState.removeExtension(s, { extensionId: connectionId }))
+        },
+
+        onError(event: any) {
+          ctx.logger?.error('Extension WebSocket error:', event)
+        },
+      }
+    }),
+  )
 }
 
 // ============================================================================
@@ -229,9 +238,8 @@ function handleExtensionResponse(
 
 function handleExtensionLog(ctx: ServerContext, message: any) {
   const { level, args } = message.params
-  const logFn = (ctx.logger as Record<string, unknown>)?.[level] as
-    | ((...args: unknown[]) => void)
-    | undefined
+  const logFn =
+    (ctx.logger as Record<string, unknown>)?.[level] as ((...args: unknown[]) => void) | undefined
   const logFunc = logFn || ctx.logger?.log
   const prefix = pc.yellow(`[Extension] [${level.toUpperCase()}]`)
   logFunc?.(prefix, ...args)
@@ -260,14 +268,10 @@ function handleCDPEvent(
   const cdpEvent: CDPEventBase = { method, sessionId, params }
   ctx.emitter.emit('cdp:event', { event: cdpEvent, sessionId })
 
+  // Dispatch by CDP method
   switch (method) {
     case 'Target.attachedToTarget':
-      handleTargetAttached(
-        ctx,
-        connectionId,
-        params as Protocol.Target.AttachedToTargetEvent,
-        sessionId,
-      )
+      handleTargetAttached(ctx, connectionId, params as Protocol.Target.AttachedToTargetEvent, sessionId)
       break
     case 'Target.detachedFromTarget':
       handleTargetDetached(ctx, connectionId, params as Protocol.Target.DetachedFromTargetEvent)
@@ -282,31 +286,13 @@ function handleCDPEvent(
       handleFrameAttached(ctx, connectionId, params as Protocol.Page.FrameAttachedEvent, sessionId)
       break
     case 'Page.frameDetached':
-      handleFrameDetached(
-        ctx,
-        connectionId,
-        params as Protocol.Page.FrameDetachedEvent,
-        sessionId,
-        method,
-      )
+      handleFrameDetached(ctx, connectionId, params as Protocol.Page.FrameDetachedEvent, sessionId, method)
       break
     case 'Page.frameNavigated':
-      handleFrameNavigated(
-        ctx,
-        connectionId,
-        params as Protocol.Page.FrameNavigatedEvent,
-        sessionId,
-        method,
-      )
+      handleFrameNavigated(ctx, connectionId, params as Protocol.Page.FrameNavigatedEvent, sessionId, method)
       break
     case 'Page.navigatedWithinDocument':
-      handleNavigatedWithinDocument(
-        ctx,
-        connectionId,
-        params as Protocol.Page.NavigatedWithinDocumentEvent,
-        sessionId,
-        method,
-      )
+      handleNavigatedWithinDocument(ctx, connectionId, params as Protocol.Page.NavigatedWithinDocumentEvent, sessionId, method)
       break
     default:
       // Forward all other events to Playwright
@@ -332,29 +318,24 @@ function handleTargetAttached(
   const currentExtState = ctx.store.getState().extensions.get(connectionId)
   const iframeOwnerSessionId =
     targetParams.targetInfo.type === 'iframe' && iframeParentFrameId && currentExtState
-      ? ctx.getPageTargetForFrameId({
-          extensionState: currentExtState,
-          frameId: iframeParentFrameId,
-        })?.sessionId
+      ? ctx.getPageTargetForFrameId({ extensionState: currentExtState, frameId: iframeParentFrameId })?.sessionId
       : undefined
 
   if (isRestrictedTarget(targetParams.targetInfo)) {
     if (targetParams.waitingForDebugger && targetParams.sessionId) {
-      void ctx
-        .sendToExtension({
-          extensionId: connectionId,
-          method: 'forwardCDPCommand',
-          params: {
-            sessionId: targetParams.sessionId,
-            method: 'Runtime.runIfWaitingForDebugger',
-            params: {},
-            source: 'server',
-          },
-        })
-        .catch((error) => {
-          const msg = error instanceof Error ? error.message : String(error)
-          ctx.logger?.log(pc.yellow('[Server] Failed to resume restricted target:'), msg)
-        })
+      void ctx.sendToExtension({
+        extensionId: connectionId,
+        method: 'forwardCDPCommand',
+        params: {
+          sessionId: targetParams.sessionId,
+          method: 'Runtime.runIfWaitingForDebugger',
+          params: {},
+          source: 'server',
+        },
+      }).catch((error) => {
+        const msg = error instanceof Error ? error.message : String(error)
+        ctx.logger?.log(pc.yellow('[Server] Failed to resume restricted target:'), msg)
+      })
     }
     ctx.logger?.log(
       pc.gray(
@@ -367,20 +348,12 @@ function handleTargetAttached(
   if (!targetParams.targetInfo.url) {
     ctx.logger?.error(
       pc.red('[Extension] WARNING: Target.attachedToTarget received with empty URL!'),
-      JSON.stringify({
-        method: 'Target.attachedToTarget',
-        params: targetParams,
-        sessionId: incomingSessionId,
-      }),
+      JSON.stringify({ method: 'Target.attachedToTarget', params: targetParams, sessionId: incomingSessionId }),
     )
   }
   ctx.logger?.log(
     pc.yellow('[Extension] Target.attachedToTarget full payload:'),
-    JSON.stringify({
-      method: 'Target.attachedToTarget',
-      params: targetParams,
-      sessionId: incomingSessionId,
-    }),
+    JSON.stringify({ method: 'Target.attachedToTarget', params: targetParams, sessionId: incomingSessionId }),
   )
 
   const alreadyConnected = currentExtState?.connectedTargets.has(targetParams.sessionId) ?? false
@@ -428,10 +401,7 @@ function handleTargetCrashed(
   crashParams: Protocol.Target.TargetCrashedEvent,
 ) {
   ctx.store.setState((s) =>
-    relayState.removeTargetByCrash(s, {
-      extensionId: connectionId,
-      targetId: crashParams.targetId,
-    }),
+    relayState.removeTargetByCrash(s, { extensionId: connectionId, targetId: crashParams.targetId }),
   )
   ctx.logger?.log(pc.red('[Server] Target crashed, removing:'), crashParams.targetId)
   ctx.sendToPlaywright({
@@ -447,10 +417,7 @@ function handleTargetInfoChanged(
   infoParams: Protocol.Target.TargetInfoChangedEvent,
 ) {
   ctx.store.setState((s) =>
-    relayState.updateTargetInfo(s, {
-      extensionId: connectionId,
-      targetInfo: infoParams.targetInfo,
-    }),
+    relayState.updateTargetInfo(s, { extensionId: connectionId, targetInfo: infoParams.targetInfo }),
   )
   ctx.sendToPlaywright({
     message: { method: 'Target.targetInfoChanged', params: infoParams } as CDPEventBase,
@@ -467,11 +434,7 @@ function handleFrameAttached(
 ) {
   if (sessionId) {
     ctx.store.setState((s) =>
-      relayState.addFrameId(s, {
-        extensionId: connectionId,
-        sessionId,
-        frameId: frameParams.frameId,
-      }),
+      relayState.addFrameId(s, { extensionId: connectionId, sessionId, frameId: frameParams.frameId }),
     )
   }
   ctx.sendToPlaywright({
@@ -492,11 +455,7 @@ function handleFrameDetached(
     relayState.removeFrameId(s, { extensionId: connectionId, frameId: frameParams.frameId }),
   )
   ctx.sendToPlaywright({
-    message: {
-      sessionId,
-      method: method || 'Page.frameDetached',
-      params: frameParams,
-    } as CDPEventBase,
+    message: { sessionId, method: method || 'Page.frameDetached', params: frameParams } as CDPEventBase,
     source: 'extension',
     extensionId: connectionId,
   })
@@ -511,11 +470,7 @@ function handleFrameNavigated(
 ) {
   if (sessionId) {
     ctx.store.setState((s) =>
-      relayState.addFrameId(s, {
-        extensionId: connectionId,
-        sessionId,
-        frameId: frameParams.frame.id,
-      }),
+      relayState.addFrameId(s, { extensionId: connectionId, sessionId, frameId: frameParams.frame.id }),
     )
   }
   if (!frameParams.frame.parentId && sessionId) {
@@ -533,11 +488,7 @@ function handleFrameNavigated(
     )
   }
   ctx.sendToPlaywright({
-    message: {
-      sessionId,
-      method: method || 'Page.frameNavigated',
-      params: frameParams,
-    } as CDPEventBase,
+    message: { sessionId, method: method || 'Page.frameNavigated', params: frameParams } as CDPEventBase,
     source: 'extension',
     extensionId: connectionId,
   })
@@ -560,11 +511,7 @@ function handleNavigatedWithinDocument(
     )
   }
   ctx.sendToPlaywright({
-    message: {
-      sessionId,
-      method: method || 'Page.navigatedWithinDocument',
-      params: navParams,
-    } as CDPEventBase,
+    message: { sessionId, method: method || 'Page.navigatedWithinDocument', params: navParams } as CDPEventBase,
     source: 'extension',
     extensionId: connectionId,
   })
