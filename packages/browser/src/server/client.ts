@@ -13,7 +13,7 @@ import { VERSION, sleep, LOG_FILE_PATH } from './utils.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-export const RELAY_PORT = Number(process.env.TERMIO_BROWSER_PORT) || 8790
+export const RELAY_PORT = Number(process.env.RUNBROWSER_PORT) || 8790
 
 export type ExtensionStatus = {
   extensionId: string

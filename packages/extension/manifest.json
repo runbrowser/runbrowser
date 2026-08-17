@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Termio Browser",
+  "name": "RunBrowser",
   "version": "0.0.72",
   "description": "Let your coding agent drive this browser \u2014 your tabs, logins and cookies, over the Chrome DevTools Protocol.",
   "permissions": [

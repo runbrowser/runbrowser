@@ -1,4 +1,4 @@
-# runbrowser End-to-End Testing Guide
+# RunBrowser End-to-End Testing Guide
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ This runs in order:
 ## Step 3 — Enable Extension on a Tab
 
 1. Open any webpage in Chrome (e.g. `https://example.com`)
-2. **Click the runbrowser extension icon** on that tab
+2. **Click the RunBrowser extension icon** on that tab
 3. Icon turns **green** = tab is now controlled via CDP
 4. Chrome shows an **"is debugging this tab"** banner — this is expected
 

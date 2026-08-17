@@ -23,7 +23,7 @@ async function buildExtension({ port, distDir }: { port: number; distDir: string
     })
     .then(async () => {
       // Build into a per-port dist to avoid parallel test runs overwriting each other.
-      await execAsync(`TESTING=1 TERMIO_BROWSER_PORT=${port} TERMIO_BROWSER_EXTENSION_DIST=${distDir} pnpm build`, {
+      await execAsync(`TESTING=1 RUNBROWSER_PORT=${port} RUNBROWSER_EXTENSION_DIST=${distDir} pnpm build`, {
         cwd: path.resolve(__dirname, '../../extension'),
       })
     })

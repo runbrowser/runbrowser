@@ -67,8 +67,8 @@ export class RelayApiClient {
   private logger?: { log: (...args: any[]) => void; error: (...args: any[]) => void }
 
   constructor(options: RelayClientOptions = {}) {
-    this.host = options.host || process.env.TERMIO_BROWSER_HOST || ''
-    this.token = options.token || process.env.TERMIO_BROWSER_TOKEN
+    this.host = options.host || process.env.RUNBROWSER_HOST || ''
+    this.token = options.token || process.env.RUNBROWSER_TOKEN
     this.logger = options.logger
   }
 

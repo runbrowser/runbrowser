@@ -15,7 +15,7 @@ export type CdpLogger = {
   logFilePath: string
 }
 
-const DEFAULT_MAX_STRING_LENGTH = Number(process.env.TERMIO_BROWSER_CDP_LOG_MAX_STRING_LENGTH) || 2000
+const DEFAULT_MAX_STRING_LENGTH = Number(process.env.RUNBROWSER_CDP_LOG_MAX_STRING_LENGTH) || 2000
 
 function truncateString(value: string, maxLength: number): string {
   if (value.length <= maxLength) {

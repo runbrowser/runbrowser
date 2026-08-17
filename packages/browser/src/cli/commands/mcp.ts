@@ -16,8 +16,8 @@ registerBuiltinCommand({
   async execute(args) {
     const { startMcp } = await import('../../mcp/server.js')
     await startMcp({
-      host: args.host || process.env.TERMIO_BROWSER_HOST,
-      token: args.token || process.env.TERMIO_BROWSER_TOKEN,
+      host: args.host || process.env.RUNBROWSER_HOST,
+      token: args.token || process.env.RUNBROWSER_TOKEN,
     })
   },
 })

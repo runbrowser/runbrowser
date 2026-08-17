@@ -1,10 +1,10 @@
-# runbrowser
+# RunBrowser
 
 > Control your browser via CDP. Extension + CLI, no wrapper layer.
 
-Other Browser Automation spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. runbrowser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
+Other Browser Automation spawn a fresh Chrome — no logins, no extensions, instantly flagged by bot detectors, double the memory. RunBrowser connects to **your running browser** instead. One Chrome extension, full CDP access, everything you're already logged into.
 
-|               | Playwright MCP    | runbrowser                        |
+|               | Playwright MCP    | RunBrowser                        |
 | ------------- | ----------------- | --------------------------------- |
 | Browser       | Spawns new Chrome | **Uses your Chrome**              |
 | Extensions    | None              | Your existing ones                |
@@ -38,14 +38,14 @@ runbrowser skill install --global     # → ~/.claude/skills and ~/.agents/skill
 Installs into the current project by default, so the skill is committed and
 reviewed alongside the code it is used on; `--global` (`-g`) installs into
 `$HOME` instead. Re-running is safe, and a `SKILL.md` you have edited yourself
-is never overwritten — remove it first if you want ours back. `runbrowser skill
+is never overwritten — remove it first if you want ours back. `RunBrowser skill
 uninstall` removes only files we installed.
 
 This teaches your agent the CDP patterns that matter: read the accessibility tree before acting, filter it before printing, poll instead of sleeping.
 
 ## How It Works
 
-runbrowser uses the **Chrome DevTools Protocol (CDP)** directly. The extension bridges CDP commands over WebSocket to your running browser.
+RunBrowser uses the **Chrome DevTools Protocol (CDP)** directly. The extension bridges CDP commands over WebSocket to your running browser.
 
 ```
 ┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
@@ -180,12 +180,12 @@ Control Chrome on a remote machine — headless Mac mini, cloud VM, devcontainer
 runbrowser serve --host 0.0.0.0 --token <secret>
 
 # From anywhere
-export TERMIO_BROWSER_HOST=192.168.1.10
-export TERMIO_BROWSER_TOKEN=<secret>
+export RUNBROWSER_HOST=192.168.1.10
+export RUNBROWSER_TOKEN=<secret>
 runbrowser navigate https://example.com -s 1
 ```
 
-For Docker/devcontainers, use `TERMIO_BROWSER_HOST=host.docker.internal`.
+For Docker/devcontainers, use `RUNBROWSER_HOST=host.docker.internal`.
 
 ## Playwright API (Optional)
 
@@ -211,13 +211,13 @@ server.close()
 
 | Variable | Description |
 |---|---|
-| `TERMIO_BROWSER_HOST` | Remote relay server host |
-| `TERMIO_BROWSER_TOKEN` | Authentication token |
-| `TERMIO_BROWSER_PORT` | Relay server port (default: 8790) |
-| `TERMIO_BROWSER_SESSION` | Default session ID (avoids `-s` flag) |
-| `TERMIO_BROWSER_AUTO_ENABLE` | Auto-create tab on connect |
-| `TERMIO_BROWSER_LOG_FILE_PATH` | Custom path for relay server log file |
-| `TERMIO_BROWSER_CDP_LOG_FILE_PATH` | Custom path for CDP JSONL log file |
+| `RUNBROWSER_HOST` | Remote relay server host |
+| `RUNBROWSER_TOKEN` | Authentication token |
+| `RUNBROWSER_PORT` | Relay server port (default: 8790) |
+| `RUNBROWSER_SESSION` | Default session ID (avoids `-s` flag) |
+| `RUNBROWSER_AUTO_ENABLE` | Auto-create tab on connect |
+| `RUNBROWSER_LOG_FILE_PATH` | Custom path for relay server log file |
+| `RUNBROWSER_CDP_LOG_FILE_PATH` | Custom path for CDP JSONL log file |
 
 ## Project Structure
 
@@ -244,7 +244,7 @@ packages/
 ## Security
 
 - **Local only** — WebSocket server binds to `localhost:8790`
-- **Origin validation** — only the runbrowser extension origin is accepted
+- **Origin validation** — only the RunBrowser extension origin is accepted
 - **Explicit consent** — only tabs where you clicked the extension icon
 - **Visible automation** — Chrome shows an automation banner on controlled tabs
 
@@ -252,8 +252,8 @@ packages/
 
 ```bash
 runbrowser logfile  # prints log file paths
-# relay: ~/.termio/browser/relay-server.log
-# cdp:   ~/.termio/browser/cdp.jsonl
+# relay: ~/.runbrowser/relay-server.log
+# cdp:   ~/.runbrowser/cdp.jsonl
 ```
 
 | Problem | Fix |
@@ -265,9 +265,9 @@ runbrowser logfile  # prints log file paths
 
 ## Acknowledgements
 
-runbrowser wouldn't exist without the work of these projects and their maintainers.
+RunBrowser wouldn't exist without the work of these projects and their maintainers.
 
-- [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. runbrowser began as a fork of playwriter and owes its Chrome extension architecture to Tommaso's original design.
+- [playwriter](https://github.com/remorses/playwriter) by Tommaso De Rossi — The project that started it all. RunBrowser began as a fork of playwriter and owes its Chrome extension architecture to Tommaso's original design.
 - [bb-browser](https://github.com/epiral/bb-browser) & [bb-sites](https://github.com/epiral/bb-sites) — A beautifully designed browser automation tool with an impressive collection of 45+ community site adapters. The bb-sites ecosystem is a constant source of inspiration.
 - [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel — Pioneered many ideas around comprehensive browser CLIs for AI agents.
 - [pi](https://github.com/badlogic/pi-mono) by Mario Zechner — The command extensions system (`runbrowser commands install/list/uninstall`) was inspired by pi's elegant approach to extensibility and package management.

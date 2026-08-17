@@ -27,10 +27,10 @@ registerBuiltinCommand({
   },
   async execute(args) {
     const config = readConfig()
-    const host = (args.host || process.env.TERMIO_BROWSER_HOST || config.host) as string | undefined
+    const host = (args.host || process.env.RUNBROWSER_HOST || config.host) as string | undefined
     const client = new RelayApiClient({
       host,
-      token: (args.token || process.env.TERMIO_BROWSER_TOKEN || config.token) as string | undefined,
+      token: (args.token || process.env.RUNBROWSER_TOKEN || config.token) as string | undefined,
       logger: console,
     })
 

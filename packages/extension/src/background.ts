@@ -1,7 +1,7 @@
-declare const process: { env: { TERMIO_BROWSER_PORT: string } }
+declare const process: { env: { RUNBROWSER_PORT: string } }
 // Injected by vite at build time from runbrowser/package.json version.
 // CLI/MCP compare this against their own version to warn when the extension is outdated.
-declare const __TERMIO_BROWSER_VERSION__: string
+declare const __RUNBROWSER_VERSION__: string
 
 import { createStore } from 'zustand/vanilla'
 import type { ExtensionState, ConnectionState, TabState, TabInfo } from './types'
@@ -18,7 +18,7 @@ import {
 } from './recording'
 
 const RELAY_HOST = '127.0.0.1'
-const RELAY_PORT = Number(process.env.TERMIO_BROWSER_PORT) || 8790
+const RELAY_PORT = Number(process.env.RUNBROWSER_PORT) || 8790
 
 type NavigatorWithUaData = Navigator & {
   userAgentData?: {
@@ -267,8 +267,8 @@ class ConnectionManager {
     if (identity.id) {
       relayUrl.searchParams.set('id', identity.id)
     }
-    if (typeof __TERMIO_BROWSER_VERSION__ !== 'undefined') {
-      relayUrl.searchParams.set('v', __TERMIO_BROWSER_VERSION__)
+    if (typeof __RUNBROWSER_VERSION__ !== 'undefined') {
+      relayUrl.searchParams.set('v', __RUNBROWSER_VERSION__)
     }
     logger.debug('Creating WebSocket connection to:', relayUrl)
     const socket = new WebSocket(relayUrl.toString())

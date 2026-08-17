@@ -22,10 +22,10 @@ import { pathToFileURL } from 'node:url'
 
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
-import { TERMIO_BROWSER_DIR, type RelayApiClient } from '../../server/index.js'
+import { RUNBROWSER_DIR, type RelayApiClient } from '../../server/index.js'
 
 /** Where an agent keeps helpers it wrote itself. */
-const WORKSPACE_DIR = path.join(TERMIO_BROWSER_DIR, 'workspace')
+const WORKSPACE_DIR = path.join(RUNBROWSER_DIR, 'workspace')
 const WORKSPACE_HELPERS = path.join(WORKSPACE_DIR, 'helpers.ts')
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (

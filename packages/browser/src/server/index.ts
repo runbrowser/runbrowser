@@ -62,7 +62,7 @@ export {
   LOG_FILE_PATH,
   LOG_CDP_FILE_PATH,
   CONFIG_FILE_PATH,
-  TERMIO_BROWSER_DIR,
+  RUNBROWSER_DIR,
   readConfig,
   writeConfig,
   parseRelayHost,

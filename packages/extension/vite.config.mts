@@ -14,15 +14,15 @@ const __dirname = dirname(__filename)
 const runbrowserPkg = JSON.parse(readFileSync(resolve(__dirname, '../browser/package.json'), 'utf-8'))
 
 const defineEnv: Record<string, string> = {
-  'process.env.TERMIO_BROWSER_PORT': JSON.stringify(process.env.TERMIO_BROWSER_PORT || '19988'),
-  __TERMIO_BROWSER_VERSION__: JSON.stringify(runbrowserPkg.version),
+  'process.env.RUNBROWSER_PORT': JSON.stringify(process.env.RUNBROWSER_PORT || '19988'),
+  __RUNBROWSER_VERSION__: JSON.stringify(runbrowserPkg.version),
 }
 if (process.env.TESTING) {
   defineEnv['import.meta.env.TESTING'] = 'true'
 }
 
 // Allow tests to build per-port extension outputs to avoid parallel run conflicts.
-const outDir = process.env.TERMIO_BROWSER_EXTENSION_DIST || 'dist'
+const outDir = process.env.RUNBROWSER_EXTENSION_DIST || 'dist'
 
 export default defineConfig({
   plugins: [

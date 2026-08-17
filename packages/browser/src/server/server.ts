@@ -576,7 +576,7 @@ export async function startRunBrowserCDPRelayServer({
 // ============================================================================
 
 async function maybeAutoCreateInitialTab(ctx: ServerContext, extensionId: string): Promise<void> {
-  if (!process.env.TERMIO_BROWSER_AUTO_ENABLE) return
+  if (!process.env.RUNBROWSER_AUTO_ENABLE) return
 
   const conn = ctx.getExtensionConnection(extensionId)
   if (!conn) return

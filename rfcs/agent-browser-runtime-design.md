@@ -1,4 +1,4 @@
-# runbrowser: Agent Browser Runtime — System Design
+# RunBrowser: Agent Browser Runtime — System Design
 
 > Status: **Future / Aspirational** — Foundation (direct CDP) is implemented.
 > Credential Broker, Vision Engine, and Agent Identity are not yet implemented.
@@ -14,7 +14,7 @@
 
 ## 1. Executive Summary
 
-runbrowser is evolving from a CDP bridge tool into a full **Agent Browser Runtime** — the infrastructure layer between AI agents and the web. This document proposes a system architecture that addresses the critical gaps identified in current browser agent systems:
+RunBrowser is evolving from a CDP bridge tool into a full **Agent Browser Runtime** — the infrastructure layer between AI agents and the web. This document proposes a system architecture that addresses the critical gaps identified in current browser agent systems:
 
 1. **Credential Security** — Agents can log into websites without ever seeing passwords
 2. **Intelligent Autofill** — Production-grade form detection and filling (not just `input.value =`)
@@ -104,7 +104,7 @@ Every browser agent project today (browser-use, stagehand, openclaw, operator pr
 
 ### 3.1 Direct CDP Layer (Already Implemented)
 
-runbrowser already has the foundation: a Chrome extension that bridges CDP commands over WebSocket.
+RunBrowser already has the foundation: a Chrome extension that bridges CDP commands over WebSocket.
 
 ```
 Agent → CLI/MCP → Relay Server → Extension WebSocket → chrome.debugger → Tab
@@ -132,7 +132,7 @@ The current extension only has a **background script** that bridges CDP. We need
 2. **Autofill Engine** — Framework-compatible form filling
 3. **Semantic Extractor** — Structured page state for agents
 
-This is the critical missing piece that separates runbrowser from every other CDP-only solution.
+This is the critical missing piece that separates RunBrowser from every other CDP-only solution.
 
 #### 3.2.1 DOM Sensor
 
@@ -519,7 +519,7 @@ interface CredentialAuditEntry {
 
 #### 3.3.6 Vault Integration Adapters
 
-runbrowser doesn't build its own vault. It integrates with existing password managers.
+RunBrowser doesn't build its own vault. It integrates with existing password managers.
 
 ```typescript
 // packages/relay/src/vault-adapters/
@@ -745,7 +745,7 @@ Agent                    Runtime                    Extension                  V
 Vault Extension → (encrypted) → Content Script → DOM → HTTP POST → Website
 ```
 
-The runbrowser runtime (relay server) never handles the raw credential either.
+The RunBrowser runtime (relay server) never handles the raw credential either.
 
 ---
 
@@ -753,7 +753,7 @@ The runbrowser runtime (relay server) never handles the raw credential either.
 
 ### 5.1 New MCP Tools
 
-Building on the existing runbrowser CLI/MCP tools, add credential and vision tools:
+Building on the existing RunBrowser CLI/MCP tools, add credential and vision tools:
 
 ```
 # Existing tools (already implemented or in refactoring plan)
@@ -1077,7 +1077,7 @@ packages/
 
 ## 10. Comparison with Existing Systems
 
-| Capability | runbrowser (proposed) | Playwright MCP | browser-use | Browserbase + 1Password |
+| Capability | RunBrowser (proposed) | Playwright MCP | browser-use | Browserbase + 1Password |
 |-----------|----------------------|----------------|-------------|-------------------------|
 | Browser | User's existing | New instance | New instance | Cloud browser |
 | CDP layer | Direct (no Playwright) | Through Playwright | Through Playwright | Through Browserbase |
@@ -1133,11 +1133,11 @@ Agent → Website: "I am agent X, acting on behalf of user Y"
 Website → Agent: "Here is a scoped token for read-only access to notifications"
 ```
 
-This eliminates passwords entirely. runbrowser could be an early implementer of this pattern.
+This eliminates passwords entirely. RunBrowser could be an early implementer of this pattern.
 
 ### Agent Identity Standard (Web Bot Auth)
 
-Browserbase + Cloudflare's Web Bot Auth proposes a standard for agent identity. runbrowser could adopt this:
+Browserbase + Cloudflare's Web Bot Auth proposes a standard for agent identity. RunBrowser could adopt this:
 
 ```
 Agent → Website: "Here is my Web Bot Auth identity token"
@@ -1154,7 +1154,7 @@ Agent B: Can access docs.google.com
 Agent C: Can access all (admin)
 ```
 
-Each agent gets its own runbrowser session with its own policy.
+Each agent gets its own RunBrowser session with its own policy.
 
 ### Credential Learning
 
@@ -1176,7 +1176,7 @@ Over time, the autofill engine learns which strategies work for which sites:
 
 ## 13. Summary
 
-runbrowser's evolution into an Agent Browser Runtime addresses the three biggest problems in browser agent infrastructure:
+RunBrowser's evolution into an Agent Browser Runtime addresses the three biggest problems in browser agent infrastructure:
 
 1. **Security** — The Credential Broker ensures agents can authenticate without ever seeing passwords, protecting against prompt injection, memory leaks, and credential theft.
 
@@ -1184,4 +1184,4 @@ runbrowser's evolution into an Agent Browser Runtime addresses the three biggest
 
 3. **Architecture** — Direct CDP without Playwright overhead, working with the user's existing browser (with existing logins, extensions, and cookies), provides the lightest and most natural agent-browser interaction model.
 
-The key insight is that **the browser extension is the critical security boundary**. It sits between the untrusted agent and the trusted vault, handling credentials transiently and submitting forms before the agent can observe them. This is the same architectural pattern that 1Password and Browserbase are building toward, but runbrowser makes it open, local-first, and vault-agnostic.
+The key insight is that **the browser extension is the critical security boundary**. It sits between the untrusted agent and the trusted vault, handling credentials transiently and submitting forms before the agent can observe them. This is the same architectural pattern that 1Password and Browserbase are building toward, but RunBrowser makes it open, local-first, and vault-agnostic.

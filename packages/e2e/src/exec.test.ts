@@ -27,7 +27,7 @@ afterAll(async () => {
 function cli(args: string[], stdin?: string): Promise<{ out: string; err: string; code: number }> {
   return new Promise((resolve) => {
     const proc = spawn('bun', [CLI, ...args], {
-      env: { ...process.env, TERMIO_BROWSER_PORT: String(PORT) },
+      env: { ...process.env, RUNBROWSER_PORT: String(PORT) },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     let out = ''

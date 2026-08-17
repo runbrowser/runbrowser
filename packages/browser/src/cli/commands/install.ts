@@ -3,26 +3,26 @@
  *
  * Usage:
  *   runbrowser commands list              — lists available packages
- *   runbrowser commands install reddit    — downloads reddit/*.ts → ~/.termio/browser/commands/reddit/
- *   runbrowser commands uninstall reddit  — removes ~/.termio/browser/commands/reddit/
+ *   runbrowser commands install reddit    — downloads reddit/*.ts → ~/.runbrowser/commands/reddit/
+ *   runbrowser commands uninstall reddit  — removes ~/.runbrowser/commands/reddit/
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
 import pc from 'picocolors'
-import { TERMIO_BROWSER_DIR } from '../../server/index.js'
+import { RUNBROWSER_DIR } from '../../server/index.js'
 import { registerBuiltinCommand, type SessionResolver } from './index.js'
 import type { ParsedArgs } from '../args.js'
 
-const COMMANDS_DIR = path.join(TERMIO_BROWSER_DIR, 'commands')
+const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
 
 /**
  * Where plugins come from by default: this project's own `plugins/` directory.
  *
  * Any GitHub repository laid out the same way works — `--repo owner/name`, or
- * TERMIO_BROWSER_PLUGIN_REPO. Installing is only a download, so a plugin from
+ * RUNBROWSER_PLUGIN_REPO. Installing is only a download, so a plugin from
  * someone else's repo is the same thing as one written by hand into
- * ~/.termio/browser/commands/.
+ * ~/.runbrowser/commands/.
  */
 const DEFAULT_REPO = 'termio-sh/runbrowser'
 const DEFAULT_PATH = 'plugins'
@@ -30,12 +30,12 @@ const DEFAULT_PATH = 'plugins'
 type PluginSource = { repo: string; path: string }
 
 function resolveSource(args: ParsedArgs): PluginSource {
-  const repo = (args.flags.get('repo') as string) || process.env.TERMIO_BROWSER_PLUGIN_REPO || DEFAULT_REPO
+  const repo = (args.flags.get('repo') as string) || process.env.RUNBROWSER_PLUGIN_REPO || DEFAULT_REPO
   // `--path ""` is meaningful: repositories that keep adapters at their root,
   // like bb-sites, need it. Testing truthiness would silently ignore it.
   const dir = args.flags.has('path')
     ? String(args.flags.get('path') ?? '')
-    : (process.env.TERMIO_BROWSER_PLUGIN_PATH ?? DEFAULT_PATH)
+    : (process.env.RUNBROWSER_PLUGIN_PATH ?? DEFAULT_PATH)
 
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
     throw new Error(`Not a repository: ${repo}. Expected owner/name.`)
@@ -84,7 +84,7 @@ async function listAvailable(source: PluginSource): Promise<string[]> {
 }
 
 /**
- * Install a package: download all .ts files from repo/<site>/ to ~/.termio/browser/commands/<site>/
+ * Install a package: download all .ts files from repo/<site>/ to ~/.runbrowser/commands/<site>/
  */
 async function installPackage(site: string, source: PluginSource): Promise<string[]> {
   const files: GitHubFile[] = await fetchGitHub(contentsUrl(source, site))
@@ -118,7 +118,7 @@ async function installPackage(site: string, source: PluginSource): Promise<strin
 }
 
 /**
- * Uninstall a package: remove ~/.termio/browser/commands/<site>/
+ * Uninstall a package: remove ~/.runbrowser/commands/<site>/
  */
 function uninstallPackage(site: string): boolean {
   const dir = path.join(COMMANDS_DIR, site)

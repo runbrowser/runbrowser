@@ -20,7 +20,7 @@ import {
   CONFIG_FILE_PATH,
   isPortInUse,
   killPortProcess,
-  TERMIO_BROWSER_DIR,
+  RUNBROWSER_DIR,
   readConfig,
   writeConfig,
   RelayApiClient,
@@ -53,11 +53,11 @@ registerBuiltinCommand({
 
     const config = readConfig()
     const client = new RelayApiClient({
-      host: (args.host || process.env.TERMIO_BROWSER_HOST || config.host) as string | undefined,
-      token: (args.token || process.env.TERMIO_BROWSER_TOKEN || config.token) as string | undefined,
+      host: (args.host || process.env.RUNBROWSER_HOST || config.host) as string | undefined,
+      token: (args.token || process.env.RUNBROWSER_TOKEN || config.token) as string | undefined,
       logger: console,
     })
-    const cliRelayEnv = { TERMIO_BROWSER_AUTO_ENABLE: '1' }
+    const cliRelayEnv = { RUNBROWSER_AUTO_ENABLE: '1' }
 
     switch (cmd) {
       case 'new': {
@@ -190,9 +190,9 @@ registerBuiltinCommand({
   },
   async execute(args) {
     const host = (args.flags.get('host') as string) ?? '127.0.0.1'
-    const token = args.token || process.env.TERMIO_BROWSER_TOKEN
+    const token = args.token || process.env.RUNBROWSER_TOKEN
     if ((host === '0.0.0.0' || host === '::') && !token) {
-      throw new Error('Auth token required for public host. Use --token or TERMIO_BROWSER_TOKEN.')
+      throw new Error('Auth token required for public host. Use --token or RUNBROWSER_TOKEN.')
     }
     const portInUse = await isPortInUse(RELAY_PORT)
     if (portInUse) {
@@ -254,7 +254,7 @@ function packageFile(name: string): string | null {
  * delete it on uninstall. Recording a content hash is what makes "ours and
  * untouched" a question we can actually answer.
  */
-const INSTALL_STATE_PATH = path.join(TERMIO_BROWSER_DIR, 'skill-install.json')
+const INSTALL_STATE_PATH = path.join(RUNBROWSER_DIR, 'skill-install.json')
 
 function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf-8').digest('hex')

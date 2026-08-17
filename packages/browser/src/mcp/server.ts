@@ -19,8 +19,8 @@ let sessionId: string | null = null
 function getClient(): RelayApiClient {
   if (!client) {
     client = new RelayApiClient({
-      host: process.env.TERMIO_BROWSER_HOST,
-      token: process.env.TERMIO_BROWSER_TOKEN,
+      host: process.env.RUNBROWSER_HOST,
+      token: process.env.RUNBROWSER_TOKEN,
       logger: mcpLogger,
     })
   }
@@ -303,10 +303,10 @@ export { server }
 
 export async function startMcp(options: { host?: string; token?: string } = {}) {
   if (options.host) {
-    process.env.TERMIO_BROWSER_HOST = options.host
+    process.env.RUNBROWSER_HOST = options.host
   }
   if (options.token) {
-    process.env.TERMIO_BROWSER_TOKEN = options.token
+    process.env.RUNBROWSER_TOKEN = options.token
   }
 
   const c = getClient()

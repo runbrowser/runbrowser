@@ -71,8 +71,8 @@ export interface ParsedArgs {
 
 export const GLOBAL_FLAGS: Record<string, FlagDef> = {
   session:  { type: 'string',  alias: 's', description: 'Session ID (auto-created if omitted)' },
-  host:     { type: 'string',  description: 'Relay server host (or TERMIO_BROWSER_HOST)' },
-  token:    { type: 'string',  description: 'Auth token (or TERMIO_BROWSER_TOKEN)' },
+  host:     { type: 'string',  description: 'Relay server host (or RUNBROWSER_HOST)' },
+  token:    { type: 'string',  description: 'Auth token (or RUNBROWSER_TOKEN)' },
   json:     { type: 'boolean', description: 'JSON output' },
   format:   { type: 'string',  alias: 'f', description: 'Output format', choices: ['table', 'json', 'csv', 'md', 'yaml'] },
   help:     { type: 'boolean', alias: 'h', description: 'Show help' },

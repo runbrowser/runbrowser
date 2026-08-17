@@ -16,7 +16,7 @@ export function printMainHelp(
   builtinCommands: CommandDef[],
   siteCommands: CommandDef[],
 ) {
-  console.log(`${pc.bold('runbrowser')} v${version} — Control your running Chrome browser`)
+  console.log(`${pc.bold('RunBrowser')} v${version} — Control your running Chrome browser`)
   console.log()
   console.log(`${pc.bold('Usage:')} runbrowser <command> [options]`)
   console.log()

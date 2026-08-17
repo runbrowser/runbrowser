@@ -23,7 +23,7 @@ export async function createTransport({ args = [], port }: { args?: string[]; po
     DEBUG_HIDE_DATE: '1',
   }
   if (port) {
-    env.TERMIO_BROWSER_PORT = String(port)
+    env.RUNBROWSER_PORT = String(port)
   }
   // The MCP server is a verb on the CLI, not a separate package with its own
   // entrypoint. Driving it the way a real client does — `runbrowser mcp`

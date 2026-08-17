@@ -15,7 +15,7 @@ import { mkdir, rm, writeFile, chmod } from 'node:fs/promises'
 import path from 'node:path'
 import packageJson from '../packages/browser/package.json' with { type: 'json' }
 
-import { TARGETS, optionalDependenciesFor } from './targets.ts'
+import { TARGETS, optionalDependenciesFor, packageNameFor } from './targets.ts'
 
 const root = path.resolve(import.meta.dir, '..')
 const entry = path.join(root, 'packages', 'browser', 'src', 'cli', 'cli.ts')
@@ -50,8 +50,10 @@ await mkdir(outputRoot, { recursive: true })
 const built: string[] = []
 
 for (const target of TARGETS) {
-  const name = `runbrowser-${target.os === 'win32' ? 'win32' : target.os}-${target.cpu}`
-  const directory = path.join(outputRoot, name.replace('@termio/', ''))
+  // One source for the name, so the manifest's optionalDependencies and the
+  // directory published under it cannot say different things.
+  const name = packageNameFor(target)
+  const directory = path.join(outputRoot, name)
   const exe = target.os === 'win32' ? 'runbrowser.exe' : 'runbrowser'
   const outfile = path.join(directory, exe)
 

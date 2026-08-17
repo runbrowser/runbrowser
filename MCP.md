@@ -54,7 +54,7 @@ click its centre. Prefer that over screenshots — cheaper and searchable.
 
 ## Environment Variables
 
-### `TERMIO_BROWSER_AUTO_ENABLE`
+### `RUNBROWSER_AUTO_ENABLE`
 
 Auto-create a tab when Playwright connects (no manual extension click needed).
 
@@ -67,7 +67,7 @@ Auto-create a tab when Playwright connects (no manual extension click needed).
       "command": "npx",
       "args": ["-y", "runbrowser@latest"],
       "env": {
-        "TERMIO_BROWSER_AUTO_ENABLE": "1"
+        "RUNBROWSER_AUTO_ENABLE": "1"
       }
     }
   }
@@ -108,8 +108,8 @@ Or with environment variables:
       "command": "npx",
       "args": ["-y", "runbrowser@latest"],
       "env": {
-        "TERMIO_BROWSER_HOST": "host.docker.internal",
-        "TERMIO_BROWSER_TOKEN": "<secret>"
+        "RUNBROWSER_HOST": "host.docker.internal",
+        "RUNBROWSER_TOKEN": "<secret>"
       }
     }
   }

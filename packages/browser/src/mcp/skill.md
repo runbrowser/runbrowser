@@ -1,4 +1,4 @@
-# runbrowser
+# RunBrowser
 
 Drive the user's own Chrome — their tabs, their logins, their cookies — over the
 Chrome DevTools Protocol.

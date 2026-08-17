@@ -47,13 +47,13 @@ import { getBuiltinCommand, getAllBuiltinCommands, type SessionResolver } from '
 // Session resolver (shared across commands)
 // ============================================================================
 
-const cliRelayEnv = { TERMIO_BROWSER_AUTO_ENABLE: '1' }
+const cliRelayEnv = { RUNBROWSER_AUTO_ENABLE: '1' }
 
 function createClient(args: ParsedArgs): RelayApiClient {
   const config = readConfig()
   return new RelayApiClient({
-    host: args.host || process.env.TERMIO_BROWSER_HOST || config.host,
-    token: args.token || process.env.TERMIO_BROWSER_TOKEN || config.token,
+    host: args.host || process.env.RUNBROWSER_HOST || config.host,
+    token: args.token || process.env.RUNBROWSER_TOKEN || config.token,
     logger: console,
   })
 }
@@ -67,8 +67,8 @@ const resolveSession: SessionResolver = async (args) => {
     return { sessionId: String(args.session), client }
   }
   // Env var
-  if (process.env.TERMIO_BROWSER_SESSION) {
-    return { sessionId: process.env.TERMIO_BROWSER_SESSION, client }
+  if (process.env.RUNBROWSER_SESSION) {
+    return { sessionId: process.env.RUNBROWSER_SESSION, client }
   }
 
   // Auto-session: try to reuse existing, or create new

@@ -15,13 +15,13 @@ import packageJson from '../../package.json' with { type: 'json' }
  * published extension yet.
  *
  * Loading the extension unpacked gives it a random ID unless manifest.json
- * carries a `key`, so TERMIO_BROWSER_EXTENSION_ID lets a developer allow the
+ * carries a `key`, so RUNBROWSER_EXTENSION_ID lets a developer allow the
  * ID Chrome assigned them without editing source.
  */
 export const EXTENSION_IDS = [
   'pebbngnfojnignonigcnkdilknapkgid', // Dev build
-  ...(process.env.TERMIO_BROWSER_EXTENSION_ID
-    ? [process.env.TERMIO_BROWSER_EXTENSION_ID]
+  ...(process.env.RUNBROWSER_EXTENSION_ID
+    ? [process.env.RUNBROWSER_EXTENSION_ID]
     : []),
 ]
 
@@ -75,16 +75,16 @@ export function getCdpUrl({
 // State directory, nested under termio's own so the browser layer does not
 // claim a second top-level dotfolder. Per-OS-user, which avoids permission
 // errors on shared machines.
-export const TERMIO_BROWSER_DIR =
-  process.env.TERMIO_BROWSER_DIR || path.join(os.homedir(), '.termio', 'browser')
+export const RUNBROWSER_DIR =
+  process.env.RUNBROWSER_DIR || path.join(os.homedir(), '.runbrowser')
 
 
-const LOG_BASE_DIR = TERMIO_BROWSER_DIR
+const LOG_BASE_DIR = RUNBROWSER_DIR
 export const LOG_FILE_PATH =
-  process.env.TERMIO_BROWSER_LOG_FILE_PATH || path.join(LOG_BASE_DIR, 'relay-server.log')
+  process.env.RUNBROWSER_LOG_FILE_PATH || path.join(LOG_BASE_DIR, 'relay-server.log')
 export const LOG_CDP_FILE_PATH =
-  process.env.TERMIO_BROWSER_CDP_LOG_FILE_PATH || path.join(path.dirname(LOG_FILE_PATH), 'cdp.jsonl')
-export const CONFIG_FILE_PATH = path.join(TERMIO_BROWSER_DIR, 'config.json')
+  process.env.RUNBROWSER_CDP_LOG_FILE_PATH || path.join(path.dirname(LOG_FILE_PATH), 'cdp.jsonl')
+export const CONFIG_FILE_PATH = path.join(RUNBROWSER_DIR, 'config.json')
 
 export interface RunBrowserConfig {
   token?: string
@@ -103,7 +103,7 @@ export function readConfig(): RunBrowserConfig {
 }
 
 export function writeConfig(config: RunBrowserConfig): void {
-  fs.mkdirSync(TERMIO_BROWSER_DIR, { recursive: true })
+  fs.mkdirSync(RUNBROWSER_DIR, { recursive: true })
   fs.writeFileSync(CONFIG_FILE_PATH, JSON.stringify(config, null, 2) + '\n', 'utf-8')
 }
 

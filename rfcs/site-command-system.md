@@ -9,7 +9,7 @@
 
 ## 1. Motivation
 
-runbrowser controls browsers. But agents often need **structured data** from websites — trending repos, hot posts, search results. Today they must: navigate → snapshot → parse text → extract data. This is slow, fragile, and wastes tokens.
+RunBrowser controls browsers. But agents often need **structured data** from websites — trending repos, hot posts, search results. Today they must: navigate → snapshot → parse text → extract data. This is slow, fragile, and wastes tokens.
 
 Site commands let users write `.ts` files that encapsulate this: `runbrowser github trending --limit 5` returns clean JSON.
 
@@ -126,7 +126,7 @@ The relay server loads commands on demand using [jiti](https://github.com/unjs/j
 
 ```typescript
 // Scans ~/.runbrowser/commands/<site>/<name>.ts
-const COMMANDS_DIR = path.join(TERMIO_BROWSER_DIR, 'commands')
+const COMMANDS_DIR = path.join(RUNBROWSER_DIR, 'commands')
 
 // List all available commands (for --help, /api/commands)
 function listCustomCommands(): CommandDef[]

@@ -1,4 +1,4 @@
-# runbrowser
+# RunBrowser
 
 Drive your own Chrome over the Chrome DevTools Protocol — the browser you are
 already logged into, with your extensions, cookies and sessions intact.

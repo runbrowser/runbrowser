@@ -195,7 +195,7 @@ describe('Auto-enable Tests', () => {
   let cleanup: (() => Promise<void>) | null = null
 
   beforeAll(async () => {
-    process.env.TERMIO_BROWSER_AUTO_ENABLE = '1'
+    process.env.RUNBROWSER_AUTO_ENABLE = '1'
     testCtx = await setupTestContext({ port: TEST_PORT, tempDirPrefix: 'pw-auto-test-' })
 
     const result = await createMCPClient({ port: TEST_PORT })
@@ -211,7 +211,7 @@ describe('Auto-enable Tests', () => {
   }, 600000)
 
   afterAll(async () => {
-    delete process.env.TERMIO_BROWSER_AUTO_ENABLE
+    delete process.env.RUNBROWSER_AUTO_ENABLE
     await cleanupTestContext(testCtx, cleanup)
     cleanup = null
     testCtx = null
