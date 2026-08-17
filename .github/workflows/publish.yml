@@ -22,9 +22,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
 
+    # Six packages ship: @termio/browser plus one per platform. All of them
+    # publish with NPM_TOKEN, because npm's trusted publishing is configured on
+    # a package's settings page and a package that has never been published has
+    # no settings page. Once this has run once, each package can be switched to
+    # trusted publishing and the secret dropped.
     permissions:
       contents: read
-      id-token: write  # Required for OIDC Trusted Publishing
+      id-token: write  # Lets npm attach a provenance attestation
 
     steps:
       - name: Checkout code
@@ -85,4 +90,5 @@ jobs:
       - name: Publish @termio/browser
         run: pnpm --filter @termio/browser publish --no-git-checks --access public
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
