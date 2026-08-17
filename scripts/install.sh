@@ -124,7 +124,28 @@ mv "$tmp/runbrowser" "$bindir/runbrowser" || die "could not install into $bindir
 say "Installed $("$bindir/runbrowser" --version 2>/dev/null || echo "$version") to $bindir/runbrowser"
 
 case ":$PATH:" in
-  *":$bindir:"*) ;;
+  *":$bindir:"*)
+    # On PATH is not the same as first on PATH. An older install earlier in the
+    # search order silently wins, and every command afterwards is the old one —
+    # which looks like the install failing to take effect.
+    found=$(command -v runbrowser 2>/dev/null || true)
+    if [ -n "$found" ] && [ "$found" != "$bindir/runbrowser" ]; then
+      say ""
+      say "Another runbrowser comes first on your PATH and will be used instead:"
+      say "  $found  ($("$found" --version 2>/dev/null || echo 'unknown version'))"
+      say "  $bindir/runbrowser  ($version, just installed)"
+      say ""
+      case "$found" in
+        */node_modules/*|*/.npm*|*/npm/*)
+          say "That one looks like a global npm install. Remove it with:"
+          say "  npm rm -g \$(basename \"\$(dirname \"\$(readlink \"$found\" 2>/dev/null || echo \"$found\")\")\")"
+          ;;
+        *)
+          say "Remove it, or put $bindir earlier on your PATH."
+          ;;
+      esac
+    fi
+    ;;
   *)
     say ""
     say "$bindir is not on your PATH. Add it:"
