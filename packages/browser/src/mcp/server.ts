@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import { VERSION } from '../server/index.js'
 import { RelayApiClient } from '../server/api-client.js'
+import skillMarkdown from './skill.md' with { type: 'text' }
 
 // ============================================================================
 // Relay API Client
@@ -112,9 +113,7 @@ const server = new McpServer({
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function loadSkillContent(): string {
-  const skillPath = path.join(__dirname, 'skill.md')
-  if (fs.existsSync(skillPath)) return fs.readFileSync(skillPath, 'utf-8')
-  return 'Skill file not found. Use `termio-browser --help` for available commands.'
+  return skillMarkdown
 }
 
 server.tool(

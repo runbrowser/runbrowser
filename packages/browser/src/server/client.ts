@@ -4,6 +4,7 @@
  */
 
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pc from 'picocolors'
@@ -237,12 +238,14 @@ export async function ensureRelayServer(options: EnsureRelayServerOptions = {}):
     logger?.log(pc.dim('CDP relay server not running, starting it...'))
   }
 
-  // There is one entrypoint and one interpreter: the runtime executes
-  // TypeScript directly, so there is no build output to detect and no separate
-  // loader to shell out to.
+  // From source, process.execPath is the runtime and start.ts is a real file.
+  // Inside a compiled binary neither is true — execPath is this binary and the
+  // module graph lives in /$bunfs, off the filesystem — so it re-invokes itself
+  // with the verb that starts the relay in-process.
   const scriptPath = path.resolve(__dirname, './start.ts')
+  const args = fs.existsSync(scriptPath) ? [scriptPath] : ['serve']
 
-  const serverProcess = spawn(process.execPath, [scriptPath], {
+  const serverProcess = spawn(process.execPath, args, {
     detached: true,
     stdio: 'ignore',
     env: { ...process.env, ...additionalEnv },

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import packageJson from '../../package.json' with { type: 'json' }
 
 // RunBrowser extension IDs - used for validation and Chrome flag commands
 // NOTE: These are the same extension IDs as the original playwriter project since we share the extension.
@@ -107,13 +107,9 @@ export function writeConfig(config: RunBrowserConfig): void {
   fs.writeFileSync(CONFIG_FILE_PATH, JSON.stringify(config, null, 2) + '\n', 'utf-8')
 }
 
-const packageJsonPath = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  'package.json',
-)
-export const VERSION = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')).version as string
+// Imported rather than read: a compiled binary has no package.json on disk, and
+// reading one at module load took every command down with it.
+export const VERSION = packageJson.version as string
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))

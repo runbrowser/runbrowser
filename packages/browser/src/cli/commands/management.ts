@@ -26,6 +26,9 @@ import {
   RelayApiClient,
 } from '../../server/index.js'
 
+import skillMarkdown from '../skill.md' with { type: 'text' }
+import agentSkillMarkdown from '../agent-skill.md' with { type: 'text' }
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ============================================================================
@@ -230,7 +233,13 @@ registerBuiltinCommand({
 // skill
 // ============================================================================
 
-/** Locate a markdown file shipped alongside the CLI sources. */
+/**
+ * Locate a markdown file on disk.
+ *
+ * Only `skill path` needs a real path, and only a source checkout has one — a
+ * compiled binary carries the content but no filesystem. Everything that wants
+ * the text uses the embedded import instead.
+ */
 function packageFile(name: string): string | null {
   const candidate = path.join(__dirname, '..', name)
   return fs.existsSync(candidate) ? candidate : null
@@ -310,23 +319,23 @@ registerBuiltinCommand({
     const global = Boolean(args.flags.get('global'))
 
     if (!action) {
-      const reference = packageFile('skill.md')
-      if (!reference) throw new Error('skill.md is missing from this install')
-      console.log(fs.readFileSync(reference, 'utf-8'))
+      console.log(skillMarkdown)
       return
     }
 
     if (action === 'path') {
       const reference = packageFile('skill.md')
-      if (!reference) throw new Error('skill.md is missing from this install')
+      if (!reference) {
+        throw new Error(
+          'This build embeds the reference rather than shipping a file. Run `termio-browser skill > SKILL.md` to write it out.',
+        )
+      }
       console.log(reference)
       return
     }
 
     if (action === 'install') {
-      const source = packageFile('agent-skill.md')
-      if (!source) throw new Error('agent-skill.md is missing from this install')
-      const body = fs.readFileSync(source, 'utf-8')
+      const body = agentSkillMarkdown
       const hash = sha256(body)
       const state = readInstallState()
 
