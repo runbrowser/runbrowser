@@ -63,5 +63,12 @@
     "@types/node": "^24.10.1",
     "devtools-protocol": "^0.0.1568893",
     "typescript": "^5.9.3"
+  },
+  "optionalDependencies": {
+    "@termio/browser-darwin-arm64": "0.1.0",
+    "@termio/browser-darwin-x64": "0.1.0",
+    "@termio/browser-linux-x64": "0.1.0",
+    "@termio/browser-linux-arm64": "0.1.0",
+    "@termio/browser-win32-x64": "0.1.0"
   }
 }

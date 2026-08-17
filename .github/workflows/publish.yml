@@ -65,6 +65,23 @@ jobs:
       - name: Build extension
         run: pnpm run build
 
+      # Bun cross-compiles every target from this one runner, so there is no
+      # matrix here.
+      - name: Build platform binaries
+        run: bun scripts/build-binaries.ts
+
+      # Platform packages go first: they are optional dependencies of the main
+      # package, so publishing that one first leaves a window where installing
+      # it resolves nothing to run.
+      - name: Publish platform packages
+        run: |
+          for directory in dist-npm/*/; do
+            npm publish "$directory" --access public
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
       - name: Publish @termio/browser
         run: pnpm --filter @termio/browser publish --no-git-checks --access public
         env:
