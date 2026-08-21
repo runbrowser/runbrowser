@@ -298,9 +298,40 @@ function isOursAndUnmodified(target: string, state: Record<string, string>): boo
 function skillTargets(global: boolean): string[] {
   const base = global ? os.homedir() : process.cwd()
   return [
+    path.join(base, '.claude', 'skills', 'runbrowser'),
+    path.join(base, '.agents', 'skills', 'runbrowser'),
+  ]
+}
+
+/**
+ * Where the skill landed before the CLI was renamed to runbrowser.
+ *
+ * Changing only the new path would leave every existing install with a stale
+ * copy under a name no later version touches — and agents pick a skill by that
+ * name, so the old one keeps winning. Removal goes through the same ownership
+ * check as everything else: `browser` is generic enough that another tool may
+ * legitimately own it, and a skill we did not write is never ours to delete.
+ */
+function legacySkillTargets(global: boolean): string[] {
+  const base = global ? os.homedir() : process.cwd()
+  return [
     path.join(base, '.claude', 'skills', 'browser'),
     path.join(base, '.agents', 'skills', 'browser'),
   ]
+}
+
+function removeLegacySkill(global: boolean, state: Record<string, string>): string[] {
+  const removed: string[] = []
+  for (const dir of legacySkillTargets(global)) {
+    const target = path.join(dir, 'SKILL.md')
+    if (!fs.existsSync(target)) continue
+    if (!isOursAndUnmodified(target, state)) continue
+    fs.rmSync(target)
+    delete state[target]
+    if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
+    removed.push(target)
+  }
+  return removed
 }
 
 registerBuiltinCommand({
@@ -359,9 +390,11 @@ registerBuiltinCommand({
         installed.push(target)
       }
 
+      const superseded = removeLegacySkill(global, state)
       writeInstallState(state)
       for (const p of installed) console.log(pc.green(`✓ ${p}`))
-      if (installed.length === 0) console.log('Already up to date.')
+      for (const p of superseded) console.log(pc.dim(`removed ${p} (renamed to runbrowser)`))
+      if (installed.length === 0 && superseded.length === 0) console.log('Already up to date.')
       return
     }
 
@@ -380,6 +413,10 @@ registerBuiltinCommand({
         delete state[target]
         if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
         console.log(pc.green(`✓ removed ${target}`))
+        removed++
+      }
+      for (const p of removeLegacySkill(global, state)) {
+        console.log(pc.green(`✓ removed ${p}`))
         removed++
       }
       writeInstallState(state)

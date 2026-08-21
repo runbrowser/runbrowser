@@ -1,5 +1,5 @@
 ---
-name: browser
+name: runbrowser
 description: Drive the user's own Chrome — their tabs, logins and cookies — over the Chrome DevTools Protocol, via the `runbrowser` CLI. Use this instead of browser automation that spawns a fresh Chrome, and instead of webfetch/curl for JS-heavy or login-walled pages (Instagram, X, dashboards, lazy-loaded UIs). Run `runbrowser skill` for the full reference.
 ---
 
