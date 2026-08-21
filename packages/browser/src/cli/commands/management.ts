@@ -300,7 +300,47 @@ function isOursAndUnmodified(target: string, state: Record<string, string>): boo
  *
  * `.agents` is the cross-agent convention rather than one product.
  */
-const SKILL_HOMES = ['.claude', '.agents', '.codex', '.cursor', '.gemini', '.openclaw']
+type SkillHome = {
+  agent: string
+  /** Relative to $HOME. Empty when the agent has no global location. */
+  global: string
+  /** Relative to the project root. Empty when it has no project location. */
+  project: string
+}
+
+/*
+ * Paths follow vercel-labs/skills, which tracks 77 agents and is the closest
+ * thing this ecosystem has to a registry. Most agents read `.agents/skills`
+ * inside a project and only diverge globally — Codex is `.agents/skills` here
+ * and `~/.codex/skills` there — so the two scopes are listed separately
+ * rather than assumed to be the same directory under a different root.
+ *
+ * This list is a subset, and stays one. The full table changes weekly, and a
+ * browser CLI is the wrong place to track it; `npx skills add` exists for the
+ * long tail. What is here has a path that can be pointed at.
+ */
+const SKILL_HOMES: SkillHome[] = [
+  { agent: 'Claude Code', global: '.claude/skills', project: '.claude/skills' },
+  { agent: 'the .agents convention', global: '.agents/skills', project: '.agents/skills' },
+  { agent: 'Codex', global: '.codex/skills', project: '' },
+  { agent: 'Cursor', global: '.cursor/skills', project: '' },
+  { agent: 'Gemini CLI', global: '.gemini/skills', project: '' },
+  { agent: 'GitHub Copilot', global: '.copilot/skills', project: '' },
+  { agent: 'OpenCode', global: '.config/opencode/skills', project: '' },
+  { agent: 'Amp', global: '.config/agents/skills', project: '' },
+  { agent: 'Crush', global: '.config/crush/skills', project: '.crush/skills' },
+  { agent: 'Goose', global: '.config/goose/skills', project: '.goose/skills' },
+  { agent: 'OpenClaw', global: '.openclaw/skills', project: '' },
+  { agent: 'Qwen Code', global: '.qwen/skills', project: '.qwen/skills' },
+  { agent: 'Droid', global: '.factory/skills', project: '.factory/skills' },
+  { agent: 'Pi', global: '.pi/agent/skills', project: '.pi/skills' },
+  { agent: 'Windsurf', global: '.codeium/windsurf/skills', project: '.windsurf/skills' },
+  { agent: 'Continue', global: '.continue/skills', project: '.continue/skills' },
+  { agent: 'iFlow CLI', global: '.iflow/skills', project: '.iflow/skills' },
+  { agent: 'Roo Code', global: '.roo/skills', project: '.roo/skills' },
+  { agent: 'Kilo Code', global: '.kilocode/skills', project: '.kilocode/skills' },
+  { agent: 'Junie', global: '.junie/skills', project: '.junie/skills' },
+]
 
 /**
  * Skill directories to write, for the agents actually installed.
@@ -319,11 +359,26 @@ const SKILL_HOMES = ['.claude', '.agents', '.codex', '.cursor', '.gemini', '.ope
  * there is no fallback — an installer calls this unattended, and inventing an
  * agent home on a machine with no agent on it is not its business.
  */
+function skillHomes(global: boolean): string[] {
+  const base = global ? os.homedir() : process.cwd()
+  const relative = SKILL_HOMES.map((home) => (global ? home.global : home.project)).filter(Boolean)
+
+  // The directory that would hold `skills/` is the detection: its existence
+  // means the agent has run here. Checking `skills/` itself would miss an
+  // agent that simply has no skills yet.
+  const detected = relative.filter((rel) => fs.existsSync(path.join(base, path.dirname(rel))))
+
+  // Inside a project the two conventional directories are always written:
+  // running this here is an explicit act of setting up this repo, and
+  // `.agents/skills` is what most agents read in a project regardless of
+  // which one it is. Globally there is no such fallback.
+  const homes = global ? detected : [...new Set([...detected, '.claude/skills', '.agents/skills'])]
+  return [...new Set(homes)]
+}
+
 function skillTargets(global: boolean): string[] {
   const base = global ? os.homedir() : process.cwd()
-  const detected = SKILL_HOMES.filter((home) => fs.existsSync(path.join(base, home)))
-  const homes = detected.length > 0 ? detected : global ? [] : ['.claude', '.agents']
-  return homes.map((home) => path.join(base, home, 'skills', 'runbrowser'))
+  return skillHomes(global).map((home) => path.join(base, home, 'runbrowser'))
 }
 
 /**
@@ -337,7 +392,7 @@ function skillTargets(global: boolean): string[] {
  */
 function legacySkillTargets(global: boolean): string[] {
   const base = global ? os.homedir() : process.cwd()
-  return SKILL_HOMES.map((home) => path.join(base, home, 'skills', 'browser'))
+  return skillHomes(global).map((home) => path.join(base, home, 'browser'))
 }
 
 function removeLegacySkill(global: boolean, state: Record<string, string>): string[] {
@@ -394,7 +449,9 @@ registerBuiltinCommand({
       if (targets.length === 0) {
         console.log(
           'No agent found on this machine, so there is nowhere to install to.\n' +
-            `Looked for: ${SKILL_HOMES.map((h) => `~/${h}`).join(', ')}`,
+            `Looked for: ${SKILL_HOMES.filter((h) => h.global)
+              .map((h) => `~/${path.dirname(h.global)}`)
+              .join(', ')}`,
         )
         return
       }
