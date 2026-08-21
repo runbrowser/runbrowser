@@ -13,6 +13,7 @@
 #   RUNBROWSER_VERSION   install a specific version instead of the latest
 #   RUNBROWSER_BIN_DIR   where to install (default: ~/.local/bin, or
 #                        /usr/local/bin when it is writable)
+#   RUNBROWSER_NO_SKILL  do not install the agent skill
 
 set -eu
 
@@ -152,6 +153,26 @@ case ":$PATH:" in
     say "  echo 'export PATH=\"$bindir:\$PATH\"' >> ~/.zshrc && exec zsh"
     ;;
 esac
+
+# ---------------------------------------------------------------------------
+# The agent skill
+# ---------------------------------------------------------------------------
+#
+# runbrowser exists to be driven by an agent, and an agent only reaches a tool
+# it knows about. Installing the skill is part of installing the tool, and
+# re-running this script to update refreshes it: `skill install` compares the
+# shipped copy by hash, rewriting a stale one and staying quiet when it is
+# already current.
+#
+# Two limits keep that from being presumptuous. It writes only where an agent
+# already keeps skills, so a machine with no agent on it gets no directories
+# it never asked for. And `skill install` refuses to touch a file it did not
+# write, or one that has been edited since — an install is not a licence to
+# overwrite someone's own work.
+if [ -z "${RUNBROWSER_NO_SKILL:-}" ] && { [ -d "$HOME/.claude" ] || [ -d "$HOME/.agents" ]; }; then
+  say ""
+  "$bindir/runbrowser" skill install -g || say "Skipped the agent skill. Install it with: runbrowser skill install -g"
+fi
 
 say ""
 say "Next: install the Chrome extension, then click its icon on a tab."
