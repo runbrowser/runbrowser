@@ -288,19 +288,42 @@ function isOursAndUnmodified(target: string, state: Record<string, string>): boo
 }
 
 /**
- * Skill directories every agent we know about reads.
+ * Agents that read `<home>/skills/<name>/SKILL.md`.
+ *
+ * The list is deliberately a list. Every entry here is an agent observed to
+ * use this exact layout — frontmatter with `name` and `description`, one
+ * directory per skill. Writing a SKILL.md into an agent that reads something
+ * else is worse than writing nothing: it reports success, costs a file, and
+ * changes no behaviour, so the tool looks installed while the agent has never
+ * heard of it. An agent belongs here once its layout is confirmed, not
+ * because it is popular.
+ *
+ * `.agents` is the cross-agent convention rather than one product.
+ */
+const SKILL_HOMES = ['.claude', '.agents', '.codex', '.cursor', '.gemini', '.openclaw']
+
+/**
+ * Skill directories to write, for the agents actually installed.
+ *
+ * Presence of the agent's home directory is the detection: it means the agent
+ * has run on this machine. Creating `~/.codex` for someone who does not use
+ * Codex would be litter, and litter that looks like configuration.
  *
  * Defaults to the current project rather than $HOME: a skill installed next to
  * the code it is used on can be committed, reviewed and versioned with that
  * repo, and installing it never silently changes how agents behave in every
  * other checkout on the machine. `--global` opts into that.
+ *
+ * In a project the fallback is the two conventional directories, because
+ * running this here is an explicit act of setting up this repo. Globally
+ * there is no fallback — an installer calls this unattended, and inventing an
+ * agent home on a machine with no agent on it is not its business.
  */
 function skillTargets(global: boolean): string[] {
   const base = global ? os.homedir() : process.cwd()
-  return [
-    path.join(base, '.claude', 'skills', 'runbrowser'),
-    path.join(base, '.agents', 'skills', 'runbrowser'),
-  ]
+  const detected = SKILL_HOMES.filter((home) => fs.existsSync(path.join(base, home)))
+  const homes = detected.length > 0 ? detected : global ? [] : ['.claude', '.agents']
+  return homes.map((home) => path.join(base, home, 'skills', 'runbrowser'))
 }
 
 /**
@@ -314,10 +337,7 @@ function skillTargets(global: boolean): string[] {
  */
 function legacySkillTargets(global: boolean): string[] {
   const base = global ? os.homedir() : process.cwd()
-  return [
-    path.join(base, '.claude', 'skills', 'browser'),
-    path.join(base, '.agents', 'skills', 'browser'),
-  ]
+  return SKILL_HOMES.map((home) => path.join(base, home, 'skills', 'browser'))
 }
 
 function removeLegacySkill(global: boolean, state: Record<string, string>): string[] {
@@ -370,8 +390,17 @@ registerBuiltinCommand({
       const hash = sha256(body)
       const state = readInstallState()
 
+      const targets = skillTargets(global)
+      if (targets.length === 0) {
+        console.log(
+          'No agent found on this machine, so there is nowhere to install to.\n' +
+            `Looked for: ${SKILL_HOMES.map((h) => `~/${h}`).join(', ')}`,
+        )
+        return
+      }
+
       const installed: string[] = []
-      for (const dir of skillTargets(global)) {
+      for (const dir of targets) {
         const target = path.join(dir, 'SKILL.md')
         if (fs.existsSync(target)) {
           if (!isOursAndUnmodified(target, state)) {

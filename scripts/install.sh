@@ -164,12 +164,15 @@ esac
 # shipped copy by hash, rewriting a stale one and staying quiet when it is
 # already current.
 #
+# It installs into whichever agents are actually on the machine — the CLI
+# detects them, so the check is not duplicated here and cannot drift from it.
+#
 # Two limits keep that from being presumptuous. It writes only where an agent
 # already keeps skills, so a machine with no agent on it gets no directories
 # it never asked for. And `skill install` refuses to touch a file it did not
 # write, or one that has been edited since — an install is not a licence to
 # overwrite someone's own work.
-if [ -z "${RUNBROWSER_NO_SKILL:-}" ] && { [ -d "$HOME/.claude" ] || [ -d "$HOME/.agents" ]; }; then
+if [ -z "${RUNBROWSER_NO_SKILL:-}" ]; then
   say ""
   "$bindir/runbrowser" skill install -g || say "Skipped the agent skill. Install it with: runbrowser skill install -g"
 fi
